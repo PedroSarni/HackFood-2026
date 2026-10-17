@@ -561,7 +561,7 @@ class Bot:
         car = self.u.get('carrinho')
         texto = T.PERGUNTA_PEDIDO
         if car and car.get('itens'):
-            texto = 'O que mais você quer? 😊\nPode escrever ou mandar áudio 🎤'
+            texto = 'O que mais você quer? 😊\nÉ só escrever ✍️'
         botoes = [T.B_FINALIZAR, T.B_INICIO] if car and car.get('itens') else [T.B_REPETIR, T.B_MEU_PEDIDO]
         self.perguntar(texto, botoes, fase='pedido')
 

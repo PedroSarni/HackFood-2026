@@ -3,7 +3,7 @@
 Regra de escrita (o público é quem tem dificuldade com o celular):
 - frase curta, palavra do dia a dia, nada de "carrinho de compras", "checkout", "método";
 - um emoji no começo da linha serve de âncora visual; não enfeitar além disso;
-- toda mensagem termina dizendo o que fazer ("toque em...", "pode escrever ou mandar áudio");
+- toda mensagem termina dizendo o que fazer ("toque em...", "pode escrever"); áudio fica fora das dicas por enquanto;
 - botão com até 20 caracteres (limite da Meta), verbo ou resposta direta.
 """
 
@@ -37,7 +37,7 @@ MENU = [B_PEDIR, B_REPETIR, B_MEU_PEDIDO]
 def boas_vindas(nome):
     oi = f'Olá, {nome}! 👋' if nome else 'Olá! 👋'
     return (f'{oi}\nEu faço suas compras do iFood aqui pelo WhatsApp: mercado, farmácia, '
-            'restaurante...\n\nÉ só me dizer o que você precisa, escrevendo ou mandando um áudio 🎤')
+            'restaurante...\n\nÉ só me escrever o que você precisa. ✍️')
 
 
 LOGIN = ('🔐 Primeiro, preciso que você entre na sua conta do iFood.\n\n'
@@ -59,11 +59,11 @@ def logou(nome, conta=None):
 
 
 PERGUNTA_PEDIDO = ('O que você quer pedir? 😊\n\n'
-                   'Pode escrever do seu jeito ou mandar um áudio 🎤\n'
+                   'Pode escrever do seu jeito ✍️\n'
                    'Exemplo: _pão, leite e café_')
 
 AJUDA = ('Eu faço pedidos no iFood pra você. 🛒\n\n'
-         '1️⃣ Me diga o que quer (escrevendo ou por áudio)\n'
+         '1️⃣ Me escreva o que você quer\n'
          '2️⃣ Eu mostro as opções com foto\n'
          '3️⃣ Você toca em *Quero esse*\n'
          '4️⃣ No final eu mostro o resumo e você confirma\n\n'
@@ -73,7 +73,7 @@ FORA_DO_ESCOPO = ('Eu só sei fazer pedidos no iFood 🙂\n'
                   'Me diga o que você quer comprar, ou toque num botão.')
 
 NAO_ENTENDI = ('Desculpe, não entendi. 🙏\n'
-               'Pode escrever de outro jeito, mandar um áudio, ou tocar num botão.')
+               'Pode escrever de outro jeito ou tocar num botão.')
 
 AUDIO_RUIM = ('Não consegui ouvir seu áudio direito. 🙉\n'
               'Pode mandar de novo, ou escrever?')
