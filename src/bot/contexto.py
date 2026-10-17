@@ -124,7 +124,9 @@ def contexto_producao(estado, wpp, wa_id=None):
             return chamador_real(estado, wid)
 
     def rastrear(wid, pedido_id):
-        modulo_app.acompanhar_pedido.spawn(wid, pedido_id)
+        # pelo nome no app publicado: no container o app roda como `app` e este `src.app` é uma 2ª cópia
+        # que o Modal não hidratou ("Function has not been hydrated", rastreio nunca começava)
+        modal.Function.from_name(modulo_app.APP, 'acompanhar_pedido').spawn(wid, pedido_id)
 
     def revogar(tok):
         if not modo_mock():
