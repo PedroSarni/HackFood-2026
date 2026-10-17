@@ -12,7 +12,7 @@
 - Resumo do MCP do iFood em "regras da api/"
 - Agente "HackFood Agent" registrado no portal do iFood
 
-## No ar agora (17/10 ~18h)
+## No ar agora (17/10 ~16h40)
 - Bot no WhatsApp em MODO DEMO (mock do MCP, `IFOOD_MOCK=1` no secret `hackathon-ifood`): o número já aponta pro
   deploy novo. Pedido completo funciona: login simulado, endereço, busca com 3 cards, "Mais opções", carrinho,
   pagamento, resumo, confirmação, rastreio e lembrete. Quando o agente for aprovado: trocar o secret pelas

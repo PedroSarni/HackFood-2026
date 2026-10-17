@@ -62,7 +62,7 @@ Detalhes no JSON do repo. Aqui só o que importa no dia a dia.
 - trackOrder devolve agentHints (quando checar de novo e quando parar). Seguir isso, sem polling fixo
 - Cart: o campo options é sempre obrigatório, mesmo vazio ([])
 - paymentMethodId é UUID, não a string "PIX"
-- 2º agente: "Compras pelo WhatsApp" (conta do Fabio, 17/10 ~16h30), em análise. Redirects: o backend
+- 2º agente: "Compras pelo WhatsApp" (conta do Fabio, 17/10 ~16h05), em análise. Redirects: o backend
   publicado (`.../ifood/callback` no Modal) e `http://localhost:8080/callback`. Mesmos 3 escopos
 - Limitações descobertas ao testar (17/10, sem credencial: endpoints públicos e mock fiel à doc):
   - Discovery não aceita addressId: `userLocation` é sempre `{latitude, longitude}` (vem do `coordinates` do endereço)
