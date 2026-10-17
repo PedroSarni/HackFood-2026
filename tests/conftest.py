@@ -19,3 +19,11 @@ def nenhuma_mensagem_recusada(monkeypatch):
         if getattr(w, 'esperar_recusa', False):
             continue
         assert not w.recusadas, f'a Meta recusaria: {w.recusadas[0][0]}'
+
+
+@pytest.fixture(autouse=True)
+def freio_do_ifood_sem_espera(monkeypatch):
+    """O ritmo de ~3 chamadas/s vale em produção; nos testes (MockTransport) só atrasaria."""
+    from src.shared import ifood_mcp
+    monkeypatch.setattr(ifood_mcp, 'INTERVALO_MIN', 0)
+    monkeypatch.setattr(ifood_mcp, '_freio', {'proxima': 0.0, 'bloqueado_ate': 0.0})

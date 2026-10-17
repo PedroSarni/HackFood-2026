@@ -120,6 +120,37 @@ def _resultado(res):
 
 # --- cliente JSON-RPC -----------------------------------------------------------------
 
+# --- freio: nunca mais derrubar o iFood ------------------------------------------------
+# 17/10 ~18h30: ~50 chamadas em poucos minutos (scripts de teste) e o firewall (Akamai) do iFood
+# barrou o IP de saída do Modal por ~20 min: 403 "Access Denied" até sem token, bot inteiro fora.
+# 1) ritmo: no máximo ~3 chamadas/s por processo (rajada vira fila, não martelada);
+# 2) disjuntor: viu o 403 do Akamai, para de chamar por PAUSA_BLOQUEIO e falha na hora (insistir
+#    enquanto está barrado é o que estica o bloqueio). 403 nunca entra em retry.
+INTERVALO_MIN = 0.35
+PAUSA_BLOQUEIO = 300
+_FREIO_LOCK = threading.Lock()
+_freio = {'proxima': 0.0, 'bloqueado_ate': 0.0}
+
+
+def _esperar_vez():
+    if time.time() < _freio['bloqueado_ate']:
+        falta = int(_freio['bloqueado_ate'] - time.time())
+        raise ErroMCP('HTTP_403', f'iFood barrou a gente (firewall); pausa de mais {falta}s sem chamar',
+                      tentar_de_novo=False)
+    with _FREIO_LOCK:
+        agora = time.time()
+        espera = _freio['proxima'] - agora
+        _freio['proxima'] = max(agora, _freio['proxima']) + INTERVALO_MIN
+    if espera > 0:
+        time.sleep(espera)
+
+
+def _ver_bloqueio(r):
+    if r.status_code == 403 and 'Access Denied' in r.text:
+        _freio['bloqueado_ate'] = time.time() + PAUSA_BLOQUEIO
+        print(f'iFood (Akamai) barrou: sem chamadas por {PAUSA_BLOQUEIO}s')
+
+
 _SESSOES = {}  # hash do token -> (Mcp-Session-Id, quando): evita initialize a cada chamada
 _SESSOES_LOCK = threading.Lock()
 SESSAO_VALIDADE = 600
@@ -142,12 +173,14 @@ class ClienteMCP:
         return h
 
     def _post(self, corpo, sessao):
+        _esperar_vez()
         try:
             r = self.http.post(self.url, json=corpo, headers=self._cabecalhos(sessao))
         except httpx.TimeoutException as e:
             raise ErroMCP('TIMEOUT', str(e), tentar_de_novo=True) from e
         except httpx.TransportError as e:
             raise ErroMCP('REDE', str(e), tentar_de_novo=True) from e
+        _ver_bloqueio(r)
         if r.status_code == 401:
             raise SemAutorizacao('AUTHENTICATION_REQUIRED', r.headers.get('www-authenticate', '')[:300])
         return r

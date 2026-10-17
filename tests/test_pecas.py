@@ -261,3 +261,33 @@ def test_pagamentos_sem_cartao_sem_token():
     ofertas, _ = api.buscar('pao', {'lat': -22, 'lng': -47}, 'MERCADO')
     tipos = [f['tipo'] for f in api.pagamentos(ofertas[0]['loja_id'])]
     assert tipos == ['PIX', 'MEAL_VOUCHER']
+
+
+# --- freio contra flood no iFood (bloqueio do Akamai de 17/10) ------------------------------
+
+def test_403_do_akamai_liga_o_disjuntor_e_para_de_chamar():
+    import httpx
+    import pytest
+    from src.shared import ifood_mcp as M
+    vistos = []
+
+    def handler(req):
+        vistos.append(req)
+        return httpx.Response(403, text='<H1>Access Denied</H1>')
+    cli = M.ClienteMCP('tok-akamai', http=httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(M.ErroMCP) as e:
+        cli.chamar('getUser')
+    assert e.value.codigo == 'HTTP_403' and len(vistos) == 1  # 403 não entra em retry
+    with pytest.raises(M.ErroMCP) as e2:
+        cli.chamar('getUser')
+    assert len(vistos) == 1 and 'pausa' in str(e2.value)  # disjuntor: nem chegou a chamar
+
+
+def test_ritmo_espaca_as_chamadas(monkeypatch):
+    from src.shared import ifood_mcp as M
+    monkeypatch.setattr(M, 'INTERVALO_MIN', 0.05)
+    esperas = []
+    monkeypatch.setattr(M.time, 'sleep', lambda s: esperas.append(s))
+    for _ in range(4):
+        M._esperar_vez()
+    assert len(esperas) == 3 and all(s > 0 for s in esperas)
