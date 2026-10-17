@@ -318,9 +318,36 @@ def test_pizza_pergunta_o_tamanho_e_monta_options_no_formato_do_carrinho():
 # --- depois do pedido --------------------------------------------------------------------
 
 def _ja_pediu_isso_antes(m):
-    e = m.estado()
-    e['pedidos'] = [{'id': 'pedido-antigo', 'itens': [e['carrinho']['itens'][0]['item_id']], 'resumo': ''}]
-    m.armazem[f'u:{m.wa}'] = e
+    from src.bot.interpretar import normalizar
+    nome = m.estado()['carrinho']['itens'][0]['nome']
+    m.armazem[f'hist:{m.wa}'] = {normalizar(nome): {'nome': nome, 'vezes': 1, 'ultima': 0}}
+
+
+def test_historico_conta_as_compras_e_oferece_lembrete_na_segunda():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    hist = m.armazem[f'hist:{m.wa}']
+    assert [h['vezes'] for h in hist.values()] == [1]  # 1ª compra: registrou, sem lembrete
+    m.wpp.limpar()
+    m.enviar('quero pao')  # mesma compra de novo (endereço e CPF já guardados)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.tocar('fim')
+    if m.estado()['fase'] == 'pagamento':
+        m.tocar('pag:0')
+    if m.estado()['fase'] == 'cpf':
+        m.enviar('529.982.247-25')
+    m.tocar('ok:')
+    assert [h['vezes'] for h in m.armazem[f'hist:{m.wa}'].values()] == [2]
+    assert any(i.startswith('rec:') for i in m.wpp.todos_ids())
+
+
+def test_apagar_dados_apaga_o_historico():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    m.enviar('apagar meus dados')
+    m.tocar('apagar_sim')
+    assert f'hist:{m.wa}' not in m.armazem
 
 
 def test_primeiro_pedido_de_um_item_nao_oferece_lembrete():

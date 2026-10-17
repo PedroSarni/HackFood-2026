@@ -79,6 +79,7 @@ class Contexto:
         self.sair(wa_id)
         self.armazem.pop(f'u:{wa_id}', None)
         self.armazem.pop(f'mock:{wa_id}', None)
+        self.armazem.pop(f'hist:{wa_id}', None)  # histórico de compras (LGPD: apagar é apagar tudo)
         self.recorrencias.remover_todas(wa_id)
 
 
