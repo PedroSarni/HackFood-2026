@@ -225,6 +225,8 @@ class LlmFake:
             raise ErroLLM('fake fora do ar')
         if self.resposta is not None:
             return self.resposta, 'fake', 0.01
+        if 'acao' not in esquema['properties']:  # o tutor de erros (src/bot/tutor.py)
+            return {'texto': '[tutor] Calma, o iFood deu uma travadinha 😅 Toque em Tentar de novo.'}, 'fake', 0.01
         from src.bot.interpretar import normalizar
         texto = normalizar(' '.join(p[1] for p in partes[1:] if p[0] == 'texto'))
         if any(p[0] == 'arquivo' for p in partes):
@@ -237,7 +239,9 @@ class LlmFake:
         if 'mais opcoes' in texto or 'outras' in texto:
             return {'acao': 'mais_opcoes'}, 'fake', 0.01
         if 'piada' in texto or 'presidente' in texto:
-            return {'acao': 'fora_do_escopo'}, 'fake', 0.01
+            return {'acao': 'fora_do_escopo', 'resposta': '[fala] Haha 😄 piada eu não sei, mas pedido eu faço!'}, 'fake', 0.01
+        if 'ta ai' in texto:
+            return {'acao': 'saudacao', 'resposta': '[fala] Tô aqui sim! 😊 O iFood tá instável, mas já volta.'}, 'fake', 0.01
         if itens:
             return {'acao': 'comprar', 'itens': itens}, 'fake', 0.01
         return {'acao': 'nao_entendi'}, 'fake', 0.01

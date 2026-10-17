@@ -361,7 +361,8 @@ def test_audio_vira_pedido():
 def test_fora_do_escopo_volta_pro_pedido():
     m = Mundo()
     m.enviar('me conta uma piada')
-    assert 'só sei fazer pedidos' in ' '.join(m.wpp.textos())
+    textos = ' '.join(m.wpp.textos())
+    assert '[fala]' in textos and 'O que você quer pedir' in textos  # responde como gente e volta pro pedido
 
 
 def test_palavra_secreta_desloga_e_reseta_em_qualquer_etapa(monkeypatch):
@@ -450,3 +451,60 @@ def test_meta_recusou_carrossel_volta_pros_3_cards_soltos():
     endereco_pronto(m)
     m.wpp._real.carrossel = original
     assert len(m.wpp.cards()) == 3 and all(t != 'carrossel' for t, _ in m.wpp.saida)
+
+# --- atendente que explica (Gemini) ---------------------------------------------------------
+
+def _ifood_cai(m):
+    from src.shared.ifood_mcp import ErroMCP
+    original = m.mcp.chamar
+
+    def chamar(tool, **a):
+        if tool == 'searchOffers':
+            raise ErroMCP('HTTP_403', 'Access Denied')
+        return original(tool, **a)
+    m.mcp.chamar = chamar
+
+
+def test_ifood_fora_do_ar_vira_explicacao_do_tutor_e_marca_instavel():
+    m = Mundo()
+    endereco_pronto(m)
+    _ifood_cai(m)
+    m.wpp.limpar()
+    m.enviar('quero leite')
+    tipo, d = m.wpp.saida[-1]
+    assert '[tutor]' in d['texto'] and [i for i, _ in d['botoes']] == ['tentar', 'inicio']
+    assert m.armazem.get('ifood_instavel')
+
+
+def test_vc_ta_ai_com_ifood_instavel_responde_como_gente():
+    m = Mundo()
+    endereco_pronto(m)
+    m.armazem['ifood_instavel'] = m.agora
+    m.wpp.limpar()
+    m.enviar('oi vc ta ai?')
+    assert '[fala] Tô aqui sim' in m.wpp.textos()[-1]
+
+
+def test_fora_do_assunto_usa_a_fala_do_gemini_e_volta_pro_pedido():
+    m = Mundo()
+    m.enviar('me conta uma piada')
+    assert '[fala] Haha' in m.wpp.textos()[-1]
+
+
+def test_tutor_fora_do_ar_volta_pro_texto_fixo():
+    from src.bot import textos as T
+    m = Mundo()
+    endereco_pronto(m)
+    _ifood_cai(m)
+    m.llm.resposta = None
+    original = m.llm.__call__
+
+    def so_interpreta(s, p, e):
+        if 'acao' not in e['properties']:
+            from src.shared.llm import ErroLLM
+            raise ErroLLM('fora')
+        return original(s, p, e)
+    m.ctx._gerar_json = so_interpreta
+    m.wpp.limpar()
+    m.enviar('quero leite')
+    assert T.ERRO.split('\n')[0] in m.wpp.textos()[-1]

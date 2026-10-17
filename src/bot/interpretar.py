@@ -33,6 +33,7 @@ ESQUEMA = {
         'numero': {'type': 'INTEGER', 'nullable': True},
         'texto': {'type': 'STRING', 'nullable': True},
         'transcricao': {'type': 'STRING', 'nullable': True},
+        'resposta': {'type': 'STRING', 'nullable': True},
     },
     'required': ['acao'],
 }
@@ -59,6 +60,13 @@ sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebi
 "o do meio"=2, "o último" = o último da tela) ou quando quantidade.
 - texto: quando endereco, o endereço como a pessoa disse.
 - transcricao: se veio áudio ou foto, o que foi dito ou o que está escrito/mostrado, curto.
+- resposta: SEMPRE preencha. Uma frase curta (até 200 caracteres) como um atendente de verdade \
+responderia ao que a pessoa disse, no contexto da etapa, com 1 ou 2 emojis, português informal e \
+caloroso. Ela é usada quando o assistente não entende ou a conversa sai do assunto, então: se não \
+entendeu, diga o que entendeu e como ela pode pedir; se for fora do assunto, responda com simpatia em \
+poucas palavras e traga de volta pro pedido (não vire bate-papo nem responda perguntas gerais). \
+Se houver AVISO INTERNO no contexto, leve ele em conta (ex.: explique com calma que o iFood está \
+instável). Nunca diga que fez algo que não fez.
 
 Regras:
 - Lista de compras (escrita, falada ou foto de papel) vira acao=comprar com todos os itens.
@@ -176,9 +184,11 @@ def contexto_para_llm(estado):
     return '\n'.join(linhas)
 
 
-def interpretar(llm, estado, partes):
-    """partes: [('texto', str) | ('arquivo', mime, bytes)] na ordem em que chegaram."""
-    entrada = [('texto', contexto_para_llm(estado) + '\n\nMensagens da pessoa, na ordem:')]
+def interpretar(llm, estado, partes, aviso=None):
+    """partes: [('texto', str) | ('arquivo', mime, bytes)] na ordem em que chegaram.
+    aviso: algo que o atendente precisa saber agora (ex.: o iFood está instável)."""
+    contexto = contexto_para_llm(estado) + (f'\nAVISO INTERNO: {aviso}' if aviso else '')
+    entrada = [('texto', contexto + '\n\nMensagens da pessoa, na ordem:')]
     entrada += partes
     dados, _modelo, _seg = llm(SISTEMA, entrada, ESQUEMA)
     if not isinstance(dados, dict) or dados.get('acao') not in ACOES:
@@ -196,4 +206,5 @@ def interpretar(llm, estado, partes):
     dados['itens'] = itens[:15]
     if dados['acao'] == 'comprar' and not itens:
         dados['acao'] = 'nao_entendi'
+    dados['resposta'] = ' '.join(str(dados.get('resposta') or '').split())[:300] or None
     return dados

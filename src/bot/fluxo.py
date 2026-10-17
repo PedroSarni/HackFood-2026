@@ -14,7 +14,7 @@ import os
 import time
 import traceback
 
-from src.bot import ranking
+from src.bot import ranking, tutor
 from src.bot import textos as T
 from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import cpf_em, igual_a_botao, interpretar, normalizar, numero_em, regra_rapida
@@ -22,6 +22,7 @@ from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 from src.shared.llm import ErroLLM
 from src.shared.whatsapp import MAX_BOTAO, MAX_LINHA, ErroWhatsApp, partir
 
+IFOOD_INSTAVEL_SEG = 600  # depois de uma falha do iFood, o atendente avisa por 10 min
 POR_PAGINA = 10         # cards por vez no carrossel ("Mais opções" mostra os próximos da MESMA lista)
 POR_PAGINA_SEM_CARROSSEL = 3  # se a Meta recusar o carrossel, volta pros cards soltos
 # carrossel exige foto em todo card: produto sem foto usa a nossa logo
@@ -86,6 +87,8 @@ class Bot:
         self.ctx = ctx
         self.wa = None
         self.u = None
+        self._resposta = None
+        self._disse = ''
 
     # ================================================================== entrada
 
@@ -95,8 +98,11 @@ class Bot:
         if msgs and msgs[-1].get('_nome'):
             u['nome'] = msgs[-1]['_nome']
         u['ultima_msg'] = self.ctx.agora()
+        self._resposta = None   # fala do Gemini pra esta rodada (interpretar preenche)
+        self._disse = ''
         try:
             entradas = entradas_de(msgs)
+            self._disse = ' / '.join(e.texto for e in entradas if e.texto)[:300]
             if self._debug_reset(entradas):   # palavra secreta de debug: desloga e zera tudo
                 return
             botoes = [e for e in entradas if e.tipo == 'botao']
@@ -192,10 +198,28 @@ class Bot:
         except Exception:
             traceback.print_exc()
             try:
-                self.perguntar(T.ERRO, [T.B_TENTAR, T.B_INICIO])
+                self.perguntar(self._tutor('erro_nosso', T.ERRO), [T.B_TENTAR, T.B_INICIO])
             except Exception:  # noqa: BLE001 - nem o aviso com botão saiu: vai texto puro
                 traceback.print_exc()
                 self.dizer(T.ERRO_SEM_BOTAO)
+
+    def _ifood_instavel(self):
+        try:
+            return self.ctx.agora() - float(self.ctx.armazem.get('ifood_instavel') or 0) < IFOOD_INSTAVEL_SEG
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _aviso_ifood(self):
+        if not self._ifood_instavel():
+            return None
+        return ('o servidor do iFood ficou instável nos últimos minutos e buscas/pedidos podem falhar; '
+                'não é culpa da pessoa e costuma voltar logo')
+
+    def _tutor(self, situacao, padrao):
+        """Explicação do Gemini pro que deu errado, no contexto; sem ele, o texto fixo."""
+        u = self.u or {}
+        return tutor.falar(self.ctx.llm, situacao, getattr(self, '_disse', ''), u.get('fase'),
+                           (u.get('pergunta') or {}).get('texto', '')) or padrao
 
     # ================================================================== envio
 
@@ -347,7 +371,8 @@ class Bot:
             self.dizer(T.AUDIO_RUIM)
             return
         try:
-            intent = interpretar(self.ctx.llm, u, partes)
+            intent = interpretar(self.ctx.llm, u, partes, aviso=self._aviso_ifood())
+            self._resposta = intent.get('resposta')
         except ErroLLM as e:
             print(f'LLM falhou: {e!r}')
             if texto and fase in ('inicio', 'pedido', 'escolhendo', 'mais', None):
@@ -385,7 +410,7 @@ class Bot:
             elif n and 1 <= n <= len(botoes):
                 self.botao(botoes[n - 1][0])
             else:
-                self.repetir_pergunta(T.NAO_ENTENDI)
+                self.repetir_pergunta(self._resposta or T.NAO_ENTENDI)
         elif a == 'sim':
             if fase == 'confirmar':
                 self.botao(botoes[0][0] if botoes else 'nada')
@@ -443,7 +468,9 @@ class Bot:
         elif a == 'inicio':
             self.menu()
         elif a == 'saudacao':
-            if fase in NO_MEIO_DO_PEDIDO and botoes:
+            if self._resposta and self._ifood_instavel():  # "vc tá aí?" com o iFood fora: explica
+                self.repetir_pergunta(self._resposta) if botoes else self.menu(self._resposta)
+            elif fase in NO_MEIO_DO_PEDIDO and botoes:
                 self.repetir_pergunta('Olá! 😊 Estávamos aqui:')
             else:
                 self.saudar()
@@ -459,9 +486,11 @@ class Bot:
         elif a == 'parar_lembrete':
             self.parar_lembretes()
         elif a == 'fora_do_escopo':
-            self.repetir_pergunta(T.FORA_DO_ESCOPO) if botoes else self.menu(T.FORA_DO_ESCOPO)
+            fala = self._resposta or T.FORA_DO_ESCOPO
+            self.repetir_pergunta(fala) if botoes else self.menu(fala)
         else:
-            self.repetir_pergunta(T.NAO_ENTENDI) if botoes else self.menu(T.NAO_ENTENDI)
+            fala = self._resposta or T.NAO_ENTENDI
+            self.repetir_pergunta(fala) if botoes else self.menu(fala)
 
     def tentar_de_novo(self, _arg=None):
         ult = self.u.get('ultima_acao')
@@ -1379,7 +1408,15 @@ class Bot:
             self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF], fase='cpf')
         else:
             msg = e.para_usuario or T.ERRO
+            if _falha_do_ifood(cod):  # servidor deles caiu/barrou: marca e explica como gente
+                self.ctx.armazem['ifood_instavel'] = self.ctx.agora()
+                msg = self._tutor('ifood_fora', msg)
             self.perguntar(msg, [T.B_TENTAR, T.B_INICIO])
+
+
+def _falha_do_ifood(cod):
+    """Erro de infraestrutura do iFood (fora do ar, firewall, rede), não de regra de negócio."""
+    return cod.startswith('HTTP_') or cod in ('TIMEOUT', 'REDE', 'SESSAO', 'RESPOSTA_VAZIA')
 
 
 def _mime_aceito(mime):
