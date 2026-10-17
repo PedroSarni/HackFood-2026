@@ -12,13 +12,20 @@
 - Resumo do MCP do iFood em "regras da api/"
 - Agente "HackFood Agent" registrado no portal do iFood
 
+## No ar agora (17/10 ~18h)
+- Bot no WhatsApp em MODO DEMO (mock do MCP, `IFOOD_MOCK=1` no secret `hackathon-ifood`): o número já aponta pro
+  deploy novo. Pedido completo funciona: login simulado, endereço, busca com 3 cards, "Mais opções", carrinho,
+  pagamento, resumo, confirmação, rastreio e lembrete. Quando o agente for aprovado: trocar o secret pelas
+  credenciais e tirar o IFOOD_MOCK
+- 65 testes passando (`.venv/Scripts/python.exe -m pytest`)
+
 ## Em andamento
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
 - Fabio: criando um 2º agente no portal com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
 
 ## Bloqueado ou esperando
 - Credenciais do MCP: agente em análise no iFood desde ~15h
-- Webhook do número ainda aponta pro deploy do handwrite (virada não feita)
+- Ordem de prioridade dos itens (ranking): esperando a regra do time; entra só em `src/bot/ranking.py`
 - Back em Python: está em `src/` (claim `bot-ifood-agent`)
 
 ## Próximo passo

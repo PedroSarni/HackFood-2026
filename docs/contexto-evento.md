@@ -62,7 +62,16 @@ Detalhes no JSON do repo. Aqui só o que importa no dia a dia.
 - trackOrder devolve agentHints (quando checar de novo e quando parar). Seguir isso, sem polling fixo
 - Cart: o campo options é sempre obrigatório, mesmo vazio ([])
 - paymentMethodId é UUID, não a string "PIX"
-- Limitações descobertas ao testar: (preencher)
+- 2º agente: "Compras pelo WhatsApp" (conta do Fabio, 17/10 ~16h30), em análise. Redirects: o backend
+  publicado (`.../ifood/callback` no Modal) e `http://localhost:8080/callback`. Mesmos 3 escopos
+- Limitações descobertas ao testar (17/10, sem credencial: endpoints públicos e mock fiel à doc):
+  - Discovery não aceita addressId: `userLocation` é sempre `{latitude, longitude}` (vem do `coordinates` do endereço)
+  - Cartão inviável por bot: `setCartPayment` exige `cardTokenId`, o `listPaymentMethods` sempre devolve null e não há
+    API de tokenização. Sobra PIX e vale. Não existe "pagar na entrega"
+  - `submitOrder` devolve só `orderId`: nenhum código PIX copia-e-cola/QR em nenhuma tool
+  - Entrega agendada exige `selectedTimeSlotId`, mas os timeslots só têm `from`/`to` (sem ID)
+  - Opções do item → carrinho: o mapeamento `optionGroupId/optionId` → `options/customizations` não está claro.
+    O bot tenta o modo A e cai pro B sozinho se o iFood recusar
 
 ## 5. Log de falas (mais novo no topo)
 Formato: - [HH:MM] Quem falou: o que disse -> impacto pra gente
@@ -81,8 +90,11 @@ Ver docs/decisoes.md.
 ## 8. Bugs e inconsistências do MCP (alimenta o entregável 06)
 Marcar cada item como [só na doc] ou [testado].
 - [14h40-15h03] Portal de cadastro fora do ar. Mentores avisaram que estavam resolvendo [testado]
-- Hosts diferentes entre os guias (consumer-mcp.ifood.com.br) e o llms.txt (api-mcp.ifood.com / dev-api-mcp.ifood.com) [só na doc]
-- Hosts de auth diferentes (id.ifood.com.br vs auth.ifood.com.br / dev-auth.ifood.com.br) [só na doc]
+- Hosts diferentes entre os guias (consumer-mcp.ifood.com.br) e o llms.txt (api-mcp.ifood.com / dev-api-mcp.ifood.com). Os do llms.txt nem resolvem no DNS; o consumer-mcp responde 401 com `resource_metadata` [testado]
+- Hosts de auth diferentes (id.ifood.com.br vs auth.ifood.com.br / dev-auth.ifood.com.br). Só o id.ifood.com.br tem OIDC de verdade (authorize, token, revoke, PKCE S256); os outros devolvem 302/vazio [testado]
+- O 401 do gateway manda o cliente "re-register automatically", mas não existe registration_endpoint (credencial só pelo portal) [testado]
+- llms.txt usa escopos `user:read`/`cart:write` e `code_challenge_method=pkce`; as páginas usam `mcp.*` e `S256` [só na doc]
+- Doc do MCP não mostra initialize, Mcp-Session-Id nem protocolVersion: tudo deduzido da spec do MCP [só na doc]
 - Nomes de escopo diferentes (mcp.cart.* vs cart:write) [só na doc]
 - 3 formatos de erro diferentes: User/Discovery, Cart e Order Tracking [só na doc]
 - Erros do Cart não trazem retryable, os outros trazem [só na doc]
