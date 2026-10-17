@@ -13,12 +13,13 @@
 - Agente "HackFood Agent" registrado no portal do iFood
 
 ## Em andamento
-- (preencher: quem está com qual claim)
+- Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
+- Fabio: criando um 2º agente no portal com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
 
 ## Bloqueado ou esperando
 - Credenciais do MCP: agente em análise no iFood desde ~15h
 - Webhook do número ainda aponta pro deploy do handwrite (virada não feita)
-- Back em Python: confirmar com o Fabio onde está
+- Back em Python: está em `src/` (claim `bot-ifood-agent`)
 
 ## Próximo passo
 - Fechar a ideia com o time
