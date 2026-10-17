@@ -7,6 +7,7 @@ Os limites de tamanho abaixo são da Meta. Estourar qualquer um derruba a mensag
 com erro 400, então todo texto passa por `linha()` ou `bloco()` antes de sair.
 """
 import os
+import re
 import time
 
 import httpx
@@ -57,6 +58,37 @@ def linha(s, n):
 def bloco(s, n):
     """Texto com quebras de linha preservadas, cortado em n caracteres."""
     return _cortar(str(s or '').strip(), n)
+
+
+_LIXO = re.compile(r'[#*_~=]{2,}|[*_~]|#(?=\s|$)')
+
+
+def limpar(s):
+    """Nome cadastrado pela loja -> texto apresentável: tira "#######", "***" e os * _ ~ soltos
+    (no WhatsApp eles viram/quebram negrito, itálico e riscado)."""
+    s = _LIXO.sub(' ', str(s or ''))
+    s = re.sub(r'\(\s*\)', ' ', s)  # parêntese que ficou vazio
+    s = re.sub(r'\s+([,.;:)])', r'\1', ' '.join(s.split()))
+    return s.strip(' -–,;:/|')
+
+
+def partir(titulo, n):
+    """Título que não cabe em n -> (curto, detalhe, cortou). Primeiro tenta o que está entre
+    parênteses virar detalhe ("Sim, desejo sachês (maionese, ketchup)"); senão corta na palavra
+    e o detalhe leva o texto inteiro, pra ninguém ficar sem saber o que escolheu."""
+    titulo = ' '.join(str(titulo or '').split())
+    if tamanho(titulo) <= n:
+        return titulo, '', False
+    m = re.match(r'^(.*?)\s*[(\[](.+?)[)\]]\s*(.*)$', titulo)
+    if m and m.group(1) and tamanho(m.group(1)) <= n and not m.group(3):
+        return m.group(1).rstrip(' -,:'), m.group(2).strip(), False
+    curto = ''
+    for palavra in titulo.split():
+        prox = f'{curto} {palavra}'.strip()
+        if tamanho(prox) + 1 > n:
+            break
+        curto = prox
+    return (curto.rstrip(' -,:(') or titulo[:n - 1]) + '…', titulo, True
 
 
 def titulos_unicos(titulos, n):

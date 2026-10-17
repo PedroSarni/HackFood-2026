@@ -19,6 +19,7 @@ Formatos nossos (o fluxo depende só destes campos):
 import os
 
 from src.shared.ifood_mcp import ErroMCP
+from src.shared.whatsapp import limpar
 
 TIPO_LOJA = {'MERCADO': 'GROCERIES', 'RESTAURANTE': 'RESTAURANT', 'FARMACIA': 'DRUGSTORE',
              'BEBIDAS': 'LIQUORSTORE', 'PET': 'PETSTORE', 'LOJA': 'SHOPPING'}
@@ -186,7 +187,7 @@ class Ifood:
         elif cheio is not None and cheio <= preco:
             cheio = None
         return {'item_id': _campo(r, 'itemId'), 'loja_id': _campo(loja, 'merchantId'),
-                'nome': _campo(r, 'itemName', padrao='Produto'), 'descricao': '',
+                'nome': limpar(_campo(r, 'itemName', padrao='Produto')) or 'Produto', 'descricao': '',
                 'preco': preco, 'preco_antigo': cheio, 'imagem': _campo(r, 'itemImageUrl'),
                 'loja': _campo(loja, 'merchantName', padrao=''), 'tempo': _minutos(_campo(entrega, 'estimatedMinutes')),
                 'nota': _num(_campo(loja, 'reviewRating')), 'distancia': _num(_campo(loja, 'straightLineDistanceKm')),
@@ -210,13 +211,13 @@ class Ifood:
         d = self._chamar('getItem', itemId=item_id, merchantId=loja_id, userLocation=self._local(endereco))
         grupos = []
         for g in _lista(d, 'optionGroups'):
-            ops = [{'id': _campo(o, 'optionId'), 'nome': _campo(o, 'name', padrao='Opção'),
+            ops = [{'id': _campo(o, 'optionId'), 'nome': limpar(_campo(o, 'name', padrao='Opção')) or 'Opção',
                     'preco': _num(_campo(o, 'additionalPrice'))} for o in _lista(g, 'options')]
-            grupos.append({'id': _campo(g, 'optionGroupId'), 'nome': _campo(g, 'name', padrao=''),
+            grupos.append({'id': _campo(g, 'optionGroupId'), 'nome': limpar(_campo(g, 'name', padrao='')),
                            'min': int(_campo(g, 'minSelections', padrao=0) or 0),
                            'max': int(_campo(g, 'maxSelections', padrao=1) or 1),
                            'opcoes': [o for o in ops if o['id']]})
-        return {'item_id': item_id, 'loja_id': loja_id, 'nome': _campo(d, 'itemName'),
+        return {'item_id': item_id, 'loja_id': loja_id, 'nome': limpar(_campo(d, 'itemName')),
                 'descricao': _campo(d, 'itemDescription', padrao=''), 'imagem': _campo(d, 'itemImageUrl'),
                 'preco': _num(_campo(d, 'promotionalUnitPrice', 'unitPrice')), 'grupos': grupos}
 
@@ -237,7 +238,7 @@ class Ifood:
             qtd = int(_campo(it, 'quantity', padrao=1) or 1)
             unit = _num(_campo(it, 'unitPrice'))
             itens.append({'cart_item_id': _campo(it, 'cartItemId'), 'item_id': _campo(it, 'itemId'),
-                          'nome': _campo(it, 'name', padrao='Item'), 'qtd': qtd,
+                          'nome': limpar(_campo(it, 'name', padrao='Item')) or 'Item', 'qtd': qtd,
                           'preco_total': round(unit * qtd, 2) if unit is not None else None})
         s = _campo(d, 'summary', padrao={}) or {}
         desconto = (_num(s.get('voucherTotalAmount')) or 0) + (_num(s.get('benefitsTotalAmount')) or 0)

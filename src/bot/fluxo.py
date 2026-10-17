@@ -20,7 +20,7 @@ from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import cpf_em, igual_a_botao, interpretar, normalizar, numero_em, regra_rapida
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 from src.shared.llm import ErroLLM
-from src.shared.whatsapp import ErroWhatsApp
+from src.shared.whatsapp import MAX_BOTAO, MAX_LINHA, ErroWhatsApp, partir
 
 POR_PAGINA = 3          # cards por vez ("Mais opções" mostra os próximos 3 da MESMA lista)
 LISTAS_GUARDADAS = 3    # listas antigas que ainda aceitam toque de botão
@@ -201,12 +201,22 @@ class Bot:
         Se a Meta recusar a mensagem interativa (formato), manda as opções numeradas em texto:
         a pessoa responde o número e a conversa segue (o "2" já vira o 2º botão)."""
         botoes = [tuple(b) for b in botoes]
+        # título longo é cortado pela Meta ("Não desejo sachês #…"): o que está entre parênteses
+        # vira detalhe no texto; se mesmo assim não couber em 20, vai de lista (24 + descrição 72)
+        curtos = [partir(b[1], MAX_BOTAO) for b in botoes]
+        cabe = len(botoes) <= 3 and not any(cortou for _, _, cortou in curtos)
         try:
-            if len(botoes) <= 3:
-                self.wpp.botoes(self.wa, texto, [(b[0], b[1]) for b in botoes], imagem=imagem, rodape=rodape)
+            if cabe:
+                detalhes = '\n'.join(f'• *{c}*: {d}' for c, d, _ in curtos if d)
+                self.wpp.botoes(self.wa, f'{texto}\n\n{detalhes}' if detalhes else texto,
+                                [(b[0], c) for b, (c, _, _) in zip(botoes, curtos)], imagem=imagem, rodape=rodape)
             else:
-                self.wpp.lista(self.wa, texto, rotulo, [(b[0], b[1], b[2] if len(b) > 2 else '') for b in botoes],
-                               rodape=rodape)
+                linhas = []
+                for b in botoes:
+                    curto, resto, _ = partir(b[1], MAX_LINHA)
+                    extra = b[2] if len(b) > 2 else ''
+                    linhas.append((b[0], curto, ' · '.join(x for x in (resto, extra) if x)))
+                self.wpp.lista(self.wa, texto, rotulo, linhas, rodape=rodape)
         except ErroWhatsApp as e:
             if e.status != 400 or not botoes:
                 raise

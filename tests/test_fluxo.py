@@ -86,8 +86,8 @@ def test_mensagem_recusada_pela_meta_vira_texto_numerado():
     m.armazem[f'u:{m.wa}'] = {'fase': 'pedido'}
     bot = m.Bot(m.ctx)
     bot.wa, bot.u = m.wa, bot._carregar(m.wa)
-    bot.perguntar('Escolha:', [('a', 'x' * 30), ('b', 'y')])  # força: título enorme passa pelo corte...
-    assert m.wpp.saida[-1][0] == 'botoes'  # ...e o corte resolve sozinho
+    bot.perguntar('Escolha:', [('a', 'x' * 30), ('b', 'y')])  # título que não cabe em botão...
+    assert m.wpp.saida[-1][0] == 'lista'  # ...vira lista, com o texto inteiro na descrição
     original = m.wpp._real.botoes
 
     def recusa(*a, **kw):
@@ -390,3 +390,36 @@ def test_apagar_dados():
     m.enviar('apagar meus dados')
     m.tocar('apagar_sim')
     assert f'u:{m.wa}' not in m.armazem and f'tok:{m.wa}' not in m.armazem
+
+
+# --- botões que não cabem e nomes sujos da loja (bug real de 17/10 18h08) ------------------
+
+def test_limpar_tira_hashtag_e_marcacao_do_whatsapp():
+    from src.shared.whatsapp import limpar
+    assert limpar('Não desejo sachês #######') == 'Não desejo sachês'
+    assert limpar('**Pão** de _queijo_ ~~top~~') == 'Pão de queijo top'
+    assert limpar('Molho (###)') == 'Molho'
+    assert limpar('X-Burguer #1') == 'X-Burguer #1'  # # com número é nome de verdade
+
+
+def test_partir_manda_o_parentese_pro_detalhe_e_corta_na_palavra():
+    from src.shared.whatsapp import partir
+    assert partir('Sim, desejo sachês (maionese, kethchup e mostarda)', 20) == \
+        ('Sim, desejo sachês', 'maionese, kethchup e mostarda', False)
+    curto, resto, cortou = partir('Refrigerante lata trezentos e cinquenta', 20)
+    assert cortou and curto == 'Refrigerante lata…' and resto.startswith('Refrigerante lata trezentos')
+    assert partir('Curto', 20) == ('Curto', '', False)
+
+
+def test_opcoes_dos_saches_viram_botoes_inteiros_com_detalhe_no_texto():
+    m = Mundo()
+    m.armazem[f'u:{m.wa}'] = {'fase': 'pedido'}
+    bot = m.Bot(m.ctx)
+    bot.wa, bot.u = m.wa, bot._carregar(m.wa)
+    bot.perguntar('Escolha: *Deseja sachês?* 👇',
+                  [('opt:0', 'Sim, desejo sachês (maionese, kethchup e mostarda)'), ('opt:1', 'Não desejo sachês')])
+    tipo, d = m.wpp.saida[-1]
+    assert tipo == 'botoes'
+    assert [t for _, t in d['botoes']] == ['Sim, desejo sachês', 'Não desejo sachês']
+    assert 'maionese, kethchup e mostarda' in d['texto']
+    assert bot.u['pergunta']['titulos'][0].startswith('Sim, desejo sachês (')  # digitar o nome inteiro ainda vale
