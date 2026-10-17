@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import os
+import pathlib
 import secrets
 import time
 
@@ -26,7 +27,9 @@ LOGIN_VALIDADE = 30 * 60      # link "Entrar no iFood" vale 30 min (cada toque g
 app = modal.App(APP)
 imagem = (modal.Image.debian_slim(python_version='3.12')
           .pip_install('fastapi[standard]==0.141.1', 'httpx==0.28.1')
-          .add_local_python_source('src'))
+          .add_local_python_source('src')
+          # add_local_python_source só leva .py: sem isso o /logo.png dava 500 no ar
+          .add_local_file(pathlib.Path(__file__).parent / 'web' / 'logo.png', '/root/src/web/logo.png'))
 segredos = [modal.Secret.from_name('hackathon-whatsapp'),
             modal.Secret.from_name('llm-conversor'),
             modal.Secret.from_name('hackathon-ifood'),
@@ -161,9 +164,8 @@ def web():
 
     @api.get('/logo.png')
     async def logo():
-        import pathlib
         from fastapi.responses import Response
-        dados = (pathlib.Path(__file__).parent / 'web' / 'logo.png').read_bytes()
+        dados = (pathlib.Path(paginas.__file__).parent / 'logo.png').read_bytes()  # no ar o app.py fica em /root
         return Response(dados, media_type='image/png', headers={'cache-control': 'public, max-age=86400'})
 
     # --- WhatsApp ---
