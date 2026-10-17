@@ -43,7 +43,7 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 - [x] Bot no ar em modo demo com MCP falso, 65 testes
 - [x] Agente "HackFood Agent" aprovado no portal do iFood
 ### Agora (até 18h)
-- [ ] A1 Registrar a ideia (decisoes.md e estado.md) — Davi
+- [x] A1 Registrar a ideia (decisoes.md e estado.md) — Davi
 - [ ] A2 Mentor: MCP real (invalid_client), perguntas da seção 7 do contexto-evento.md, e COMO submeter os entregáveis — Davi
 - [ ] A3 Testar o bot no WhatsApp como usuário (idoso apressado) e anotar problemas — Davi e time
 - [ ] A4 Combinar canal do time e divisão dos entregáveis — Davi
