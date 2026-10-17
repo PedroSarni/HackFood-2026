@@ -1,0 +1,3 @@
+#!/bin/sh
+# Bloqueia atribuição de IA na mensagem e identidade de IA no autor/committer.
+exec sh "$(git rev-parse --show-toplevel)/scripts/check-authorship.sh" --msg-file "$1"

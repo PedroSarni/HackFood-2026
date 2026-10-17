@@ -1,0 +1,36 @@
+name: authorship
+
+on:
+  push:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Autoria dos commits
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            range="$BASE..$HEAD"
+          elif [ -n "$BEFORE" ] && git cat-file -e "$BEFORE" 2>/dev/null && [ "${BEFORE#*[!0]}" != "$BEFORE" ]; then
+            range="$BEFORE..$HEAD"
+          else
+            range="$HEAD"
+          fi
+          sh scripts/check-authorship.sh $range
+
+      - name: Descrição do PR
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s\n\n%s\n' "$PR_TITLE" "$PR_BODY" | sh scripts/check-authorship.sh --stdin
