@@ -27,6 +27,7 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
 - Fabio: 2º agente "Compras pelo WhatsApp" (criado às ~16h05) já APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
 - Pedro: `Frontend/Rascunho_Dash` (dashboard de analytics, só dados simulados), sem claim ainda
+- Rascunho do 06 (Davi): em andamento, fora do repo
 
 ## Bloqueado ou esperando
 - Ordem de prioridade dos itens (ranking): esperando a regra do time; entra só em `src/bot/ranking.py`
