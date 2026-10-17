@@ -17,7 +17,7 @@ estava em produção. Ninguém precisa configurar Meta Business, número ou toke
 | Token | System User, **não expira**, escopos `whatsapp_business_messaging` + `whatsapp_business_management` |
 | Graph API | `https://graph.facebook.com/v23.0` |
 | Hospedagem usada até agora | [Modal](https://modal.com), workspace `fabio-araujo-silva` |
-| Webhook atual | ainda aponta para o deploy do handwrite (URL no backup do Fabio) |
+| Webhook atual | aponta para o deploy novo: `https://fabio-araujo-silva--hackfood-bot.us-east.modal.run/whatsapp` (URL antiga do handwrite no backup do Fabio) |
 
 ### Onde estão as credenciais
 
@@ -34,10 +34,11 @@ estava em produção. Ninguém precisa configurar Meta Business, número ou toke
 
 Convenção herdada: valor `PREENCHER` = não configurado (trate como string vazia).
 
-## Virada do número para o deploy novo (ainda NÃO feita)
+## Virada do número para o deploy novo (feita em 17/10, antes das 16h37)
 
-O número continua entregando mensagens para o webhook do handwrite até existir o nosso endpoint.
-Quando ele estiver no ar, a virada é trocar o callback **só deste número**, sem mexer no app:
+O número já entrega mensagens para o nosso endpoint (`/whatsapp` no Modal). A virada troca o callback
+**só deste número**, sem mexer no app. O jeito usado é `scripts/virar_webhook.py` (padrão: URL nova;
+`--url <URL antiga>` desfaz). O equivalente em curl:
 
 ```sh
 curl -X POST "https://graph.facebook.com/v23.0/$WHATSAPP_PHONE_ID" \
