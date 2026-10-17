@@ -25,7 +25,7 @@ NÃO cobre: lado do restaurante, cancelamento/reembolso (a API não tem), painel
 
 - `src/shared/whatsapp.py` — `WhatsApp(...).texto/botoes/lista/link/imagem/digitando/baixar_midia` — pronto
 - `src/shared/ifood_mcp.py` — `ClienteMCP(token).chamar(tool, **args)` + OAuth (`pkce`, `url_login`, `trocar_codigo`, `renovar`) — pronto
-- `src/shared/mcp_fake.py` — `McpFake().chamar(tool, **args)`: MCP falso com as 24 tools — stub
+- `src/shared/mcp_fake.py` — `McpFake().chamar(tool, **args)`: MCP falso com as 24 tools — pronto
 - `src/shared/buffer.py` — `Caixa`: junta rajada de mensagens por pessoa — pronto
 - `src/shared/geocoder.py` — `normalizar(texto)`: texto com CEP -> endereço canônico pro iFood (BrasilAPI/ViaCEP, grátis) — pronto
 - `src/shared/llm.py` — `gerar_json(sistema, partes, esquema)`: Gemini com texto/áudio/foto — pronto
