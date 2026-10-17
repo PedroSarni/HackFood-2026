@@ -122,13 +122,14 @@ class Bot:
         try:
             def seguir():
                 nome = (u.get('nome') or '').split(' ')[0]  # nome do perfil de WhatsApp, se já temos
+                perfil = {}
                 try:
                     perfil = self.ctx.ifood(wa_id).usuario()
                     u['nome_ifood'] = perfil.get('nome')
                     nome = nome or (perfil.get('nome') or '').split(' ')[0]
                 except ErroMCP as e:
                     print(f'getUser falhou depois do login: {e!r}')
-                self.wpp.texto(wa_id, T.logou(nome))
+                self.wpp.texto(wa_id, T.logou(nome, perfil.get('nome')))
                 pend, u['pendente'] = u.get('pendente'), None
                 if pend:
                     self.botao(pend['botao']) if pend.get('acao') == 'botao' else self.intencao(pend)

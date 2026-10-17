@@ -50,9 +50,12 @@ LOGIN_AINDA = ('Ainda estou esperando você entrar no iFood. 🙂\n'
                'Toque em *Entrar no iFood* aqui embaixo.')
 
 
-def logou(nome):
+def logou(nome, conta=None):
     oi = f'Pronto, {nome}! ✅' if nome else 'Pronto! ✅'
-    return f'{oi} Você entrou no iFood.'
+    if not conta:
+        return f'{oi} Você entrou no iFood.'
+    # mostra de quem é a conta: 3 celulares já entraram na MESMA conta sem perceber (17/10)
+    return f'{oi} Você entrou no iFood na conta de *{conta}*.\nNão é a sua conta? Escreva *sair* e entre de novo.'
 
 
 PERGUNTA_PEDIDO = ('O que você quer pedir? 😊\n\n'
