@@ -157,6 +157,13 @@ def web():
     async def saude():
         return {'ok': True, 'app': APP, 'ts': int(time.time())}
 
+    @api.get('/logo.png')
+    async def logo():
+        import pathlib
+        from fastapi.responses import Response
+        dados = (pathlib.Path(__file__).parent / 'web' / 'logo.png').read_bytes()
+        return Response(dados, media_type='image/png', headers={'cache-control': 'public, max-age=86400'})
+
     # --- WhatsApp ---
 
     @api.get('/whatsapp')
@@ -206,14 +213,17 @@ def web():
     # --- login do iFood ---
 
     @api.get('/login/{codigo}', response_class=HTMLResponse)
-    async def login(codigo: str):
+    async def login(codigo: str, request: Request):
         pedido = await estado.get.aio(f'login:{codigo}')
         if not pedido or time.time() - pedido.get('criado', 0) > LOGIN_VALIDADE:
             return paginas.tela('⏰', 'Esse link venceu',
                                 'Volte pro WhatsApp e toque de novo em "Entrar no iFood".',
                                 'Voltar pro WhatsApp', voltar)
         if _cfg('IFOOD_MOCK') in ('1', 'true', 'sim'):
-            # modo demo: sem OAuth de verdade; marca como logado e segue a conversa
+            # modo demo: sem OAuth de verdade. 1º a tela de consentimento (nossa, não do iFood);
+            # só quando a pessoa toca em "Permitir" (go=1) marca como logada e segue a conversa.
+            if request.query_params.get('go') != '1':
+                return paginas.login_demo(f'{BASE}/login/{codigo}?go=1', voltar)
             await estado.put.aio(f'tok:{pedido["wa_id"]}', {'access_token': 'mock', 'refresh_token': 'mock',
                                                             'expira_em': time.time() + 30 * 86400})
             await depois_do_login.spawn.aio(pedido['wa_id'])

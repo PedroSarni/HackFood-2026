@@ -134,6 +134,40 @@ endereços guardados e lembretes. Você recebe a confirmação na hora.</li>
 {_rodape()}""")
 
 
+def login_demo(continuar_url, voltar_url, logo_url='/logo.png'):
+    """Tela de login do MODO DEMONSTRAÇÃO. Parece um consentimento de OAuth (dá a impressão de
+    conectar a conta), mas é a NOSSA página: não pede senha, não imita a tela do iFood e não
+    manda nada pro iFood. O botão só segue o fluxo da demo."""
+    return _pagina(f'Entrar · {NOME}', f"""
+<div style="max-width:420px;margin:0 auto">
+  <div style="text-align:center;margin-top:16px">
+    <img src="{html.escape(logo_url)}" alt="" width="72" height="72"
+         style="border-radius:18px;vertical-align:middle">
+  </div>
+  <p style="text-align:center;font-size:.8em;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+            margin:18px 0 0">Modo demonstração</p>
+  <h1 style="text-align:center;font-size:1.35em;margin:6px 0 4px">Conectar sua conta iFood</h1>
+  <p style="text-align:center;color:var(--suave);margin:0 0 20px">
+     Para <b>{html.escape(NOME)}</b> montar e acompanhar seus pedidos.</p>
+
+  <div style="border:1px solid var(--borda);border-radius:14px;padding:4px 18px">
+    <p style="margin:14px 0;color:var(--suave)">🏠 &nbsp;Ver e salvar seus endereços de entrega</p>
+    <p style="margin:14px 0;color:var(--suave);border-top:1px solid var(--borda);padding-top:14px">
+       🛒 &nbsp;Montar o carrinho e fazer pedidos que você confirmar</p>
+    <p style="margin:14px 0;color:var(--suave);border-top:1px solid var(--borda);padding-top:14px">
+       🛵 &nbsp;Acompanhar a entrega</p>
+  </div>
+
+  <a class="botao" href="{html.escape(continuar_url)}">Permitir e entrar</a>
+  <p style="text-align:center;margin:14px 0 0">
+     <a href="{html.escape(voltar_url)}" style="color:var(--suave)">Agora não</a></p>
+
+  <p style="text-align:center;font-size:.82em;color:var(--suave);margin-top:28px;line-height:1.5">
+     ⚠️ Demonstração do hackathon. Esta tela é do nosso sistema, não do iFood.
+     Não pedimos sua senha e nada é enviado ao iFood.</p>
+</div>""")
+
+
 def tela(icone, titulo, texto, botao=None, link=None):
     """Tela de uma mensagem só (login concluído, link vencido...)."""
     acao = (f'<a class="botao" href="{html.escape(link)}">{html.escape(botao)}</a>'

@@ -177,9 +177,12 @@ class McpFake:
     # --- User ---
 
     def t_getUser(self, st):
-        return {'success': True, 'data': {'fullName': 'Maria Aparecida', 'email': 'maria@test.ifood.com.br',
-                                          'phone': '5520900000000'},
-                'agentHints': {'suggestedNextAction': 'Use the user name.'}}
+        # demo: usa o nome do perfil de WhatsApp da pessoa (o bot guarda em u:{wa_id}['nome']);
+        # sem isso, um nome genérico. No real, isto vem da conta iFood de verdade.
+        wa_id = self.chave.split(':', 1)[-1]
+        nome = (self.armazem.get(f'u:{wa_id}') or {}).get('nome') or 'Cliente'
+        return {'success': True, 'data': {'fullName': nome, 'email': 'cliente@test.ifood.com.br',
+                                          'phone': '5520900000000'}, 'agentHints': {}}
 
     def t_listAddresses(self, st):
         if not st['enderecos']:

@@ -118,11 +118,11 @@ class Bot:
         self.u = u = self._carregar(wa_id)
         try:
             def seguir():
-                nome = u.get('nome')
+                nome = (u.get('nome') or '').split(' ')[0]  # nome do perfil de WhatsApp, se já temos
                 try:
                     perfil = self.ctx.ifood(wa_id).usuario()
-                    nome = (perfil.get('nome') or '').split(' ')[0] or nome
                     u['nome_ifood'] = perfil.get('nome')
+                    nome = nome or (perfil.get('nome') or '').split(' ')[0]
                 except ErroMCP as e:
                     print(f'getUser falhou depois do login: {e!r}')
                 self.wpp.texto(wa_id, T.logou(nome))
@@ -608,7 +608,8 @@ class Bot:
         # candidatos costumam ter a MESMA rua e número (muda o bairro): o endereço completo vai
         # no texto, numerado, e o botão leva o número e o bairro
         lista = '\n'.join(f'{i}️⃣ {c.get("texto", "")}' for i, c in enumerate(cands[:9], 1))
-        botoes = [(f'cand:{i}', f'{i} · {c.get("bairro") or c.get("titulo") or "Endereço"}', c.get('texto', ''))
+        # id interno é cand:<índice do array> (0-based); o rótulo mostra o número que a pessoa vê (1-based)
+        botoes = [(f'cand:{i}', f'{i + 1} · {c.get("bairro") or c.get("titulo") or "Endereço"}', c.get('texto', ''))
                   for i, c in enumerate(cands[:9])]
         self.perguntar(f'{T.ESCOLHA_ENDERECO}\n\n{lista}', botoes, fase='endereco_escolha', rotulo='Ver endereços')
 
