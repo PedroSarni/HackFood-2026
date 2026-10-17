@@ -47,7 +47,7 @@ A banca avalia os 20 grupos por 5 pilares. O site não informa pesos.
 
 ## 4. MCP do iFood: fatos
 Detalhes no JSON do repo. Aqui só o que importa no dia a dia.
-- Gateway único: https://consumer-mcp.ifood.com.br/marketplace (4 domínios, 24 tools)
+- Gateway único: https://consumer-mcp.ifood.com.br/marketplace (4 domínios, 23 tools no servidor: falta listItemTaxonomy, que só existe na doc)
 - O llms.txt cita outros hosts (api-mcp.ifood.com, dev-api-mcp.ifood.com, auth.ifood.com.br, dev-auth.ifood.com.br). Usar o gateway acima até confirmar
 - Auth: OAuth 2.1 com PKCE. authorize em https://id.ifood.com.br/authorize, token em https://id.ifood.com.br/token
 - Access token dura ~1h, refresh token ~30 dias e rotaciona. client_secret só no backend
@@ -85,12 +85,13 @@ Ver docs/decisoes.md.
 - [ ] Mentor: dá pra cadastrar um redirect de backend publicado, além de localhost:8080?
 - [ ] Mentor: que tipo de agente externo o iFood imagina usando esse MCP?
 - [ ] Confirmar se o prêmio é em dinheiro ou iFood Card
-- [ ] Testar quando as credenciais saírem: trackOrder funciona com os escopos liberados? (a doc pede mcp.orders.read, que não aparece em nenhum card do portal)
+- [x] Testar quando as credenciais saírem: trackOrder funciona com os escopos liberados? (a doc pede mcp.orders.read, que não aparece em nenhum card do portal). Resposta: funciona. trackOrder devolve ORDER_NOT_FOUND, não erro de acesso [testado]
+- [ ] Submissão: provável repo do GitHub, instruções domingo de manhã [assumido, confirmar]
 
 ## 8. Bugs e inconsistências do MCP (alimenta o entregável 06)
 Marcar cada item como [só na doc] ou [testado].
 - [14h40-15h03] Portal de cadastro fora do ar. Mentores avisaram que estavam resolvendo [testado]
-- [16h30] Agente "HackFood Agent" (Davi): POST /token devolve invalid_client com o secret recém gerado (post, Basic e sem secret). [testado]
+- [16h30] Agente "HackFood Agent" (Davi): POST /token devolve invalid_client com o secret recém gerado (post, Basic e sem secret). RESOLVIDO: o secret estava errado, não era problema do iFood [testado]
 - [17h05] RESOLVIDO para o agente "Compras pelo WhatsApp": com o client_id GbC9J7... + o secret dele, POST /token devolve invalid_grant (não invalid_client) usando um code falso — ou seja, a autenticação do cliente PASSA, tanto por client_secret_post quanto por Basic. Logo, o invalid_client do item acima era específico do agente/secret do Davi, NÃO um bug geral do iFood. O OAuth do nosso agente está completo (authorize + escopos mcp.* + redirect + /token). Falta só um login humano real. [testado]
 - Dica pro invalid_client: conferir se o secret é do MESMO agente do client_id (cada agente tem o seu), e gerar de novo no portal se tiver dúvida (some ao recarregar a página) [testado]
 - Hosts diferentes entre os guias (consumer-mcp.ifood.com.br) e o llms.txt (api-mcp.ifood.com / dev-api-mcp.ifood.com). Os do llms.txt nem resolvem no DNS; o consumer-mcp responde 401 com `resource_metadata` [testado]
@@ -99,9 +100,23 @@ Marcar cada item como [só na doc] ou [testado].
 - llms.txt usa escopos `user:read`/`cart:write` e `code_challenge_method=pkce`; as páginas usam `mcp.*` e `S256` [só na doc]
 - Doc do MCP não mostra initialize, Mcp-Session-Id nem protocolVersion: tudo deduzido da spec do MCP [só na doc]
 - Nomes de escopo diferentes (mcp.cart.* vs cart:write) [só na doc]
-- 3 formatos de erro diferentes: User/Discovery, Cart e Order Tracking [só na doc]
-- Erros do Cart não trazem retryable, os outros trazem [só na doc]
-- ORDER_NOT_FOUND: retryable não bate com o que a doc descreve [só na doc]
+- Formatos de erro: a doc fala em 3 (User/Discovery, Cart e Order Tracking); na prática são 4 em JSON + 3 em texto cru (exceção Java, NPE Kotlin, chave i18n) [testado]
+- Erros do Cart não trazem retryable, os outros trazem [testado]
+- ORDER_NOT_FOUND vem com retryable=false (a hipótese anterior, de que não batia com a doc, era falsa) [testado]
+- listPaymentMethods devolve PIX e cartão de teste; paymentMethodId é UUID (não null, não "PIX") [testado]
+- createCart já exige o 1º item: não existe carrinho vazio [testado]
+- addItemToCart sem options estoura exceção (a doc está certa, o schema está errado); createCart aceita sem options; options=[] funciona nos dois [testado]
+- cartItemId muda a cada escrita no carrinho (add/update/remove/setDelivery/setPayment/setVoucher) [testado]
+- getCart de carrinho inexistente devolve GEN-123 "try again", sem retryable [testado]
+- createAddress com endereço falso devolve um endereço nos EUA com confiança SINGLE [testado]
+- Facets do browseOffers contam só a página atual; listItemTaxonomy não existe no servidor [testado]
+- getItem pode devolver 61 KB para um único item [testado]
+- setVoucher com cupom não aplicável responde sucesso [testado]
+- setCartDelivery aceita timeslot inválido e troca em silêncio [testado]
+- totalAmount não fecha num carrinho de mercado (R$ 5,54 vs 9,38), origem não identificada [testado]
+- benefitsTotalAmount é fixo e não bate com o total [testado]
+- Não existe tool para listar pedidos [testado]
+- Discovery só aceita lat/lng, nunca addressId. Timeslots existem em mercado (campo timeslotId na resposta, selectedTimeSlotId na entrada) e vêm omitidos em restaurante [testado]
 - Doc do fluxo de User cita update/delete de endereço que não existem [só na doc]
 - "Fluxo completo de pedido" na doc pula passos que o Cart exige [só na doc]
 - Portal mostra só mcp.cart no card "Criação de pedidos"; a doc pede mcp.orders.read pra rastrear e esse escopo não aparece em nenhum card [testado no portal]
