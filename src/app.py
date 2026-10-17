@@ -229,8 +229,8 @@ def web():
             await estado.put.aio(f'tok:{pedido["wa_id"]}', {'access_token': 'mock', 'refresh_token': 'mock',
                                                             'expira_em': time.time() + 30 * 86400})
             await depois_do_login.spawn.aio(pedido['wa_id'])
-            return paginas.tela('✅', 'Pronto, você entrou!', 'Modo de demonstração. Pode voltar pro '
-                                'WhatsApp: já te mandei uma mensagem lá.', 'Voltar pro WhatsApp', voltar)
+            return paginas.logou('Modo de demonstração. Pode voltar pro '
+                                 'WhatsApp: já te mandei uma mensagem lá.', 'Voltar pro WhatsApp', voltar)
         verificador, desafio = ifood_mcp.pkce()
         state = secrets.token_urlsafe(24)
         await estado.put.aio(f'oauth:{state}', {'wa_id': pedido['wa_id'], 'verificador': verificador,
@@ -261,8 +261,8 @@ def web():
                                 'Voltar pro WhatsApp', voltar)
         await estado.put.aio(f'tok:{sessao["wa_id"]}', tokens)
         await depois_do_login.spawn.aio(sessao['wa_id'])
-        return paginas.tela('✅', 'Pronto, você entrou!', 'Pode voltar pro WhatsApp: já te mandei '
-                            'uma mensagem lá.', 'Voltar pro WhatsApp', voltar)
+        return paginas.logou('Pode voltar pro WhatsApp: já te mandei '
+                             'uma mensagem lá.', 'Voltar pro WhatsApp', voltar)
 
     return api
 

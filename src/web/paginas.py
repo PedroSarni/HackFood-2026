@@ -28,15 +28,21 @@ a.botao { display:block; text-align:center; background:var(--marca); color:#fff;
           font-size:1.2em; font-weight:600; padding:18px; border-radius:14px; margin:28px 0 0; }
 footer { margin-top: 40px; border-top: 1px solid var(--borda); padding-top: 12px; }
 footer a { color: var(--marca); }
+/* tela de login concluído: vermelho do iFood */
+body.vermelha { --marca:#ea1d2c; --fundo:#fff5f5; }
+@media (prefers-color-scheme: dark) { body.vermelha { --marca:#ff4d5a; --fundo:#1f1212; } }
+body.vermelha .grande { color: var(--marca); }
+.selo { width:96px; height:96px; margin:24px auto 0; border-radius:50%; background:var(--marca);
+        color:#fff; font-size:56px; line-height:96px; text-align:center; font-weight:700; }
 """
 
 
-def _pagina(titulo, corpo):
+def _pagina(titulo, corpo, classe=''):
     return f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(titulo)}</title><style>{_ESTILO}</style></head>
-<body><main>{corpo}</main></body></html>"""
+<body class="{classe}"><main>{corpo}</main></body></html>"""
 
 
 def _rodape():
@@ -177,3 +183,13 @@ def tela(icone, titulo, texto, botao=None, link=None):
 <p class="grande"><b>{html.escape(titulo)}</b></p>
 <p style="text-align:center">{html.escape(texto)}</p>
 {acao}""")
+
+
+def logou(texto, botao, link):
+    """Tela de login concluído, em vermelho."""
+    acao = f'<a class="botao" href="{html.escape(link)}">{html.escape(botao)}</a>'
+    return _pagina('Pronto, você entrou!', f"""
+<div class="selo">✓</div>
+<p class="grande"><b>Pronto, você entrou!</b></p>
+<p style="text-align:center">{html.escape(texto)}</p>
+{acao}""", classe='vermelha')
