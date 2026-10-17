@@ -85,3 +85,29 @@ def test_fluxo_cai_pro_texto_original_quando_o_arrumado_nao_acha():
     m.enviar('Rua das Flores, 120, São Carlos')
     enviados = [c['address'] for c in m.mcp.chamadas_de('createAddress')]
     assert enviados == ['Lugar Nenhum', 'Rua das Flores, 120, São Carlos']
+
+
+def test_resposta_real_do_ifood_vem_embrulhada_em_data():
+    """Formato visto no MCP real em 17/10: success + data + agentHints (o mock responde sem envelope)."""
+    from src.bot.ifood import Ifood
+    real = {'success': True, 'data': {'matchConfidence': 'SINGLE', 'candidates': [{
+        'candidateId': 'c1', 'formattedAddress': 'Avenida Paulista, 1578, Bela Vista, São Paulo, SP, CEP 01310-000',
+        'location': {'street': 'Avenida Paulista', 'number': '1578', 'neighborhood': 'Bela Vista',
+                     'city': 'São Paulo', 'state': 'SP'},
+        'coordinates': {'latitude': -23.56144, 'longitude': -46.65592}}]},
+        'agentHints': {'confirmAddressGuidance': '...'}}
+    r = Ifood(lambda tool, **a: real).geocodificar('Avenida Paulista, 1578')
+    c = r['candidatos'][0]
+    assert c['id'] == 'c1' and c['bairro'] == 'Bela Vista' and c['lat'] == -23.56144
+
+
+def test_candidato_fora_do_brasil_e_descartado():
+    """Bug real: '01310-100, 1578' cru virou '100th St, 1578, Tisdale, SK' (Canadá)."""
+    from src.bot.ifood import Ifood
+    real = {'success': True, 'data': {'candidates': [
+        {'candidateId': 'ca', 'formattedAddress': '100th St, 1578, Tisdale, SK',
+         'location': {'street': '100th St', 'number': '1578', 'state': 'SK'}, 'coordinates': {'latitude': 52.8}},
+        {'candidateId': 'br', 'formattedAddress': 'Avenida Paulista, 1578',
+         'location': {'street': 'Avenida Paulista', 'number': '1578', 'neighborhood': 'Bela Vista', 'state': 'SP'},
+         'coordinates': {'latitude': -23.5, 'longitude': -46.6}}]}}
+    assert [c['id'] for c in Ifood(lambda tool, **a: real).geocodificar('x')['candidatos']] == ['br']

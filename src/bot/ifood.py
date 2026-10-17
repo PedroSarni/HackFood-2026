@@ -91,14 +91,36 @@ def opcoes_para_carrinho(opcoes, modo=None):
     return list(grupos.values())
 
 
+UFS_BR = {'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE',
+          'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'}
+
+
+def _sem_envelope(d):
+    """O MCP real responde `{"success": true, "data": {...}, "agentHints": {...}}` (visto em
+    17/10 no createAddress: os candidates vêm DENTRO de data). Achata pra o resto do código ler
+    os campos direto, aceite a resposta venha embrulhada ou não."""
+    if not isinstance(d, dict):
+        return d
+    dados = d.get('data')
+    resto = {k: v for k, v in d.items() if k != 'data'}
+    if isinstance(dados, dict):
+        return {**resto, **dados}
+    if isinstance(dados, list):
+        return {**resto, 'results': dados}
+    return d
+
+
 class Ifood:
     def __init__(self, chamar):
-        self._chamar = chamar   # função chamar(tool, **args) -> dict (ClienteMCP ou McpFake)
+        self._chamar_cru = chamar   # função chamar(tool, **args) -> dict (ClienteMCP ou McpFake)
+
+    def _chamar(self, ferramenta, **args):
+        return _sem_envelope(self._chamar_cru(ferramenta, **args))
 
     # --- usuário e endereço -------------------------------------------------------------
 
     def usuario(self):
-        d = _campo(self._chamar('getUser'), 'data', padrao={})
+        d = self._chamar('getUser')
         return {'nome': _campo(d, 'fullName', padrao=''), 'email': _campo(d, 'email'),
                 'telefone': _campo(d, 'phone'), 'cpf': _campo(d, 'taxPayerIdentificationNumber')}
 
@@ -132,9 +154,10 @@ class Ifood:
             coords = _campo(c, 'coordinates', padrao={}) or {}
             cands.append({'id': _campo(c, 'candidateId'), 'texto': _campo(c, 'formattedAddress', padrao=rua),
                           'titulo': rua or _campo(c, 'formattedAddress', padrao='')[:24],
-                          'bairro': loc.get('neighborhood') or '', 'endereco': texto,
+                          'bairro': loc.get('neighborhood') or '', 'endereco': texto, 'uf': loc.get('state') or '',
                           'lat': coords.get('latitude'), 'lng': coords.get('longitude')})
-        return {'criado': None, 'candidatos': [c for c in cands if c['id']]}
+        # CEP solto confunde o geocode do iFood (01310-100 já deu Canadá, 20040-002 Amsterdã): fora do Brasil não entrega
+        return {'criado': None, 'candidatos': [c for c in cands if c['id'] and c['uf'] in UFS_BR]}
 
     def criar_endereco(self, candidato, complemento='', apelido='Casa', bairro=None):
         """Passo 2: confirma o candidato. A doc pede o mesmo `address` junto do candidateId;

@@ -154,7 +154,8 @@ def _normalizar_com(texto, perto, http):
         if not perto and _sem_acento(cidade) not in _sem_acento(texto):
             return None
         rua = a['road']
-        numero = a.get('house_number') or _numero(texto, rua)
+        # o número que a pessoa digitou ganha: o OSM devolve o do prédio mapeado mais perto (1578 -> 1600)
+        numero = _numero(texto, rua) or a.get('house_number') or ''
         # bairro do OSM é o do trecho da rua, não o do número: só vai se a pessoa escreveu ele
         bairro = next((b for b in (a.get('suburb'), a.get('neighbourhood'), a.get('quarter'))
                        if b and _citou_bairro(b, texto)), '')

@@ -625,7 +625,7 @@ class Bot:
             try:
                 r = self.ctx.ifood(self.wa).geocodificar(consulta)
             except ErroMCP as e:
-                if str(e.codigo) not in ('PLACE_NOT_FOUND', 'MISSING_ADDRESS'):
+                if str(e.codigo) not in ('PLACE_NOT_FOUND', 'MISSING_ADDRESS', 'CANDIDATE_NOT_FOUND', 'GEOCODE_FAILED'):
                     raise
                 r = {}
             if r.get('criado') or r.get('candidatos'):
