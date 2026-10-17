@@ -28,12 +28,29 @@ a.botao { display:block; text-align:center; background:var(--marca); color:#fff;
           font-size:1.2em; font-weight:600; padding:18px; border-radius:14px; margin:28px 0 0; }
 footer { margin-top: 40px; border-top: 1px solid var(--borda); padding-top: 12px; }
 footer a { color: var(--marca); }
-/* tela de login concluído: vermelho do iFood */
-body.vermelha { --marca:#ea1d2c; --fundo:#fff5f5; }
-@media (prefers-color-scheme: dark) { body.vermelha { --marca:#ff4d5a; --fundo:#1f1212; } }
-body.vermelha .grande { color: var(--marca); }
-.selo { width:96px; height:96px; margin:24px auto 0; border-radius:50%; background:var(--marca);
-        color:#fff; font-size:56px; line-height:96px; text-align:center; font-weight:700; }
+/* login concluído no visual do app do iFood: fundo branco sempre, vermelho só na ação */
+body.ifood { --fundo:#ffffff; --texto:#3e3e3e; --suave:#717171; --marca:#ea1d2c; --borda:#f2f2f2;
+             background:#ffffff; color:#3e3e3e; }
+body.ifood main { max-width: 440px; padding: 24px 20px 40px; }
+.topo { display:flex; align-items:center; justify-content:center; gap:12px; padding:8px 0 20px;
+        border-bottom:1px solid #f2f2f2; }
+.topo svg { width:72px; height:auto; color:#ea1d2c; }
+.topo .x { color:#a6a6a6; font-size:.9em; }
+.topo img { width:36px; height:36px; border-radius:10px; }
+.check { width:88px; height:88px; margin:36px auto 0; border-radius:50%; background:#ea1d2c;
+         display:flex; align-items:center; justify-content:center; box-shadow:0 8px 24px rgba(234,29,44,.25); }
+.check svg { width:44px; height:44px; }
+body.ifood h1 { text-align:center; font-size:1.5em; font-weight:700; color:#3e3e3e; margin:24px 0 8px; }
+body.ifood .sub { text-align:center; color:#717171; margin:0 0 24px; }
+.cartao { background:#f7f7f7; border-radius:12px; padding:16px; display:flex; gap:12px; align-items:center; }
+.cartao .bola { flex:none; width:40px; height:40px; border-radius:50%; background:#fff; display:flex;
+                align-items:center; justify-content:center; }
+.cartao .bola svg { width:28px; color:#ea1d2c; }
+.cartao b { display:block; color:#3e3e3e; font-size:.95em; }
+.cartao span { color:#717171; font-size:.85em; }
+body.ifood a.botao { border-radius:8px; font-size:1.05em; font-weight:600; padding:16px; margin-top:24px;
+                     box-shadow:0 4px 12px rgba(234,29,44,.2); }
+body.ifood .rodape { text-align:center; color:#a6a6a6; font-size:.8em; margin-top:20px; }
 """
 
 
@@ -185,11 +202,33 @@ def tela(icone, titulo, texto, botao=None, link=None):
 {acao}""")
 
 
-def logou(texto, botao, link):
-    """Tela de login concluído, em vermelho."""
-    acao = f'<a class="botao" href="{html.escape(link)}">{html.escape(botao)}</a>'
+# logo oficial do iFood (Wikimedia Commons, IFood_logo.svg) com a cor herdada do CSS
+LOGO_IFOOD = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1004 530.58" role="img" aria-label="iFood">'
+              '<g transform="translate(4 -224.71)" fill="currentColor">'
+              '<path d="M-4,529.31H72.41l42.46-211.2H38.45ZM42.66,292.92h76.73L132,229.73H55.3Zm59.47,295.82h76.42l46.69'
+              '-228.18h57.31L291,318.11H234.79l2.13-9.55c3.18-18,9.55-38.21,38.2-38.21,17,0,32.91,1.06,48.82,8.49l8.5-44'
+              '.57a167.8,167.8,0,0,0-55.19-9.56c-61.56,0-104,36.09-119.93,93.4H130.79l-8.49,42.45h26.53Z"/>'
+              '<path d="M344.11,533.56c90.21,0,152.83-81.73,152.83-148.59,0-49.88-45.64-71.11-90.21-71.11C308,313.86,253.9'
+              ',402,253.9,462.45c0,49.88,46.7,71.11,90.21,71.11m242,0c90.21,0,152.83-81.73,152.83-148.59,0-49.88-46.7-71'
+              '.11-91.28-71.11-98.7,0-152.82,88.09-152.82,148.59,0,49.88,47.76,71.11,91.27,71.11m277-4.25h75.35L1000,229'
+              'H923.59l-18.05,89.15-31.84-3.18c-74.29,0-142.21,95.51-142.21,163.44,0,27.59,18,55.19,48.82,55.19,43.51,0'
+              ',74.29-21.23,87-42.46h4.24ZM627.48,687.45a295,295,0,0,1-212.26,66.86c-100.83-6.37-173-83.85-185.73-165.57'
+              'h4.24c23.35,51,79.6,98.71,148.59,106.13,70,8.49,153.89-23.34,199.52-66.86L530.9,588.74H684.79l-34,163.45'
+              '-22.29-63.68Z"/></g></svg>')
+_CHECK = ('<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" '
+          'stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>')
+
+
+def logou(texto, botao, link, logo_url='/logo.png'):
+    """Tela de login concluído no visual do app do iFood. É a NOSSA página (domínio nosso, não
+    pede nada): a logo do iFood aparece como a conta que foi conectada, ao lado da nossa."""
     return _pagina('Pronto, você entrou!', f"""
-<div class="selo">✓</div>
-<p class="grande"><b>Pronto, você entrou!</b></p>
-<p style="text-align:center">{html.escape(texto)}</p>
-{acao}""", classe='vermelha')
+<div class="topo">{LOGO_IFOOD}<span class="x">+</span>
+  <img src="{html.escape(logo_url)}" alt="{html.escape(NOME)}"></div>
+<div class="check">{_CHECK}</div>
+<h1>Pronto, você entrou!</h1>
+<p class="sub">{html.escape(texto)}</p>
+<div class="cartao"><div class="bola">{LOGO_IFOOD}</div>
+  <div><b>Conta iFood conectada</b><span>{html.escape(NOME)} já pode montar seus pedidos.</span></div></div>
+<a class="botao" href="{html.escape(link)}">{html.escape(botao)}</a>
+<p class="rodape">Pra desconectar, é só escrever <b>sair</b> no WhatsApp.</p>""", classe='ifood')
