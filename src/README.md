@@ -32,10 +32,10 @@ WhatsApp → POST /whatsapp (webhook, responde 200 na hora)
 | Gemini com JSON garantido + modelo reserva | `shared/llm.py` | ✅ pronto |
 | Junta rajada de mensagens (idoso manda 5 mensagens seguidas) | `shared/buffer.py` | ✅ pronto |
 | Cliente MCP (JSON-RPC, sessão, 3 formatos de erro) + OAuth PKCE | `shared/ifood_mcp.py` | ✅ pronto, falta testar com credencial real |
-| App Modal: webhook, login do iFood, páginas públicas | `app.py`, `web/` | ✅ no ar (webhook ainda não recebe o número) |
+| App Modal: webhook, login do iFood, páginas públicas | `app.py`, `web/` | ✅ no ar (o número já entrega no `/whatsapp`, via `scripts/virar_webhook.py`) |
 | Fluxo da conversa (login, endereço, busca com 3 cards, "Mais opções", opções do item, carrinho, entrega, pagamento, cupom, CPF, resumo, confirmação) | `bot/fluxo.py` | 🚧 escrito, em teste |
 | Tradutor MCP ↔ fluxo (formatos da doc do portal) | `bot/ifood.py` | 🚧 escrito, em teste |
-| MCP falso pra demo/teste sem credencial | `shared/mcp_fake.py` | 🚧 ajustando pro formato real da doc |
+| MCP falso pra demo/teste sem credencial | `shared/mcp_fake.py` | ✅ pronto, formato igual ao da doc (pedido completo roda nele; liga com `IFOOD_MOCK=1`) |
 | Rastreio (segue agentHints) e lembretes de recorrência | `bot/rastreio.py`, `bot/recorrencia.py` | 🚧 escrito, em teste |
 | Ordem de prioridade dos itens | `bot/ranking.py` | ⏳ esperando a regra do time |
 
