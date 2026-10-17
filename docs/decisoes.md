@@ -3,6 +3,7 @@
 > Formato: - [HH:MM] Decisão — motivo — quem decidiu. Mais novo no topo.
 > Registrar na hora, não depois.
 
+- [20h] Submissão: provável repo do GitHub, instruções domingo de manhã [assumido]
 - [17h37] Login do iFood só pela web (id.ifood.com.br/authorize), sem o OneLink do app: é o recomendado pro nosso caso, o fluxo do app exige redirect por Universal/App Link — Fabio
 - [17h00] Pagamento só PIX e vales: cartão exige cardTokenId e o listPaymentMethods sempre devolve null (não há API de tokenização) — Fabio (registrado por Davi)
 - [16h55] Ideia fechada: agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital). Botões sempre, 3 opções por vez com "Mais opções", entende texto, áudio e foto, aguenta várias mensagens seguidas e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência — time (registrado por Davi)
