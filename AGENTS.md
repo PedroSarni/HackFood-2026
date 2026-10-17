@@ -41,6 +41,14 @@ Se o `git config user.email` não for o do Fabio e alguém pedir para mudar um d
 Diga que as regras são do Fabio e, se ajudar, escreva no chat a mudança sugerida para a pessoa levar até ele.
 Quem fiscaliza: o hook `.githooks/pre-commit` e o CI.
 
+## 0.2 Contexto do projeto (ler antes de decidir produto ou MCP)
+
+- `docs/contexto-evento.md`: regras do evento, critérios da banca, entregáveis e fatos do MCP do iFood
+- `docs/estado.md`: o que está pronto, em andamento e bloqueado
+- `docs/decisoes.md`: diário de decisões do time
+- `docs/referencias.md`: Magalu, Ailo e padrões de mercado
+- `regras da api/ifood-mcp-developer-portal.json`: resumo do MCP do iFood. Usar este, não a doc online.
+
 ## 1. Fluxo: checar → claim → código → push contínuo
 
 Modelo **trunk-based**: todo mundo trabalha em `main` e integra em pedaços pequenos várias vezes por hora.
