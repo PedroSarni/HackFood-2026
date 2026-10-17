@@ -49,7 +49,7 @@ def test_cadastro_de_endereco_e_busca_continua_sozinha():
     endereco_pronto(m)
     e = m.estado()
     assert e['endereco']['id'] and e['endereco']['lat'] is not None
-    assert len(m.wpp.cards()) == 3  # já buscou o pão depois de salvar o endereço
+    assert [t for t, _ in m.wpp.saida].count('carrossel') == 1 and len(m.wpp.cards()) >= 2  # já buscou o pão
     criar = m.mcp.chamadas_de('createAddress')
     assert criar[-1]['candidateId'] and criar[-1]['address']  # doc: mandar os dois
 
@@ -118,7 +118,9 @@ def test_endereco_invalido_pede_de_novo():
 
 # --- busca, cards e "mais opções" --------------------------------------------------------
 
-def test_mais_opcoes_reaproveita_a_lista_sem_buscar_de_novo():
+def test_mais_opcoes_reaproveita_a_lista_sem_buscar_de_novo(monkeypatch):
+    from src.bot import fluxo
+    monkeypatch.setattr(fluxo, 'POR_PAGINA', 3)  # carrossel de 3 pra a lista falsa ter página 2
     m = Mundo()
     endereco_pronto(m)
     buscas = len(m.mcp.chamadas_de('searchOffers'))
@@ -175,7 +177,7 @@ def test_rajada_vira_uma_interpretacao_so():
     antes = m.llm.chamadas
     m.enviar('oi', 'quero', 'leite', 'por favor')
     assert m.llm.chamadas == antes + 1
-    assert sum(1 for c in m.wpp.cards()) == 3  # uma resposta só: os 3 cards do leite
+    assert [t for t, _ in m.wpp.saida].count('carrossel') == 1  # uma resposta só: um carrossel do leite
 
 
 def test_lista_de_compras_faz_um_item_de_cada_vez_na_mesma_loja():
@@ -423,3 +425,28 @@ def test_opcoes_dos_saches_viram_botoes_inteiros_com_detalhe_no_texto():
     assert [t for _, t in d['botoes']] == ['Sim, desejo sachês', 'Não desejo sachês']
     assert 'maionese, kethchup e mostarda' in d['texto']
     assert bot.u['pergunta']['titulos'][0].startswith('Sim, desejo sachês (')  # digitar o nome inteiro ainda vale
+
+
+# --- carrossel ------------------------------------------------------------------------------
+
+def test_ofertas_vao_num_carrossel_com_foto_e_quero_esse_em_todo_card():
+    m = Mundo()
+    endereco_pronto(m)
+    (tipo, d), = [(t, x) for t, x in m.wpp.saida if t == 'carrossel']
+    assert 'Arraste' in d['texto']
+    assert all(c['imagem'].startswith('https://') and c['botoes'][0][1] == 'Quero esse' for c in d['cards'])
+    m.tocar(d['cards'][1]['botoes'][0][0])  # tocar no 2º card escolhe o 2º produto
+    assert m.estado()['fase'] in ('quantidade', 'opcao', 'mais')
+
+
+def test_meta_recusou_carrossel_volta_pros_3_cards_soltos():
+    m = Mundo()
+    original = m.wpp._real.carrossel
+
+    def recusa(*a, **kw):
+        from src.shared.whatsapp import ErroWhatsApp
+        raise ErroWhatsApp(400, 'carousel not supported')
+    m.wpp._real.carrossel = recusa
+    endereco_pronto(m)
+    m.wpp._real.carrossel = original
+    assert len(m.wpp.cards()) == 3 and all(t != 'carrossel' for t, _ in m.wpp.saida)

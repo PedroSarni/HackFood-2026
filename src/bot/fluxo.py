@@ -22,7 +22,10 @@ from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 from src.shared.llm import ErroLLM
 from src.shared.whatsapp import MAX_BOTAO, MAX_LINHA, ErroWhatsApp, partir
 
-POR_PAGINA = 3          # cards por vez ("Mais opções" mostra os próximos 3 da MESMA lista)
+POR_PAGINA = 10         # cards por vez no carrossel ("Mais opções" mostra os próximos da MESMA lista)
+POR_PAGINA_SEM_CARROSSEL = 3  # se a Meta recusar o carrossel, volta pros cards soltos
+# carrossel exige foto em todo card: produto sem foto usa a nossa logo
+FOTO_PADRAO = (os.environ.get('HACKFOOD_BASE') or 'https://fabio-araujo-silva--hackfood-bot.us-east.modal.run') + '/logo.png'
 LISTAS_GUARDADAS = 3    # listas antigas que ainda aceitam toque de botão
 PEDIDOS_GUARDADOS = 10
 TRIVIAIS = {'saudacao', 'agradecer', 'sim'}
@@ -768,14 +771,27 @@ class Bot:
     def mostrar_pagina(self, lid):
         u = self.u
         lst = u['listas'][lid]
-        pagina = lst['ofertas'][lst['pos']:lst['pos'] + POR_PAGINA]
         inicio = lst['pos']
-        lst['pos'] += len(pagina)
         if inicio == 0 and u.get('endereco') and not (u.get('carrinho') or {}).get('itens'):
             self.dizer(T.entregando_em(u['endereco'].get('apelido') or 'Casa', u['endereco'].get('texto', '')))
-        for i, of in enumerate(pagina, start=inicio):
-            self.wpp.botoes(self.wa, T.card(of), [(f'pick:{lid}:{i}', T.B_QUERO)],
-                            imagem=of.get('imagem') or None)
+        pagina = lst['ofertas'][inicio:inicio + POR_PAGINA]
+        enviado = False
+        if len(pagina) >= 2:  # carrossel pede de 2 a 10 cards
+            try:
+                self.wpp.carrossel(self.wa, T.topo_carrossel(lst['termo']),
+                                   [(of.get('imagem') or FOTO_PADRAO, T.card_curto(of), [(f'pick:{lid}:{i}', T.B_QUERO)])
+                                    for i, of in enumerate(pagina, start=inicio)])
+                enviado = True
+            except ErroWhatsApp as e:
+                if e.status != 400:
+                    raise
+                print(f'carrossel recusado, indo de cards soltos: {e}')
+        if not enviado:
+            pagina = pagina[:POR_PAGINA_SEM_CARROSSEL]
+            for i, of in enumerate(pagina, start=inicio):
+                self.wpp.botoes(self.wa, T.card(of), [(f'pick:{lid}:{i}', T.B_QUERO)],
+                                imagem=of.get('imagem') or None)
+        lst['pos'] = inicio + len(pagina)
         u['fase'] = 'escolhendo'
         u['visiveis'] = [f'pick:{lid}:{i}' for i in range(inicio, inicio + len(pagina))]
         self._rodape_cards()

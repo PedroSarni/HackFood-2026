@@ -60,6 +60,22 @@ def erro_meta(p):
         if len(set(ids)) != len(ids) or any(len(i) > 256 for i in ids):
             return 'id de botão repetido ou > 256'
         return None
+    if it['type'] == 'carousel':
+        cards = it['action']['cards']
+        if not 2 <= len(cards) <= 10:
+            return 'carrossel fora de 2..10 cards'
+        if [c['card_index'] for c in cards] != list(range(len(cards))):
+            return 'card_index fora de ordem'
+        if any(not (c.get('header') or {}).get('image', {}).get('link', '').startswith('https://') for c in cards):
+            return 'card sem foto https'
+        if any(tamanho(c['body']['text']) > 160 or c['body']['text'].count('\n') > 2 for c in cards):
+            return 'texto do card > 160 ou > 2 quebras'
+        if len({len(c['action']['buttons']) for c in cards}) != 1:
+            return 'cards com número diferente de botões'
+        bts = [b['quick_reply'] for c in cards for b in c['action']['buttons']]
+        if any(not b['title'] or tamanho(b['title']) > 20 for b in bts) or len({b['id'] for b in bts}) != len(bts):
+            return 'botão do card > 20 ou id repetido'
+        return None
     if it['type'] == 'list':
         act = it['action']
         if not act['button'] or tamanho(act['button']) > 20:
@@ -110,6 +126,9 @@ class WhatsAppFake:
     def botoes(self, to, texto, botoes, imagem=None, rodape=None):
         return self._real.botoes(to, texto, botoes, imagem=imagem, rodape=rodape)
 
+    def carrossel(self, to, texto, cards):
+        return self._real.carrossel(to, texto, cards)
+
     def lista(self, to, texto, rotulo, linhas, titulo_secao='Opções', rodape=None):
         return self._real.lista(to, texto, rotulo, linhas, titulo_secao=titulo_secao, rodape=rodape)
 
@@ -148,13 +167,21 @@ class WhatsAppFake:
                 ids += [i for i, _ in d['botoes']]
             elif tipo == 'lista':
                 ids += [i for i, _, _ in d['linhas']]
+            elif tipo == 'carrossel':
+                ids += [i for c in d['cards'] for i, _ in c['botoes']]
         return ids
 
     def textos(self):
         return [d.get('texto', '') for _, d in self.saida]
 
     def cards(self):
-        return [d for t, d in self.saida if t == 'botoes' and any(i.startswith('pick:') for i, _ in d['botoes'])]
+        saida = []
+        for t, d in self.saida:
+            if t == 'carrossel':
+                saida += d['cards']
+            elif t == 'botoes' and any(i.startswith('pick:') for i, _ in d['botoes']):
+                saida.append(d)
+        return saida
 
 
 def _simplificar(p):
@@ -171,6 +198,11 @@ def _simplificar(p):
         return 'botoes', {'to': to, 'texto': it['body']['text'],
                           'botoes': [(b['reply']['id'], b['reply']['title']) for b in it['action']['buttons']],
                           'imagem': (it.get('header') or {}).get('image', {}).get('link')}
+    if it['type'] == 'carousel':
+        return 'carrossel', {'to': to, 'texto': it['body']['text'], 'cards': [
+            {'texto': c['body']['text'], 'imagem': c['header']['image']['link'],
+             'botoes': [(b['quick_reply']['id'], b['quick_reply']['title']) for b in c['action']['buttons']]}
+            for c in it['action']['cards']]}
     if it['type'] == 'list':
         rows = [r for s in it['action']['sections'] for r in s['rows']]
         return 'lista', {'to': to, 'texto': it['body']['text'],

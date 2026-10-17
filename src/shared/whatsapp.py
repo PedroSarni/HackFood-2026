@@ -22,6 +22,8 @@ MAX_LINHA = 24       # título de linha de lista
 MAX_DESCR = 72       # descrição de linha de lista
 MAX_LINHAS = 10      # linhas por lista (somando as seções)
 MAX_RODAPE = 60
+MAX_CARDS = 10       # carrossel: de 2 a 10 cards
+MAX_CORPO_CARD = 160 # texto de cada card, até 2 quebras de linha
 MAX_ID = 200         # id de botão/linha (a Meta aceita 256; folga pra prefixo)
 
 # pausa mínima entre duas mensagens seguidas pra mesma pessoa. A Meta não garante a ordem
@@ -180,6 +182,23 @@ class WhatsApp:
             inter['footer'] = {'text': linha(rodape, MAX_RODAPE)}
         return self._mandar(to, {'type': 'interactive', 'interactive': inter},
                             pausa=PAUSA_FOTO if imagem else None)
+
+    def carrossel(self, to, texto, cards):
+        """Carrossel interativo (sem template): cards = [(imagem, texto, [(id, título)])], de 2 a 10.
+        A foto é obrigatória em todo card e todos precisam do MESMO número de botões."""
+        cards = cards[:MAX_CARDS]
+        saida = []
+        for n, (imagem, corpo, botoes) in enumerate(cards):
+            corpo = '\n'.join(str(corpo or '').split('\n')[:3])  # Meta: no máximo 2 quebras de linha
+            titulos = titulos_unicos([t for _, t in botoes], MAX_BOTAO)
+            saida.append({'card_index': n, 'type': 'cta_url',  # assim mesmo na doc, até com quick_reply
+                          'header': {'type': 'image', 'image': {'link': imagem}},
+                          'body': {'text': bloco(corpo, MAX_CORPO_CARD)},
+                          'action': {'buttons': [{'type': 'quick_reply',
+                                                  'quick_reply': {'id': str(i)[:MAX_ID], 'title': tt}}
+                                                 for (i, _), tt in zip(botoes, titulos)]}})
+        inter = {'type': 'carousel', 'body': {'text': bloco(texto, MAX_CORPO)}, 'action': {'cards': saida}}
+        return self._mandar(to, {'type': 'interactive', 'interactive': inter}, pausa=PAUSA_FOTO)
 
     def lista(self, to, texto, rotulo, linhas, titulo_secao='Opções', rodape=None):
         """linhas: [(id, título, descrição)], no máximo 10. rotulo: texto do botão que abre."""

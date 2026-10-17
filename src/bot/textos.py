@@ -145,6 +145,21 @@ def card(oferta):
 B_QUERO = 'Quero esse'
 
 
+def card_curto(oferta):
+    """Card do carrossel: 160 caracteres e 3 linhas no máximo (limite da Meta)."""
+    nome = oferta['nome'] if len(oferta['nome']) <= 70 else oferta['nome'][:69].rstrip() + '…'
+    preco = f'💰 {reais(oferta.get("preco"))}'
+    if oferta.get('preco_antigo'):
+        preco += f' ~{reais(oferta["preco_antigo"])}~'
+    extras = [x for x in (f'⭐ {str(oferta["nota"]).replace(".", ",")}' if oferta.get('nota') else '',
+                          f'🛵 {oferta["tempo"]}' if oferta.get('tempo') else '') if x]
+    loja = (oferta.get('loja') or '')[:40]
+    return '\n'.join([f'*{nome}*', preco + (f' · {loja}' if loja else ''), ' · '.join(extras)]).strip()
+
+
+def topo_carrossel(termo):
+    return f'Achei *{termo}* pra você 👇\nArraste pro lado pra ver todas e toque em *{B_QUERO}*.'
+
 def rodape_opcoes(tem_mais):
     if tem_mais:
         return 'Gostou de algum? Toque em *Quero esse* 👆\nSe não, peça mais opções:'
