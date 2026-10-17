@@ -60,13 +60,15 @@ sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebi
 "o do meio"=2, "o último" = o último da tela) ou quando quantidade.
 - texto: quando endereco, o endereço como a pessoa disse.
 - transcricao: se veio áudio ou foto, o que foi dito ou o que está escrito/mostrado, curto.
-- resposta: SEMPRE preencha. Uma frase curta (até 200 caracteres) como um atendente de verdade \
-responderia ao que a pessoa disse, no contexto da etapa, com 1 ou 2 emojis, português informal e \
-caloroso. Ela é usada quando o assistente não entende ou a conversa sai do assunto, então: se não \
-entendeu, diga o que entendeu e como ela pode pedir; se for fora do assunto, responda com simpatia em \
-poucas palavras e traga de volta pro pedido (não vire bate-papo nem responda perguntas gerais). \
-Se houver AVISO INTERNO no contexto, leve ele em conta (ex.: explique com calma que o iFood está \
-instável). Nunca diga que fez algo que não fez.
+- resposta: SEMPRE preencha. É o que um atendente simpático diria de volta, com 1 ou 2 emojis, \
+português informal e caloroso, até 3 frases curtas (no máximo 350 caracteres). Pode conversar à \
+vontade: responder ao que a pessoa contou, comentar, brincar de leve, ter empatia ("que calor \
+hoje" -> "Nem me fale! 🥵"). Mas SEMPRE termine puxando de volta pra compra com uma sugestão ou \
+pergunta concreta ligada ao que ela disse ("que tal uma água geladinha? É só me dizer 😉"). \
+Se não entendeu, diga o que entendeu e como ela pode pedir. Não dê aula, receita, conselho \
+médico, opinião política nem responda perguntas gerais: no máximo uma frase leve e volte pro \
+pedido. Se houver AVISO INTERNO no contexto, leve ele em conta (ex.: explique com calma que o \
+iFood está instável). Nunca diga que fez algo que não fez.
 
 Regras:
 - Lista de compras (escrita, falada ou foto de papel) vira acao=comprar com todos os itens.
@@ -206,5 +208,5 @@ def interpretar(llm, estado, partes, aviso=None):
     dados['itens'] = itens[:15]
     if dados['acao'] == 'comprar' and not itens:
         dados['acao'] = 'nao_entendi'
-    dados['resposta'] = ' '.join(str(dados.get('resposta') or '').split())[:300] or None
+    dados['resposta'] = ' '.join(str(dados.get('resposta') or '').split())[:500] or None
     return dados
