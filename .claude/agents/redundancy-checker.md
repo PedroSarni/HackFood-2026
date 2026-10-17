@@ -82,5 +82,8 @@ Combinar com: Ana, João
 - `refactor-dedupe-money` (Ana + João) — grupos 1, 4
 ```
 
+Inclua uma seção **Stubs parados**: `git grep -n "STUB — dono"` e, para cada um, a idade do commit que o
+criou (`git log -1 --format=%ar -S "STUB — dono" -- <arquivo>`). Liste os que têm mais de 1h, com dono e claim.
+
 Termine com no máximo 3 linhas dizendo o que vale atacar primeiro antes da demo. Se nada relevante
 for encontrado, diga isso em uma linha. Não invente grupos para preencher o relatório.

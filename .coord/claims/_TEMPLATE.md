@@ -13,6 +13,12 @@ Uma ou duas frases sobre a feature e o que ela NÃO cobre.
 
 - src/...
 
+## Peças compartilháveis que vou criar
+
+<!-- helpers, componentes genéricos, endpoints, models, tabelas. Cada uma vira stub em src/shared/ antes de implementar (AGENTS.md §1.3) -->
+
+- `src/shared/...` — `nomeDaPeca(args): Retorno` — stub | pronto
+
 ## Onde está (preencher ao terminar)
 
 - `src/...` — `nomeDaFuncao()`, rota `POST /api/...`, componente `<Xyz />`

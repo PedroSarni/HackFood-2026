@@ -67,11 +67,40 @@ git pull --rebase && git push
 - Slug: `<área>-<coisa>`, kebab-case, em inglês. Ex.: `auth-login`, `api-payments`, `ui-navbar`.
   Antes de inventar um slug, veja os que já existem na mesma área.
 - `owner` = o humano (`git config user.name`), nunca o nome do agente.
+- Preencha **"Peças compartilháveis que vou criar"** com tudo que dá para prever: helpers, componentes genéricos,
+  endpoints, models, tabelas. Antes de listar cada uma, procure nos claims e no código; se já existe ou está
+  listada em outro claim, reuse ou combine com o dono.
 
-### 1.3 Durante o trabalho
+### 1.3 Peças compartilháveis: contrato primeiro
+
+Vale para qualquer peça que outra feature poderia usar (helper, componente genérico, endpoint, model, tabela),
+inclusive as que surgem no meio do trabalho:
+
+1. `git pull --rebase`, depois procure a peça nos claims e no código (nomes e sinônimos, como em 1.1).
+2. Existe ou está em outro claim → use, estenda ou espere. Não reimplemente.
+3. Não existe → **pushe primeiro um stub** em `src/shared/<tema>` (assinatura, tipos e o comentário abaixo),
+   adicione a peça ao seu claim no mesmo commit (`chore(stub): <peça>`) e só então implemente.
+   O push do stub é a trava.
+
+```ts
+// STUB — dono: Ana (claim ui-cart). Em implementação: use esta assinatura, não reimplemente.
+export function formatPrice(cents: number, currency = "BRL"): string {
+  throw new Error("TODO: formatPrice");
+}
+```
+
+- Implemente o stub logo (até ~30 min) e apague o comentário `STUB` no commit que o completa.
+- Encontrou um stub de outra pessoa que você precisa? Programe contra a assinatura. Precisa mudar a assinatura?
+  Combine com o dono antes.
+
+### 1.4 Durante o trabalho
 
 - **Commit + push a cada passo que funciona** (compila/roda). Nunca passe de ~20 min ou ~150 linhas sem push.
 - Sempre `git pull --rebase` antes de `git push`. Nada de merge commit de pull.
+- **A cada pull, veja o que chegou** antes do rebase:
+  `git fetch && git diff --name-only HEAD...@{u} -- src/shared .coord/claims`.
+  Se apareceu algo equivalente ao que você está fazendo, passe a usar aquilo e descarte a sua versão.
+  Se a sua já estava pushada, avise o humano para combinarem qual fica.
 - Edite só os arquivos listados no seu claim. Se o claim crescer, atualize a lista no mesmo commit.
 - Precisa mexer em arquivo de **outro claim ativo**? Faça a mudança mínima, num commit isolado, e avise o humano.
 - **Arquivos compartilhados** (manifest de dependências, lockfiles, rotas centrais, schema/migrations,
@@ -79,7 +108,7 @@ git pull --rebase && git push
 - Nunca reformate, renomeie ou mova arquivos fora do seu claim. Refactor amplo precisa de claim próprio
   (`refactor-<x>`) e aviso ao grupo.
 
-### 1.4 Ao terminar
+### 1.5 Ao terminar
 
 - No claim: `status: done` e preencha **"Onde está"** (arquivos + funções/rotas/componentes públicos).
   Isso vira o índice de features que os próximos agentes consultam para não duplicar.
@@ -164,7 +193,8 @@ Definição: `.claude/agents/redundancy-checker.md`.
 ```
 chegou   → hooks + pull --rebase + ler .coord/claims/
 pedido   → já existe? em andamento? → perguntar : claim + push
-código   → passo funcionou → commit → pull --rebase → push   (≤ 20 min)
+peça     → existe? → reusar : stub em src/shared/ + push → implementar
+código   → passo funcionou → commit → ver o que chegou → pull --rebase → push   (≤ 20 min)
 terminou → claim done + "Onde está" → push
 nunca    → co-autoria de IA · --no-verify · --force na main · reformatar o que não é seu
 ```
