@@ -15,6 +15,7 @@ O estado (endereços, carrinhos, pedidos) fica em `armazem[chave]`: em produçã
 modal.Dict do bot, então sobrevive entre uma mensagem e outra.
 """
 import copy
+import re
 import unicodedata
 import uuid
 
@@ -212,15 +213,17 @@ class McpFake:
         if not any(ch.isdigit() for ch in texto) or len(texto) < 8:
             raise ErroMCP('PLACE_NOT_FOUND', 'endereço não encontrado', tentar_de_novo=False,
                           bruto={'errors': {'mcpCode': -32301, 'code': 'PLACE_NOT_FOUND'}})
-        rua, _, resto = texto.partition(',')
-        numero = ''.join(ch for ch in resto if ch.isdigit())[:6] or '1'
+        # "Rua X, 120, Cidade" ou "rua x 120 cidade": rua é o que vem antes do 1º número
+        m = re.search(r'\d+', texto)
+        rua = texto[:m.start()].strip(' ,-') if m and m.start() > 0 else texto.partition(',')[0]
+        numero = m.group(0)[:6] if m else '1'
+        rua = ' '.join(p if p in ('de', 'da', 'do', 'das', 'dos', 'e') else p.capitalize() for p in rua.lower().split())
         sem_bairro = 'sem bairro' in _n(texto)  # gatilho de teste pro fluxo do bairro
         bairros = [''] if sem_bairro else ['Centro', 'Jardim São Paulo']
         cands = []
         for bairro in bairros:
             cid = f'cand-{_uid(texto, bairro)[:8]}'
-            loc = {'street': rua.strip().title(), 'number': numero, 'neighborhood': bairro,
-                   'city': 'São Carlos', 'state': 'SP'}
+            loc = {'street': rua, 'number': numero, 'neighborhood': bairro, 'city': 'São Carlos', 'state': 'SP'}
             c = {'candidateId': cid, 'location': loc, 'postalCode': '13560-000', 'coordinates': dict(COORD),
                  'formattedAddress': ', '.join(p for p in (loc['street'], numero, bairro, 'São Carlos', 'SP') if p)}
             st['candidatos'][cid] = c

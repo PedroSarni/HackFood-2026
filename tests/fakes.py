@@ -27,27 +27,100 @@ class Fila:
         return saida
 
 
+def erro_meta(p):
+    """As regras da Meta pra mensagem enviada (as que já derrubaram a gente ou podem derrubar).
+    Devolve o motivo do 400, ou None se a Meta aceitaria."""
+    from src.shared.whatsapp import tamanho
+    tipo = p.get('type')
+    if tipo == 'text':
+        corpo = p['text']['body']
+        return 'texto vazio' if not corpo.strip() else ('texto > 4096' if tamanho(corpo) > 4096 else None)
+    if tipo == 'image':
+        return None if p['image'].get('link', '').startswith('https://') else 'imagem sem https'
+    if tipo == 'template':
+        return None
+    if tipo != 'interactive':
+        return f'tipo desconhecido {tipo}'
+    it = p['interactive']
+    corpo = it['body']['text']
+    if not corpo.strip() or tamanho(corpo) > 1024:
+        return 'body vazio ou > 1024'
+    if it.get('footer') and tamanho(it['footer']['text']) > 60:
+        return 'footer > 60'
+    if it['type'] == 'button':
+        bts = it['action']['buttons']
+        if not 1 <= len(bts) <= 3:
+            return 'botões fora de 1..3'
+        titulos = [b['reply']['title'] for b in bts]
+        ids = [b['reply']['id'] for b in bts]
+        if any(not t or tamanho(t) > 20 for t in titulos):
+            return f'título de botão > 20: {titulos}'
+        if len({t.lower() for t in titulos}) != len(titulos):
+            return f'Duplicate button title: {titulos}'
+        if len(set(ids)) != len(ids) or any(len(i) > 256 for i in ids):
+            return 'id de botão repetido ou > 256'
+        return None
+    if it['type'] == 'list':
+        act = it['action']
+        if not act['button'] or tamanho(act['button']) > 20:
+            return 'rótulo da lista > 20'
+        rows = [r for s in act['sections'] for r in s['rows']]
+        if not 1 <= len(rows) <= 10:
+            return 'linhas fora de 1..10'
+        if any(tamanho(r['title']) > 24 or tamanho(r.get('description', '')) > 72 for r in rows):
+            return 'linha de lista grande demais'
+        if len({r['id'] for r in rows}) != len(rows) or len({r['title'].lower() for r in rows}) != len(rows):
+            return 'linha de lista repetida'
+        return None
+    if it['type'] == 'cta_url':
+        par = it['action']['parameters']
+        if tamanho(par['display_text']) > 20 or not par['url'].startswith(('https://', 'http://')):
+            return 'cta_url inválido'
+        return None
+    return f'interativa desconhecida {it["type"]}'
+
+
 class WhatsAppFake:
+    """Passa pelo código de verdade (src/shared/whatsapp.py: cortes, títulos únicos) e valida o
+    JSON final com as regras da Meta. O que a Meta recusaria aqui vira o mesmo ErroWhatsApp 400."""
+
     def __init__(self):
-        self.saida = []   # (tipo, dados)
+        import httpx
+
+        from src.shared.whatsapp import WhatsApp
+        self.saida = []   # (tipo, dados), já no formato que chegou na "Meta"
+        self.recusadas = []
+
+        def meta(req):
+            import json
+            p = json.loads(req.content)
+            if p.get('status') == 'read':
+                return httpx.Response(200, json={'success': True})
+            erro = erro_meta(p)
+            if erro:
+                self.recusadas.append((erro, p))
+                return httpx.Response(400, json={'error': {'code': 131009, 'message': erro}})
+            self.saida.append(_simplificar(p))
+            return httpx.Response(200, json={'messages': [{'id': f'wamid.out{len(self.saida)}'}]})
+        self._real = WhatsApp(token='t', phone_id='p', http=httpx.Client(transport=httpx.MockTransport(meta)), pausa=0)
 
     def texto(self, to, texto):
-        self.saida.append(('texto', {'to': to, 'texto': texto}))
+        return self._real.texto(to, texto)
 
     def botoes(self, to, texto, botoes, imagem=None, rodape=None):
-        self.saida.append(('botoes', {'to': to, 'texto': texto, 'botoes': list(botoes), 'imagem': imagem}))
+        return self._real.botoes(to, texto, botoes, imagem=imagem, rodape=rodape)
 
     def lista(self, to, texto, rotulo, linhas, titulo_secao='Opções', rodape=None):
-        self.saida.append(('lista', {'to': to, 'texto': texto, 'linhas': list(linhas)}))
+        return self._real.lista(to, texto, rotulo, linhas, titulo_secao=titulo_secao, rodape=rodape)
 
     def link(self, to, texto, rotulo, url, imagem=None, rodape=None):
-        self.saida.append(('link', {'to': to, 'texto': texto, 'url': url}))
+        return self._real.link(to, texto, rotulo, url, imagem=imagem, rodape=rodape)
 
     def imagem(self, to, link, legenda=''):
-        self.saida.append(('imagem', {'to': to, 'link': link}))
+        return self._real.imagem(to, link, legenda)
 
     def template(self, to, nome, idioma='pt_BR', componentes=None):
-        self.saida.append(('template', {'to': to, 'nome': nome}))
+        return self._real.template(to, nome, idioma, componentes)
 
     def digitando(self, mid):
         return True
@@ -82,6 +155,27 @@ class WhatsAppFake:
 
     def cards(self):
         return [d for t, d in self.saida if t == 'botoes' and any(i.startswith('pick:') for i, _ in d['botoes'])]
+
+
+def _simplificar(p):
+    """JSON da Meta -> (tipo, dados) que os testes leem."""
+    to = p.get('to')
+    if p['type'] == 'text':
+        return 'texto', {'to': to, 'texto': p['text']['body']}
+    if p['type'] == 'image':
+        return 'imagem', {'to': to, 'link': p['image']['link']}
+    if p['type'] == 'template':
+        return 'template', {'to': to, 'nome': p['template']['name']}
+    it = p['interactive']
+    if it['type'] == 'button':
+        return 'botoes', {'to': to, 'texto': it['body']['text'],
+                          'botoes': [(b['reply']['id'], b['reply']['title']) for b in it['action']['buttons']],
+                          'imagem': (it.get('header') or {}).get('image', {}).get('link')}
+    if it['type'] == 'list':
+        rows = [r for s in it['action']['sections'] for r in s['rows']]
+        return 'lista', {'to': to, 'texto': it['body']['text'],
+                         'linhas': [(r['id'], r['title'], r.get('description', '')) for r in rows]}
+    return 'link', {'to': to, 'texto': it['body']['text'], 'url': it['action']['parameters']['url']}
 
 
 class LlmFake:

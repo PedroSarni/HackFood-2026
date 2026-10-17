@@ -36,16 +36,43 @@ def cfg(nome):
     return '' if v == 'PREENCHER' else v
 
 
+def tamanho(s):
+    """Tamanho como a Meta conta (UTF-16): emoji fora do plano básico vale 2 ("🔎" = 2)."""
+    return len(str(s).encode('utf-16-le')) // 2
+
+
+def _cortar(s, n):
+    if tamanho(s) <= n:
+        return s
+    while s and tamanho(s) + 1 > n:
+        s = s[:-1]
+    return s.rstrip() + '…'
+
+
 def linha(s, n):
     """Uma linha só (títulos de botão/lista): junta espaços e corta com reticências."""
-    s = ' '.join(str(s or '').split())
-    return s if len(s) <= n else s[:n - 1].rstrip() + '…'
+    return _cortar(' '.join(str(s or '').split()), n)
 
 
 def bloco(s, n):
     """Texto com quebras de linha preservadas, cortado em n caracteres."""
-    s = str(s or '').strip()
-    return s if len(s) <= n else s[:n - 1].rstrip() + '…'
+    return _cortar(str(s or '').strip(), n)
+
+
+def titulos_unicos(titulos, n):
+    """A Meta recusa a mensagem inteira se dois botões (ou linhas) tiverem o mesmo título
+    (erro 131009 "Duplicate button title"). Corta no limite e numera os repetidos."""
+    saida, vistos = [], set()
+    for t in titulos:
+        base = linha(t, n) or '…'
+        cand, k = base, 2
+        while cand.lower() in vistos:
+            sufixo = f' {k}'
+            cand = linha(base, n - tamanho(sufixo)).rstrip('…').rstrip() + sufixo
+            k += 1
+        vistos.add(cand.lower())
+        saida.append(cand)
+    return saida
 
 
 class ErroWhatsApp(Exception):
@@ -95,7 +122,8 @@ class WhatsApp:
         try:
             return self.graph('POST', f'{self.phone_id}/messages', json=corpo)
         finally:
-            self._livre_em = time.monotonic() + (self.pausa if pausa is None else pausa)
+            if self.pausa:  # pausa=0 desliga todas (testes)
+                self._livre_em = time.monotonic() + (self.pausa if pausa is None else pausa)
 
     # --- mensagens ---------------------------------------------------------------------
 
@@ -107,11 +135,13 @@ class WhatsApp:
         """botoes: [(id, título)], no máximo 3. imagem: URL pública (JPG/PNG) do cabeçalho."""
         if not botoes:
             return self.texto(to, texto)
+        botoes = botoes[:MAX_BOTOES]
+        titulos = titulos_unicos([t for _, t in botoes], MAX_BOTAO)
         inter = {'type': 'button',
                  'body': {'text': bloco(texto, MAX_CORPO)},
                  'action': {'buttons': [
-                     {'type': 'reply', 'reply': {'id': str(i)[:MAX_ID], 'title': linha(t, MAX_BOTAO)}}
-                     for i, t in botoes[:MAX_BOTOES]]}}
+                     {'type': 'reply', 'reply': {'id': str(i)[:MAX_ID], 'title': t}}
+                     for (i, _), t in zip(botoes, titulos)]}}
         if imagem:
             inter['header'] = {'type': 'image', 'image': {'link': imagem}}
         if rodape:
@@ -121,9 +151,10 @@ class WhatsApp:
 
     def lista(self, to, texto, rotulo, linhas, titulo_secao='Opções', rodape=None):
         """linhas: [(id, título, descrição)], no máximo 10. rotulo: texto do botão que abre."""
-        rows = [{'id': str(i)[:MAX_ID], 'title': linha(t, MAX_LINHA),
-                 **({'description': linha(d, MAX_DESCR)} if d else {})}
-                for i, t, d in linhas[:MAX_LINHAS]]
+        linhas = linhas[:MAX_LINHAS]
+        titulos = titulos_unicos([t for _, t, _ in linhas], MAX_LINHA)
+        rows = [{'id': str(i)[:MAX_ID], 'title': t, **({'description': linha(d, MAX_DESCR)} if d else {})}
+                for (i, _, d), t in zip(linhas, titulos)]
         inter = {'type': 'list',
                  'body': {'text': bloco(texto, MAX_CORPO)},
                  'action': {'button': linha(rotulo, MAX_BOTAO),

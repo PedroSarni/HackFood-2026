@@ -21,7 +21,7 @@ B_PEDIR = ('pedir', '🛒 Fazer pedido')
 B_REPETIR = ('repetir', '🔁 Pedir de novo')
 B_MEU_PEDIDO = ('meu_pedido', '📦 Meu pedido')
 B_INICIO = ('inicio', '🏠 Início')
-B_OUTRA = ('outra', '🔎 Buscar outra coisa')
+B_OUTRA = ('outra', '🔎 Procurar outra')
 B_FINALIZAR = ('fim', '✅ Finalizar pedido')
 B_MAIS_COISAS = ('add', '➕ Quero mais coisas')
 B_TIRAR = ('tirar', '🗑️ Tirar um item')
@@ -77,6 +77,8 @@ AUDIO_RUIM = ('Não consegui ouvir seu áudio direito. 🙉\n'
 
 ERRO = ('Ops, deu um probleminha aqui do meu lado. 😕\n'
         'Toque em *Tentar de novo*.')
+ERRO_SEM_BOTAO = ('Ops, deu um probleminha aqui do meu lado. 😕\n'
+                  'Mande sua mensagem de novo, por favor.')
 
 BOTAO_VELHO = 'Esse botão é de uma conversa antiga. Vamos continuar daqui: 👇'
 

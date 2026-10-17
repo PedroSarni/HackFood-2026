@@ -65,6 +65,49 @@ def test_endereco_sem_bairro_pergunta_o_bairro():
     assert m.wpp.cards()
 
 
+def test_endereco_sem_virgula_com_candidatos_iguais_nao_quebra():
+    """Bug real de 17/10 16h43: dois candidatos com a mesma rua e número viraram dois botões
+    com o mesmo título e a Meta recusou a mensagem (131009 Duplicate button title)."""
+    m = Mundo()
+    m.enviar('quero pao de queijo')
+    m.enviar('adolfo cattani 676 sao carlos')
+    tipo, d = m.wpp.saida[-1]
+    assert tipo == 'botoes' and m.estado()['fase'] == 'endereco_escolha'
+    titulos = [t for _, t in d['botoes']]
+    assert len(set(titulos)) == len(titulos)
+    assert 'Centro' in d['texto'] and 'Jardim' in d['texto']  # endereço completo no texto
+    m.enviar('2')  # digitou o número em vez de tocar
+    assert m.estado()['fase'] == 'complemento'
+
+
+def test_mensagem_recusada_pela_meta_vira_texto_numerado():
+    m = Mundo()
+    m.wpp.esperar_recusa = True
+    m.armazem[f'u:{m.wa}'] = {'fase': 'pedido'}
+    bot = m.Bot(m.ctx)
+    bot.wa, bot.u = m.wa, bot._carregar(m.wa)
+    bot.perguntar('Escolha:', [('a', 'x' * 30), ('b', 'y')])  # força: título enorme passa pelo corte...
+    assert m.wpp.saida[-1][0] == 'botoes'  # ...e o corte resolve sozinho
+    original = m.wpp._real.botoes
+
+    def recusa(*a, **kw):
+        from src.shared.whatsapp import ErroWhatsApp
+        raise ErroWhatsApp(400, 'Parameter value is not valid')
+    m.wpp._real.botoes = recusa
+    bot.perguntar('Escolha:', [('a', 'Opção A'), ('b', 'Opção B')])
+    m.wpp._real.botoes = original
+    tipo, d = m.wpp.saida[-1]
+    assert tipo == 'texto' and '1️⃣ Opção A' in d['texto'] and 'número' in d['texto']
+    assert bot.u['pergunta']['botoes'][1][0] == 'b'  # o "2" ainda funciona
+
+
+def test_titulos_unicos_e_limite_utf16():
+    from src.shared.whatsapp import tamanho, titulos_unicos
+    t = titulos_unicos(['🔎 Buscar outra coisa', 'Casa', 'casa', 'Casa'], 20)
+    assert all(tamanho(x) <= 20 for x in t)
+    assert len({x.lower() for x in t}) == 4
+
+
 def test_endereco_invalido_pede_de_novo():
     m = Mundo()
     m.enviar('quero pao')

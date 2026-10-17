@@ -19,6 +19,7 @@ from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import cpf_em, igual_a_botao, interpretar, normalizar, numero_em, regra_rapida
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 from src.shared.llm import ErroLLM
+from src.shared.whatsapp import ErroWhatsApp
 
 POR_PAGINA = 3          # cards por vez ("Mais opções" mostra os próximos 3 da MESMA lista)
 LISTAS_GUARDADAS = 3    # listas antigas que ainda aceitam toque de botão
@@ -164,19 +165,33 @@ class Bot:
             self.erro_mcp(e)
         except Exception:
             traceback.print_exc()
-            self.perguntar(T.ERRO, [T.B_TENTAR, T.B_INICIO])
+            try:
+                self.perguntar(T.ERRO, [T.B_TENTAR, T.B_INICIO])
+            except Exception:  # noqa: BLE001 - nem o aviso com botão saiu: vai texto puro
+                traceback.print_exc()
+                self.dizer(T.ERRO_SEM_BOTAO)
 
     # ================================================================== envio
 
     def perguntar(self, texto, botoes, fase=None, rotulo='Ver opções', imagem=None, rodape=None):
         """Manda texto + botões (até 3) ou lista (4 a 10) e guarda a pergunta.
-        botoes: [(id, título)] ou [(id, título, descrição)]."""
+        botoes: [(id, título)] ou [(id, título, descrição)].
+        Se a Meta recusar a mensagem interativa (formato), manda as opções numeradas em texto:
+        a pessoa responde o número e a conversa segue (o "2" já vira o 2º botão)."""
         botoes = [tuple(b) for b in botoes]
-        if len(botoes) <= 3:
-            self.wpp.botoes(self.wa, texto, [(b[0], b[1]) for b in botoes], imagem=imagem, rodape=rodape)
-        else:
-            self.wpp.lista(self.wa, texto, rotulo, [(b[0], b[1], b[2] if len(b) > 2 else '') for b in botoes],
-                           rodape=rodape)
+        try:
+            if len(botoes) <= 3:
+                self.wpp.botoes(self.wa, texto, [(b[0], b[1]) for b in botoes], imagem=imagem, rodape=rodape)
+            else:
+                self.wpp.lista(self.wa, texto, rotulo, [(b[0], b[1], b[2] if len(b) > 2 else '') for b in botoes],
+                               rodape=rodape)
+        except ErroWhatsApp as e:
+            if e.status != 400 or not botoes:
+                raise
+            print(f'interativa recusada, indo de texto numerado: {e}')
+            opcoes = '\n'.join(f'{i}️⃣ {b[1]}' + (f' ({b[2]})' if len(b) > 2 and b[2] else '')
+                               for i, b in enumerate(botoes, 1))
+            self.dizer(f'{texto}\n\n{opcoes}\n\nResponda com o *número* da opção. 🙂')
         self.u['pergunta'] = {'texto': texto, 'botoes': [list(b[:2]) for b in botoes],
                               'titulos': [b[1] for b in botoes]}
         if fase:
@@ -259,6 +274,7 @@ class Bot:
                 if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados'):
                     self.intencao(r)
                 else:
+                    u['ultima_acao'] = ['endereco', texto]  # "Tentar de novo" reusa o que ela digitou
                     self.receber_endereco(texto)
                 return
             if fase == 'complemento':
@@ -417,6 +433,8 @@ class Bot:
             self.menu()
         elif ult[0] == 'botao':
             self.botao(ult[1])
+        elif ult[0] == 'endereco':
+            self.receber_endereco(ult[1])
         else:
             self.intencao(ult[1])
 
@@ -587,9 +605,12 @@ class Bot:
         if len(cands) == 1:
             self.escolher_candidato('0')
             return
-        botoes = [(f'cand:{i}', c.get('titulo') or c.get('texto', '')[:24], c.get('texto', ''))
+        # candidatos costumam ter a MESMA rua e número (muda o bairro): o endereço completo vai
+        # no texto, numerado, e o botão leva o número e o bairro
+        lista = '\n'.join(f'{i}️⃣ {c.get("texto", "")}' for i, c in enumerate(cands[:9], 1))
+        botoes = [(f'cand:{i}', f'{i} · {c.get("bairro") or c.get("titulo") or "Endereço"}', c.get('texto', ''))
                   for i, c in enumerate(cands[:9])]
-        self.perguntar(T.ESCOLHA_ENDERECO, botoes, fase='endereco_escolha', rotulo='Ver endereços')
+        self.perguntar(f'{T.ESCOLHA_ENDERECO}\n\n{lista}', botoes, fase='endereco_escolha', rotulo='Ver endereços')
 
     def escolher_candidato(self, arg):
         novo = self.u.get('novo_endereco') or {}
