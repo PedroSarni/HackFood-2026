@@ -2,6 +2,8 @@
 
 ## Começando (cada pessoa, uma vez por clone)
 
+O agente de cada um roda isso sozinho ao chegar (AGENTS.md §0). Sem agente, rode à mão:
+
 ```sh
 git config core.hooksPath .githooks
 git config pull.rebase true

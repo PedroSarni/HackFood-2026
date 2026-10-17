@@ -13,7 +13,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Autoria dos commits
+      - name: Range dos commits
         env:
           BEFORE: ${{ github.event.before }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -26,7 +26,13 @@ jobs:
           else
             range="$HEAD"
           fi
-          sh scripts/check-authorship.sh $range
+          echo "RANGE=$range" >> "$GITHUB_ENV"
+
+      - name: Autoria dos commits
+        run: sh scripts/check-authorship.sh $RANGE
+
+      - name: Arquivos protegidos
+        run: sh scripts/check-rules-owner.sh $RANGE
 
       - name: Descrição do PR
         if: github.event_name == 'pull_request'

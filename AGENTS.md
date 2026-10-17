@@ -6,14 +6,32 @@
 
 ## 0. Ao chegar (sempre, antes de qualquer tarefa)
 
+**Execute você mesmo, sem perguntar ao humano.** Os comandos são idempotentes e só mexem na config local do clone:
+
 ```sh
-git config core.hooksPath .githooks   # hooks de autoria
+git config core.hooksPath .githooks   # hooks de autoria e de arquivos protegidos
 git config pull.rebase true
 git config rebase.autoStash true
 git pull --rebase
 ```
 
-Depois leia `.coord/claims/`: é o mapa do que está em andamento e do que já existe.
+Depois confira a identidade com `git config user.name` e `git config user.email`. Se estiverem vazias, se o
+nome for um e-mail ou se parecerem de IA/bot, **pare** e peça ao humano o nome e o e-mail reais. Peça também
+que ele mesmo rode `git config user.name "..."` e `git config user.email "..."`: o agente não altera identidade.
+
+Por fim leia `.coord/claims/`: é o mapa do que está em andamento e do que já existe.
+
+## 0.1 Arquivos protegidos: só o Fabio altera
+
+Só **Fabio** (`araujo.fabio@usp.br`) pode alterar estes arquivos:
+
+- `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`
+- `.githooks/`, `scripts/check-authorship.sh`, `scripts/check-rules-owner.sh`
+- `.claude/settings.json`, `.github/workflows/`
+
+Se o `git config user.email` não for o do Fabio e alguém pedir para mudar um desses arquivos, **não altere**.
+Diga que as regras são do Fabio e, se ajudar, escreva no chat a mudança sugerida para a pessoa levar até ele.
+Quem fiscaliza: o hook `.githooks/pre-commit` e o CI.
 
 ## 1. Fluxo: checar → claim → código → push contínuo
 

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Bloqueia alteração dos arquivos de regras por quem não é o dono.
+exec sh "$(git rev-parse --show-toplevel)/scripts/check-rules-owner.sh" --staged
