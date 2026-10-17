@@ -1189,9 +1189,18 @@ class Bot:
         if t in ('nao', 'sem cpf', 'sem', 'nao quero', 'n', 'pular', 'nao tenho'):
             self.sem_cpf()
             return
+        if self._cpf_obrigatorio():
+            self.perguntar(T.CPF_INVALIDO, [T.B_CANCELAR], fase='cpf')
+            return
         self.perguntar(T.CPF_INVALIDO, [T.B_SEM_CPF], fase='cpf')
 
+    def _cpf_obrigatorio(self):
+        return bool((self.u.get('carrinho') or {}).get('cpf_obrigatorio'))
+
     def sem_cpf(self, _arg=None):
+        if self._cpf_obrigatorio():  # loja exige CPF na nota: "sem CPF" voltaria pro mesmo erro
+            self.perguntar(T.CPF_OBRIGATORIO, [T.B_CANCELAR], fase='cpf')
+            return
         self.u['cpf'] = ''
         self.finalizar()
 
@@ -1417,7 +1426,14 @@ class Bot:
             u['pagamento_preferido'] = None
             self.perguntar('Essa forma de pagamento não deu certo. 😕 Vamos escolher outra?',
                            [('mud:pagamento', '💳 Escolher outra'), T.B_CANCELAR])
-        elif 'DOCUMENT' in cod or 'CPF' in cod:
+        elif 'MERCH-007' in cod or 'CPF' in str(e).upper():
+            # 17/10 19h: "MERCH-007: Este restaurante obriga a digitação do CPF" caía no "Tentar de
+            # novo" genérico e a pessoa batia 3x no mesmo erro. Agora pede o CPF, sem a opção "sem CPF".
+            u['cpf'] = None
+            if u.get('carrinho'):
+                u['carrinho']['cpf_obrigatorio'] = True
+            self.perguntar(T.CPF_OBRIGATORIO, [T.B_CANCELAR], fase='cpf')
+        elif 'DOCUMENT' in cod:
             u['cpf'] = None
             self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF], fase='cpf')
         else:

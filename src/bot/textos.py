@@ -206,6 +206,9 @@ def mais_alguma(total):
 
 # --- fechamento -------------------------------------------------------------------------
 
+CPF_OBRIGATORIO = ('🧾 Essa loja exige *CPF na nota* pra fazer o pedido.\n'
+                   'Escreva seu CPF aqui (só os números), por favor. 🙂')
+
 PEDIR_CPF = ('🧾 Pra nota fiscal, me mande seu *CPF* (só os números).\n'
              'Se não quiser, toque em *Sem CPF*.')
 B_SEM_CPF = ('cpf_nao', 'Sem CPF')

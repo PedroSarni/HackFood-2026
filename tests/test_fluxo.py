@@ -538,3 +538,24 @@ def test_busca_vai_pro_ifood_desambiguada_e_cai_pro_termo_se_nao_achar():
     if len(consultas) > 1:
         assert consultas[1] == 'leite'           # nada? tenta o termo puro
     assert m.wpp.cards()
+
+
+def test_loja_que_exige_cpf_pede_o_cpf_sem_opcao_de_pular():
+    """Bug real 17/10 19h: MERCH-007 virava "Tentar de novo" e a pessoa batia 3x no mesmo erro."""
+    from src.shared.ifood_mcp import ErroMCP
+    m = pedido_ate_o_resumo(Mundo(), cpf='nao')
+    original, vezes = m.mcp.chamar, []
+
+    def chamar(tool, **a):
+        if tool == 'submitOrder' and not vezes:
+            vezes.append(1)
+            raise ErroMCP('MERCH-007', 'MERCH-007: Este restaurante obriga a digitação do CPF.')
+        return original(tool, **a)
+    m.mcp.chamar = chamar
+    m.tocar('ok:')
+    assert m.estado()['fase'] == 'cpf' and 'CPF na nota' in m.wpp.textos()[-1]
+    assert 'cpf_nao' not in [i for i, _ in m.wpp.ultimos_botoes()]
+    m.enviar('nao')  # insistir em "sem CPF" não volta pro erro
+    assert m.estado()['fase'] == 'cpf'
+    m.enviar('529.982.247-25')
+    assert m.estado()['cpf'] == '52998224725'
