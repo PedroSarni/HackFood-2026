@@ -1,13 +1,16 @@
 """Gemini: texto, áudio e foto entram, JSON sai (com esquema garantido pelo próprio modelo).
 
-Secret Modal `llm-conversor` (o mesmo do handwrite_bot, já pago):
-  GEMINI_API_KEY           chave do AI Studio
-  GEMINI_MODELO            principal (padrão abaixo)
-  GEMINI_MODELO_RESERVA    tentado quando o principal falha ou demora
+Secret Modal `llm-conversor` (o mesmo do handwrite_bot, já pago): só a GEMINI_API_KEY é
+usada daqui. Os modelos são nossos (o handwrite tem outras prioridades), com override por
+BOT_GEMINI_MODELOS="modelo:prazo:pensamento,modelo:prazo:pensamento".
 
-Lição do handwrite: o Gemini às vezes devolve 503 de "alta demanda" ou fica minutos sem
-responder. No chat a pessoa está esperando, então cada tentativa tem prazo curto e, estourou,
-vai pro modelo reserva em vez de insistir.
+Medido em 2026-10-17 com 12 mensagens típicas de idoso ("qero pao e lete", "o do meio"...):
+- gemini-3.1-flash-lite sem thinkingConfig: 12/12 certas, média ~1 s (com thinkingLevel=low, ~1-3 s);
+- gemini-3.8-flash: estourou 9 s na maioria e não aceita thinkingLevel=minimal;
+- depois de ~30 chamadas seguidas o lite deu 429 (cota): o reserva tem cota própria.
+Por isso o lite é o principal e o 3.8 fica de reserva. No chat a pessoa está esperando:
+cada tentativa tem prazo curto e, estourou, vai pro próximo em vez de insistir. Se os dois
+falharem, o fluxo ainda busca pelo texto cru (src/bot/fluxo.py, `livre`).
 """
 import base64
 import json
@@ -17,9 +20,7 @@ import time
 import httpx
 
 GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
-MODELO = 'gemini-3.8-flash'
-RESERVA = 'gemini-3.1-flash-lite'
-PRAZO = (9.0, 7.0)          # segundos por tentativa: principal, reserva
+MODELOS = [('gemini-3.1-flash-lite', 6.0, ''), ('gemini-3.8-flash', 9.0, 'low')]
 MAX_INLINE = 18 * 1024 * 1024
 
 
@@ -32,6 +33,18 @@ def _cfg(nome, padrao=''):
     return padrao if v in ('', 'PREENCHER') else v
 
 
+def _modelos():
+    bruto = _cfg('BOT_GEMINI_MODELOS')
+    if not bruto:
+        return MODELOS
+    saida = []
+    for parte in bruto.split(','):
+        nome, _, resto = parte.strip().partition(':')
+        prazo, _, pensamento = resto.partition(':')
+        saida.append((nome, float(prazo or 8), pensamento))
+    return saida
+
+
 def _partes(partes):
     """('texto', str) | ('arquivo', mime, bytes) -> parts do Gemini."""
     if sum(len(p[2]) for p in partes if p[0] == 'arquivo') > MAX_INLINE:
@@ -41,15 +54,14 @@ def _partes(partes):
             for p in partes]
 
 
-def _chamar(http, modelo, sistema, parts, esquema, prazo):
+def _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento):
     corpo = {'systemInstruction': {'parts': [{'text': sistema}]},
              'contents': [{'role': 'user', 'parts': parts}],
              'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 2048,
                                   'responseMimeType': 'application/json',
                                   'responseSchema': esquema}}
-    nivel = _cfg('GEMINI_PENSAMENTO')  # 'low', 'minimal'... vazio = padrão do modelo
-    if nivel:
-        corpo['generationConfig']['thinkingConfig'] = {'thinkingLevel': nivel}
+    if pensamento:
+        corpo['generationConfig']['thinkingConfig'] = {'thinkingLevel': pensamento}
     r = http.post(f'{GEMINI}/models/{modelo}:generateContent',
                   headers={'x-goog-api-key': _cfg('GEMINI_API_KEY')}, json=corpo, timeout=prazo)
     if r.status_code >= 400:
@@ -72,18 +84,22 @@ def _chamar(http, modelo, sistema, parts, esquema, prazo):
 
 def gerar_json(sistema, partes, esquema, http=None):
     """Uma resposta JSON no formato `esquema` (OpenAPI do Gemini: type OBJECT, STRING...).
-    Tenta o principal e depois o reserva; devolve (dados, modelo_usado, segundos)."""
+    Tenta os modelos em ordem; devolve (dados, modelo_usado, segundos)."""
     if not _cfg('GEMINI_API_KEY'):
         raise ErroLLM('GEMINI_API_KEY não configurada')
     http = http or httpx.Client()
     parts = _partes(partes)
-    modelos = [(_cfg('GEMINI_MODELO', MODELO), PRAZO[0]),
-               (_cfg('GEMINI_MODELO_RESERVA', RESERVA), PRAZO[1])]
     erros = []
     t0 = time.monotonic()
-    for modelo, prazo in modelos:
+    for modelo, prazo, pensamento in _modelos():
         try:
-            return _chamar(http, modelo, sistema, parts, esquema, prazo), modelo, time.monotonic() - t0
+            return _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento), modelo, time.monotonic() - t0
         except (ErroLLM, httpx.HTTPError) as e:
+            if pensamento and 'thinking' in str(e).lower():  # nível não suportado: tenta sem
+                try:
+                    return (_chamar(http, modelo, sistema, parts, esquema, prazo, ''), modelo,
+                            time.monotonic() - t0)
+                except (ErroLLM, httpx.HTTPError) as e2:
+                    e = e2
             erros.append(f'{modelo}: {e!r}'[:300])
     raise ErroLLM(' | '.join(erros))
