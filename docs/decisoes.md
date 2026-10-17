@@ -3,6 +3,7 @@
 > Formato: - [HH:MM] Decisão — motivo — quem decidiu. Mais novo no topo.
 > Registrar na hora, não depois.
 
+- [20h] Correção de fato: o QA real mostrou que listPaymentMethods devolve PIX e um cartão de teste com cardTokenId (não null); a decisão de PIX e vales segue do Fabio — Davi (QA)
 - [20h] Submissão: provável repo do GitHub, instruções domingo de manhã [assumido]
 - [17h37] Login do iFood só pela web (id.ifood.com.br/authorize), sem o OneLink do app: é o recomendado pro nosso caso, o fluxo do app exige redirect por Universal/App Link — Fabio
 - [17h00] Pagamento só PIX e vales: cartão exige cardTokenId e o listPaymentMethods sempre devolve null (não há API de tokenização) — Fabio (registrado por Davi)
