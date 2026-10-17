@@ -43,6 +43,7 @@ Quem fiscaliza: o hook `.githooks/pre-commit` e o CI.
 
 ## 0.2 Contexto do projeto (ler antes de decidir produto ou MCP)
 
+- `docs/como-funciona.md`: como o bot funciona de ponta a ponta (arquitetura, login, endereço, regras de negócio)
 - `docs/contexto-evento.md`: regras do evento, critérios da banca, entregáveis e fatos do MCP do iFood
 - `docs/estado.md`: o que está pronto, em andamento e bloqueado
 - `docs/decisoes.md`: diário de decisões do time

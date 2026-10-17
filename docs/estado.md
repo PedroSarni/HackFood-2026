@@ -12,12 +12,15 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - Resumo do MCP do iFood em "regras da api/"
 - Agente "HackFood Agent" aprovado no portal do iFood em menos de 1h
 
-## No ar agora (17/10 ~16h40)
-- Bot no WhatsApp em MODO DEMO (mock do MCP, `IFOOD_MOCK=1` no secret `hackathon-ifood`): o número já aponta pro
-  deploy novo. Pedido completo funciona: login simulado, endereço, busca com 3 cards, "Mais opções", carrinho,
-  pagamento, resumo, confirmação, rastreio e lembrete. Quando o 2º agente (o do backend) for aprovado: trocar o secret pelas
-  credenciais e tirar o IFOOD_MOCK
-- 65 testes passando (`.venv/Scripts/python.exe -m pytest`)
+## No ar agora (17/10 ~17h10) — MODO REAL
+- Agente "Compras pelo WhatsApp" APROVADO no portal. Credenciais reais no secret `hackathon-ifood`
+  (`IFOOD_CLIENT_ID`/`IFOOD_CLIENT_SECRET`, sem `IFOOD_MOCK`). O número já atende pelo deploy novo.
+- OAuth verificado de ponta a ponta: o botão "Entrar no iFood" leva ao login REAL do iFood (client,
+  escopos `mcp.*` e redirect todos aceitos). Falta só a pessoa logar (conta iFood ou conta de teste do portal).
+  Importante: o escopo `openid` NÃO é permitido pro nosso cliente — a string é só `mcp.*`.
+- Pedido completo testado no mock (login, endereço, 3 cards, "Mais opções", carrinho, pagamento, resumo,
+  confirmação, rastreio, lembrete). Pra demo sem conta iFood, voltar ao mock: `IFOOD_MOCK=1` no secret.
+- Como tudo funciona: `docs/como-funciona.md`. 68 testes passando (`.venv/Scripts/python.exe -m pytest`).
 
 ## Em andamento
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
