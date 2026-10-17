@@ -21,6 +21,14 @@ que ele mesmo rode `git config user.name "..."` e `git config user.email "..."`:
 
 Por fim leia `.coord/claims/`: é o mapa do que está em andamento e do que já existe.
 
+## 0.0 O projeto é um bot de WhatsApp
+
+O produto é **um bot no WhatsApp** (Cloud API oficial da Meta). Número, token e app já estão configurados
+e funcionando: **não crie conta, número ou app novos na Meta e não troque de provedor** (nada de
+Baileys/Evolution/Z-API). Antes de qualquer feature, leia [`docs/whatsapp.md`](docs/whatsapp.md): lá estão
+o número, as variáveis (`.env.example`), onde ficam as credenciais, como o webhook funciona e as pegadinhas
+(responder 200 na hora, dedup, janela de 24h). Credenciais nunca vão para o git.
+
 ## 0.1 Arquivos protegidos: só o Fabio altera
 
 Só **Fabio** (`araujo.fabio@usp.br`) pode alterar estes arquivos:
