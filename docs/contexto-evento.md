@@ -90,7 +90,9 @@ Ver docs/decisoes.md.
 ## 8. Bugs e inconsistências do MCP (alimenta o entregável 06)
 Marcar cada item como [só na doc] ou [testado].
 - [14h40-15h03] Portal de cadastro fora do ar. Mentores avisaram que estavam resolvendo [testado]
-- [16h30] Agente aprovado e secret gerado: o authorize do id.ifood.com.br aceita o client_id e o login chega ao callback, mas POST /token devolve invalid_client ("Client authentication failed") com o secret recém gerado, por client_secret_post, por Basic e sem secret (secret de 68 caracteres, sem espaço nem caractere invisível). Ainda não sabemos se é o cadastro do agente ou o secret [testado]
+- [16h30] Agente "HackFood Agent" (Davi): POST /token devolve invalid_client com o secret recém gerado (post, Basic e sem secret). [testado]
+- [17h05] RESOLVIDO para o agente "Compras pelo WhatsApp": com o client_id GbC9J7... + o secret dele, POST /token devolve invalid_grant (não invalid_client) usando um code falso — ou seja, a autenticação do cliente PASSA, tanto por client_secret_post quanto por Basic. Logo, o invalid_client do item acima era específico do agente/secret do Davi, NÃO um bug geral do iFood. O OAuth do nosso agente está completo (authorize + escopos mcp.* + redirect + /token). Falta só um login humano real. [testado]
+- Dica pro invalid_client: conferir se o secret é do MESMO agente do client_id (cada agente tem o seu), e gerar de novo no portal se tiver dúvida (some ao recarregar a página) [testado]
 - Hosts diferentes entre os guias (consumer-mcp.ifood.com.br) e o llms.txt (api-mcp.ifood.com / dev-api-mcp.ifood.com). Os do llms.txt nem resolvem no DNS; o consumer-mcp responde 401 com `resource_metadata` [testado]
 - Hosts de auth diferentes (id.ifood.com.br vs auth.ifood.com.br / dev-auth.ifood.com.br). Só o id.ifood.com.br tem OIDC de verdade (authorize, token, revoke, PKCE S256); os outros devolvem 302/vazio [testado]
 - O 401 do gateway manda o cliente "re-register automatically", mas não existe registration_endpoint (credencial só pelo portal) [testado]
