@@ -35,6 +35,7 @@ ESQUEMA = {
         'texto': {'type': 'STRING', 'nullable': True},
         'transcricao': {'type': 'STRING', 'nullable': True},
         'resposta': {'type': 'STRING', 'nullable': True},
+        'hora': {'type': 'STRING', 'nullable': True, 'description': 'quando agendar: horário dito, HH:MM 24h'},
     },
     'required': ['acao'],
 }
@@ -62,7 +63,9 @@ detalhes ("bem passado", "sem cebola", "marca Italac").
 arroz, fruta, café, sabão); RESTAURANTE para comida pronta (pizza, lanche, marmita, açaí, \
 sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebida alcoólica \
 (cerveja, vinho); PET para ração e coisas de bicho; LOJA para o resto.
-- numero: quando agendar, de quantos em quantos dias (todo dia=1, toda semana=7, a cada 15 dias=15, todo mês=30; sem frequência dita = null). Quando escolher (1, 2 ou 3, entre as opções que estão na tela; "o primeiro"=1, \
+- numero: quando agendar, de quantos em quantos dias (todo dia=1, toda semana=7, a cada 15 dias=15, todo mês=30; sem frequência dita = null).
+- hora: quando agendar e a pessoa disse horário, "HH:MM" 24h ("às 18h" = "18:00", "meio-dia" = \
+"12:00", "8 da noite" = "20:00"); senão null. Quando escolher (1, 2 ou 3, entre as opções que estão na tela; "o primeiro"=1, \
 "o do meio"=2, "o último" = o último da tela) ou quando quantidade.
 - texto: quando endereco, o endereço como a pessoa disse.
 - transcricao: se veio áudio ou foto, o que foi dito ou o que está escrito/mostrado, curto.

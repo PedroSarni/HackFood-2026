@@ -403,15 +403,18 @@ def test_segunda_vez_da_mesma_categoria_oferece_recorrencia():
 
 def test_agendar_no_meio_do_pedido_oferece_depois_que_sai():
     m = pedido_ate_o_resumo(Mundo())
-    m.llm.resposta = {'acao': 'agendar', 'numero': 1, 'resposta': 'não consigo agendar'}
+    m.llm.resposta = {'acao': 'agendar', 'numero': 1, 'hora': '18:00', 'resposta': 'não consigo agendar'}
     m.enviar('quero isso todo dia as 18h')
     m.llm.resposta = None
-    assert 'todo dia' in m.wpp.saida[-1][1]['texto']
+    assert 'todo dia às 18h' in m.wpp.saida[-1][1]['texto']
     assert m.estado()['fase'] == 'confirmar'  # continua no resumo
     m.tocar('ok:')
     assert 'rec:1' in m.wpp.todos_ids()
     m.tocar('rec:1')
-    assert m.ctx.recorrencias._todas(m.wa)[0]['dias'] == 1
+    rec = m.ctx.recorrencias._todas(m.wa)[0]
+    assert rec['dias'] == 1 and rec['hora'] == '18:00'
+    assert (rec['proximo'] - 3 * 3600) % 86400 == 18 * 3600  # amanhã às 18h de Brasília
+    assert 'todo dia às 18h' in m.wpp.saida[-1][1]['texto']
 
 
 def test_modo_demo_lembrete_vence_em_1_minuto():
@@ -423,6 +426,8 @@ def test_modo_demo_lembrete_vence_em_1_minuto():
     m.tocar('ok:')
     m.tocar('rec:30')
     assert agendados == [m.agora + 60]
+    ok = m.wpp.saida[-1][1]['texto']
+    assert 'todo mês' in ok and 'minuto' not in ok and 'demonstra' not in ok  # finge o tempo normal
     m.agora += 61
     m.enviar('oi')
     assert any(i.startswith('lem:pedir:') for i in m.wpp.todos_ids()[-3:])

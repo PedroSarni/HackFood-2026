@@ -227,8 +227,10 @@ Sequência obrigatória do iFood, que o fluxo (`finalizar`) respeita:
   última vez. **"Sim, pode pedir" é a confirmação**: refaz o carrinho (`createCart(orderId)`) e
   fecha o pedido na hora; se o total subiu mais de 10%, mostra o resumo antes. Sem o sim, nada é
   pedido nem cobrado. Dentro da janela de 24h o lembrete vai direto; fora dela precisa de template
-  aprovado pela Meta. Demo: `modal run scripts/modo.py --rapido on` faz qualquer frequência vencer
-  em 1 minuto (função `lembrete_na_hora`, sem esperar o cron de 15 min).
+  aprovado pela Meta. Horário dito ("às 18h") é guardado e respeitado (Brasília).
+  Demo: `modal run scripts/modo.py --rapido on` faz o 1º lembrete vir em 1 minuto, seja qual for a
+  frequência/horário; a pessoa vê o combinado normal ("todo dia às 18h"), como se o tempo tivesse
+  passado (função `lembrete_na_hora`, sem esperar o cron de 15 min).
 
 ---
 

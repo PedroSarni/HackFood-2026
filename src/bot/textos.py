@@ -290,8 +290,16 @@ def frequencia(dias):
     return {1: 'todo dia', 7: 'toda semana', 15: 'a cada 15 dias', 30: 'todo mês'}.get(dias, f'a cada {dias} dias')
 
 
-def agendar_depois(dias):
-    return (f'Fechado! 🔁 Assim que esse pedido sair, eu deixo ele no automático *{frequencia(dias)}*: '
+def quando(dias, hora=None):
+    """'todo dia', 'toda semana às 18h'."""
+    if not hora:
+        return frequencia(dias)
+    h, _, m = str(hora).partition(':')
+    return f'{frequencia(dias)} às {int(h)}h' + (f'{m}' if m and m != '00' else '')
+
+
+def agendar_depois(dias, hora=None):
+    return (f'Fechado! 🔁 Assim que esse pedido sair, eu deixo ele no automático *{quando(dias, hora)}*: '
             'no dia eu te chamo aqui e só peço com o seu *sim*. 😉\nVamos terminar o de hoje?')
 
 
@@ -299,11 +307,9 @@ AGENDAR_SEM_PEDIDO = ('Bora deixar no automático! 🔁 Primeiro me diga o que v
                       'depois que ele sair, eu combino com você o dia de repetir. 😋')
 
 
-def recorrencia_ok(dias, demo=False):
-    quando = frequencia(dias)
-    extra = '\n\n⏩ _Modo demonstração: o tempo passa rápido, te chamo daqui a 1 minuto._' if demo else ''
-    return (f'Combinado! ✅ Fica no automático {quando}: no dia eu te chamo aqui e, com o seu *sim*, '
-            f'o pedido sai na hora. 🛵\nPra parar, é só escrever *parar lembrete*.{extra}')
+def recorrencia_ok(dias, hora=None):
+    return (f'Combinado! ✅ Agendado *{quando(dias, hora)}*: no dia eu te chamo aqui e, com o seu *sim*, '
+            f'o pedido sai na hora. 🛵\nPra parar, é só escrever *parar lembrete*.')
 
 
 def lembrete(rec, endereco=None):

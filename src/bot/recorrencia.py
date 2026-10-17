@@ -65,13 +65,17 @@ class Recorrencias:
         else:
             self.dic.pop(wa_id, None)
 
-    def criar(self, wa_id, pedido, dias, pagamento=None, ciclo=None):
-        """`ciclo` em segundos substitui `dias` só na 1ª vez (modo demo: vence em 1 minuto)."""
+    def criar(self, wa_id, pedido, dias, pagamento=None, ciclo=None, hora=None):
+        """`ciclo` em segundos substitui `dias` e `hora` só na 1ª vez (modo demo: vence em 1 minuto,
+        mas a pessoa vê o combinado normal, "todo dia às 18h")."""
+        proximo = self.agora() + (ciclo or int(dias) * 86400)
+        if hora and not ciclo:
+            proximo = _na_hora(proximo, hora)
         recs = [r for r in self._todas(wa_id) if r.get('pedido_id') != pedido['id']]
         rec = {'id': secrets.token_hex(3), 'pedido_id': pedido['id'], 'dias': int(dias),
                'resumo': pedido.get('resumo', ''), 'loja': pedido.get('loja'),
-               'total': pedido.get('total'), 'pagamento': pagamento, 'ciclo': ciclo,
-               'proximo': self.agora() + (ciclo or int(dias) * 86400), 'avisado': False}
+               'total': pedido.get('total'), 'pagamento': pagamento, 'ciclo': ciclo, 'hora': hora,
+               'proximo': proximo, 'avisado': False}
         recs.append(rec)
         self._gravar(wa_id, recs[-10:])
         return rec
@@ -106,6 +110,17 @@ class Recorrencias:
     def vencido_sem_aviso(self, wa_id):
         agora = self.agora()
         return next((r for r in self._todas(wa_id) if r['proximo'] <= agora and not r.get('avisado')), None)
+
+
+def _na_hora(ts, hora):
+    """Mesmo dia de `ts`, no horário 'HH:MM' de Brasília (UTC-3, sem horário de verão desde 2019)."""
+    try:
+        h, _, m = str(hora).partition(':')
+        alvo = int(h) * 3600 + int(m or 0) * 60
+    except ValueError:
+        return ts
+    meia_noite = ts - (ts - 3 * 3600) % 86400
+    return meia_noite + alvo
 
 
 def botoes_lembrete(rec):

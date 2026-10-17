@@ -11,6 +11,7 @@ quando a pessoa responde outra coisa.
 Estado da pessoa (`u`): ver `estado_novo()`. Mora no dicionário com chave `u:{wa_id}`.
 """
 import os
+import re
 import time
 import traceback
 
@@ -489,7 +490,7 @@ class Bot:
         elif a == 'parar_lembrete':
             self.parar_lembretes()
         elif a == 'agendar':
-            self.agendar(it.get('numero'))
+            self.agendar(it.get('numero'), it.get('hora'))
         elif a == 'fora_do_escopo':
             fala = self._resposta or T.FORA_DO_ESCOPO
             self.repetir_pergunta(fala) if botoes else self.menu(fala)
@@ -1283,7 +1284,8 @@ class Bot:
             u['fase'] = 'acompanhando'  # já é recorrente: não oferece de novo
         elif dias_pedidos:
             self.perguntar(T.oferecer_repetir(repetidos[0] if repetidos else None),
-                           [(f'rec:{dias_pedidos}', T.frequencia(dias_pedidos).capitalize()), T.B_REC_NAO],
+                           [(f'rec:{dias_pedidos}', T.quando(dias_pedidos, u.get('agendar_hora')).capitalize()),
+                            T.B_REC_NAO],
                            fase='recorrencia')
         elif repetidos:
             self.perguntar(T.oferecer_repetir(repetidos[0]), [T.B_REC_SEMANA, T.B_REC_MES, T.B_REC_NAO],
@@ -1417,32 +1419,37 @@ class Bot:
 
     def definir_recorrencia(self, arg):
         dias = int(arg) if str(arg).isdigit() else 0
+        hora = self.u.pop('agendar_hora', None)
         ped = (self.u.get('pedidos') or [None])[0]
         if not dias or not ped:
             self.perguntar(T.DE_NADA, [T.B_PEDIR, T.B_MEU_PEDIDO], fase='acompanhando')
             return
         demo = bool(self.ctx.armazem.get('cfg:demo_rapido'))
         pag = (self.u.get('pagamento_preferido') or {}).get('nome')
-        rec = self.ctx.recorrencias.criar(self.wa, ped, dias, pagamento=pag, ciclo=DEMO_SEGUNDOS if demo else None)
-        self.perguntar(T.recorrencia_ok(dias, demo), [T.B_MEU_PEDIDO, T.B_INICIO], fase='acompanhando')
+        # demo: a pessoa vê o combinado normal ("todo dia às 18h"), mas o 1º lembrete vem em 1 minuto
+        rec = self.ctx.recorrencias.criar(self.wa, ped, dias, pagamento=pag, hora=hora,
+                                          ciclo=DEMO_SEGUNDOS if demo else None)
+        self.perguntar(T.recorrencia_ok(dias, hora), [T.B_MEU_PEDIDO, T.B_INICIO], fase='acompanhando')
         if demo:
             self.ctx.agendar_lembrete(self.wa, rec['proximo'])
 
-    def agendar(self, dias=None):
+    def agendar(self, dias=None, hora=None):
         """"todo dia às 18h", "deixa no automático": a recorrência é nossa (o iFood não tem)."""
         u = self.u
         dias = dias if isinstance(dias, int) and 0 < dias <= 90 else 7
+        hora = hora if isinstance(hora, str) and re.fullmatch(r'\d{1,2}:\d{2}', hora) else None
+        u['agendar_hora'] = hora
         car = u.get('carrinho') or {}
         if car.get('itens'):  # no meio do pedido: agenda assim que este sair
             u['agendar_depois'] = dias
-            self.repetir_pergunta(T.agendar_depois(dias))
+            self.repetir_pergunta(T.agendar_depois(dias, hora))
             return
         ped = (u.get('pedidos') or [None])[0]
         if not ped:
             self.perguntar(T.AGENDAR_SEM_PEDIDO, T.MENU, fase='pedido')
             return
         self.perguntar(T.oferecer_repetir(ped.get('resumo')),
-                       [(f'rec:{dias}', T.frequencia(dias).capitalize()), T.B_REC_NAO], fase='recorrencia')
+                       [(f'rec:{dias}', T.quando(dias, hora).capitalize()), T.B_REC_NAO], fase='recorrencia')
 
     def responder_lembrete(self, arg):
         oque, _, rid = arg.partition(':')
