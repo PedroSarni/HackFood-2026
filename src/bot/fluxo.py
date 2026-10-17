@@ -10,6 +10,7 @@ quando a pessoa responde outra coisa.
 
 Estado da pessoa (`u`): ver `estado_novo()`. Mora no dicionário com chave `u:{wa_id}`.
 """
+import os
 import time
 import traceback
 
@@ -93,6 +94,8 @@ class Bot:
         u['ultima_msg'] = self.ctx.agora()
         try:
             entradas = entradas_de(msgs)
+            if self._debug_reset(entradas):   # palavra secreta de debug: desloga e zera tudo
+                return
             botoes = [e for e in entradas if e.tipo == 'botao']
             livres = [e for e in entradas if e.tipo != 'botao']
             if botoes:
@@ -153,6 +156,25 @@ class Bot:
             return False
         r = regra_rapida(e.texto)
         return bool(r and r['acao'] in TRIVIAIS)
+
+    def _debug_reset(self, entradas):
+        """Atalho interno: se a pessoa digitar a palavra secreta (env DEBUG_RESET, fora do git),
+        desloga do iFood e zera a conversa, em QUALQUER etapa. Vazio = desligado."""
+        palavra = os.environ.get('DEBUG_RESET', '')
+        if not palavra or palavra == 'PREENCHER':
+            return False
+        alvo = normalizar(palavra)
+        if not any(e.tipo == 'texto' and normalizar(e.texto) == alvo for e in entradas):
+            return False
+        try:
+            self.ctx.sair(self.wa)                      # revoga e remove o token do iFood
+            self.ctx.recorrencias.remover_todas(self.wa)
+            self.ctx.armazem.pop(f'mock:{self.wa}', None)  # zera o iFood falso (demo)
+        except Exception as e:  # noqa: BLE001 - debug não pode quebrar
+            print(f'debug reset parcial: {e!r}')
+        self.u = estado_novo()
+        self.wpp.texto(self.wa, '🧹 [debug] Desconectei do iFood e zerei a conversa. Manda um "oi" pra recomeçar.')
+        return True
 
     def _protegido(self, fn):
         """Nenhum erro chega mudo pra pessoa: login vencido pede login, o resto pede pra tentar."""

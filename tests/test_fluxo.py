@@ -362,6 +362,29 @@ def test_fora_do_escopo_volta_pro_pedido():
     assert 'só sei fazer pedidos' in ' '.join(m.wpp.textos())
 
 
+def test_palavra_secreta_desloga_e_reseta_em_qualquer_etapa(monkeypatch):
+    monkeypatch.setenv('DEBUG_RESET', 'deslogarnoifood6767')
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')              # no meio de um pedido (etapa 'quantidade')
+    assert m.armazem.get(f'tok:{m.wa}')
+    antes = m.llm.chamadas
+    m.enviar('DeslogarNoIfood6767')   # com maiúsculas, pra testar a normalização
+    assert f'tok:{m.wa}' not in m.armazem          # deslogou do iFood
+    assert m.estado().get('fase') == 'inicio'       # conversa zerada
+    assert m.estado().get('carrinho') is None
+    assert m.llm.chamadas == antes                  # nem passou pela IA
+    assert '[debug]' in ' '.join(m.wpp.textos())
+
+
+def test_sem_a_env_a_palavra_e_mensagem_normal():
+    m = Mundo()  # DEBUG_RESET não está no ambiente
+    endereco_pronto(m)
+    m.enviar('deslogarnoifood6767')
+    assert m.armazem.get(f'tok:{m.wa}')             # não deslogou
+    assert '[debug]' not in ' '.join(m.wpp.textos())
+
+
 def test_apagar_dados():
     m = pedido_ate_o_resumo(Mundo())
     m.enviar('apagar meus dados')

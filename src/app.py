@@ -29,7 +29,9 @@ imagem = (modal.Image.debian_slim(python_version='3.12')
           .add_local_python_source('src'))
 segredos = [modal.Secret.from_name('hackathon-whatsapp'),
             modal.Secret.from_name('llm-conversor'),
-            modal.Secret.from_name('hackathon-ifood')]
+            modal.Secret.from_name('hackathon-ifood'),
+            # palavra secreta de debug (DEBUG_RESET), fora do git; vazia = desligado
+            modal.Secret.from_name('hackathon-debug')]
 
 estado = modal.Dict.from_name('hackfood-estado', create_if_missing=True)
 entrada = modal.Queue.from_name('hackfood-entrada', create_if_missing=True)
