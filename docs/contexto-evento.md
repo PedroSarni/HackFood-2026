@@ -51,10 +51,10 @@ Detalhes no JSON do repo. Aqui só o que importa no dia a dia.
 - O llms.txt cita outros hosts (api-mcp.ifood.com, dev-api-mcp.ifood.com, auth.ifood.com.br, dev-auth.ifood.com.br). Usar o gateway acima até confirmar
 - Auth: OAuth 2.1 com PKCE. authorize em https://id.ifood.com.br/authorize, token em https://id.ifood.com.br/token
 - Access token dura ~1h, refresh token ~30 dias e rotaciona. client_secret só no backend
-- Nosso agente: "HackFood Agent", status "em análise" (criado em 17/10 às ~15h)
+- Nosso agente: "HackFood Agent", aprovado em menos de 1h (criado ~15h10, aprovado antes das 15h58)
   - Redirect cadastrado: http://localhost:8080/callback
   - Escopos: user, discovery e cart (via "Criação de pedidos")
-  - Credenciais de teste só saem após aprovação
+  - Client Secret é gerado no portal após a aprovação e aparece uma única vez (ver o problema do /token na seção 8)
 - Contas de teste: até 10, e-mail @test.ifood.com.br, telefone falso, OTP aparece no portal, apagadas após 15 dias
 - Sem pedido real em teste. Pedido pago em teste não é reembolsado: não usar PIX real
 - submitOrder exige userConsent. O agente nunca confirma sozinho
@@ -81,7 +81,7 @@ Formato: - [HH:MM] Quem falou: o que disse -> impacto pra gente
 Ver docs/decisoes.md.
 
 ## 7. Pendências e dúvidas
-- [ ] Mentor: quanto tempo demora a aprovação do agente?
+- [x] Mentor: quanto tempo demora a aprovação do agente? Resposta: menos de 1h (agente do Davi)
 - [ ] Mentor: dá pra cadastrar um redirect de backend publicado, além de localhost:8080?
 - [ ] Mentor: que tipo de agente externo o iFood imagina usando esse MCP?
 - [ ] Confirmar se o prêmio é em dinheiro ou iFood Card
@@ -90,6 +90,7 @@ Ver docs/decisoes.md.
 ## 8. Bugs e inconsistências do MCP (alimenta o entregável 06)
 Marcar cada item como [só na doc] ou [testado].
 - [14h40-15h03] Portal de cadastro fora do ar. Mentores avisaram que estavam resolvendo [testado]
+- [16h30] Agente aprovado e secret gerado: o authorize do id.ifood.com.br aceita o client_id e o login chega ao callback, mas POST /token devolve invalid_client ("Client authentication failed") com o secret recém gerado, por client_secret_post, por Basic e sem secret (secret de 68 caracteres, sem espaço nem caractere invisível). Ainda não sabemos se é o cadastro do agente ou o secret [testado]
 - Hosts diferentes entre os guias (consumer-mcp.ifood.com.br) e o llms.txt (api-mcp.ifood.com / dev-api-mcp.ifood.com). Os do llms.txt nem resolvem no DNS; o consumer-mcp responde 401 com `resource_metadata` [testado]
 - Hosts de auth diferentes (id.ifood.com.br vs auth.ifood.com.br / dev-auth.ifood.com.br). Só o id.ifood.com.br tem OIDC de verdade (authorize, token, revoke, PKCE S256); os outros devolvem 302/vazio [testado]
 - O 401 do gateway manda o cliente "re-register automatically", mas não existe registration_endpoint (credencial só pelo portal) [testado]
