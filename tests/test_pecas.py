@@ -340,3 +340,18 @@ def test_interruptor_do_modo_demo_vale_sem_deploy(monkeypatch):
     assert not contexto.modo_mock({})
     assert contexto.modo_mock({'cfg:mock': True})
     assert not contexto.modo_mock(None)
+
+
+def test_categoria_junta_itens_de_lojas_diferentes():
+    from src.bot.recorrencia import categoria
+    assert categoria('X-Bacon Duplo') == categoria('Smash Burger da Casa') == 'hambúrguer'
+    assert categoria('Açaí 500ml') == 'açaí'
+    assert categoria('Pizza Calabresa Grande') == 'pizza'
+    assert categoria('Detergente Ypê') is None
+
+
+def test_status_desconhecido_nunca_sai_em_ingles():
+    from src.bot import textos as T
+    assert 'Order' not in T.status_pedido('ORDER_COMPLETED', 'Order was completed.')
+    assert T.status_pedido('CONCLUDED') == T.STATUS['CONCLUDED']
+    assert 'iFood' in T.status_pedido('XYZ', 'Something happened')

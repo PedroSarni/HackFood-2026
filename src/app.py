@@ -123,6 +123,15 @@ def lembretes():
     return disparar_vencidos(estado, WhatsApp())
 
 
+@app.function(image=imagem, secrets=segredos, timeout=900)
+def lembrete_na_hora(wa_id: str, quando: float):
+    """Modo demo: espera até `quando` e manda o lembrete só dessa pessoa (sem esperar o cron)."""
+    from src.bot.recorrencia import disparar_vencidos
+    from src.shared.whatsapp import WhatsApp
+    time.sleep(max(0, min(840, quando - time.time())) + 1)
+    return disparar_vencidos(estado, WhatsApp(), so=wa_id)
+
+
 # --- web ------------------------------------------------------------------------------
 
 @app.function(image=imagem, secrets=segredos, timeout=60, scaledown_window=600)

@@ -18,6 +18,7 @@ from src.bot import ranking, relevancia, tutor
 from src.bot import textos as T
 from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import cpf_em, igual_a_botao, interpretar, normalizar, numero_em, regra_rapida
+from src.bot.recorrencia import DEMO_SEGUNDOS, botoes_lembrete, categoria
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 from src.shared.llm import ErroLLM
 from src.shared.whatsapp import MAX_BOTAO, MAX_LINHA, ErroWhatsApp, partir
@@ -88,6 +89,7 @@ class Bot:
         self.wa = None
         self.u = None
         self._resposta = None
+        self._direto = None
         self._disse = ''
 
     # ================================================================== entrada
@@ -99,6 +101,7 @@ class Bot:
             u['nome'] = msgs[-1]['_nome']
         u['ultima_msg'] = self.ctx.agora()
         self._resposta = None   # fala do Gemini pra esta rodada (interpretar preenche)
+        self._direto = None     # "Sim, pode pedir" do lembrete: {'teto': total} = fecha sem resumo
         self._disse = ''
         try:
             entradas = entradas_de(msgs)
@@ -485,6 +488,8 @@ class Bot:
             self.perguntar(T.APAGAR_CONFIRMA, [T.B_APAGAR_SIM, T.B_APAGAR_NAO], fase='apagar')
         elif a == 'parar_lembrete':
             self.parar_lembretes()
+        elif a == 'agendar':
+            self.agendar(it.get('numero'))
         elif a == 'fora_do_escopo':
             fala = self._resposta or T.FORA_DO_ESCOPO
             self.repetir_pergunta(fala) if botoes else self.menu(fala)
@@ -1214,6 +1219,17 @@ class Bot:
                 raise
             print(f'getCart antes do resumo falhou: {e!r}')
         texto = T.resumo(car, u.get('endereco'), car.get('entrega'), car.get('pagamento'), car.get('cupom'))
+        direto, self._direto = self._direto, None
+        if direto is not None:
+            # a pessoa já disse "sim" no lembrete vendo valor, endereço e pagamento: fecha na hora,
+            # a não ser que o preço tenha subido mais de 10% (aí ela confere o resumo antes)
+            teto = direto.get('teto')
+            if not teto or (car.get('total') or 0) <= teto * 1.10:
+                u['fase'] = 'confirmar'
+                u['via_lembrete'] = True
+                self.confirmar(car['id'][:12])
+                return
+            texto = T.PRECO_SUBIU + '\n\n' + texto
         self.perguntar(texto, [(f'ok:{car["id"][:12]}', T.B_CONFIRMAR), T.B_MUDAR, T.B_CANCELAR], fase='confirmar')
 
     def confirmar(self, arg):
@@ -1259,19 +1275,31 @@ class Bot:
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
                                   detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')))
         self.ctx.iniciar_rastreio(self.wa, feito['id'])
-        # lembrete só quando a compra se repete: na 1ª vez de um item ninguém quer ser cobrado de rotina
-        if self._registrar_compra(car['itens']):
-            self.perguntar(T.OFERECER_REPETIR, [T.B_REC_SEMANA, T.B_REC_MES, T.B_REC_NAO], fase='recorrencia')
+        # lembrete só quando a compra se repete (item ou categoria, de qualquer loja) ou quando a pessoa
+        # pediu pra agendar: na 1ª vez de um item ninguém quer ser cobrado de rotina
+        repetidos = self._registrar_compra(car['itens'])
+        dias_pedidos = u.pop('agendar_depois', None)
+        if u.pop('via_lembrete', None):
+            u['fase'] = 'acompanhando'  # já é recorrente: não oferece de novo
+        elif dias_pedidos:
+            self.perguntar(T.oferecer_repetir(repetidos[0] if repetidos else None),
+                           [(f'rec:{dias_pedidos}', T.frequencia(dias_pedidos).capitalize()), T.B_REC_NAO],
+                           fase='recorrencia')
+        elif repetidos:
+            self.perguntar(T.oferecer_repetir(repetidos[0]), [T.B_REC_SEMANA, T.B_REC_MES, T.B_REC_NAO],
+                           fase='recorrencia')
         else:
             u['fase'] = 'acompanhando'
 
     def _registrar_compra(self, itens):
         """Histórico de compras NOSSO (o iFood não diz se a pessoa já comprou aquilo): hist:{wa}
-        = {nome normalizado: {nome, vezes, ultima}}. Chave pelo nome, não pelo id: pão francês de
-        outra padaria ainda é a 2ª vez do pão. Devolve os nomes que já tinham sido comprados antes."""
+        = {nome normalizado: {nome, vezes, ultima}} + {'cat:<categoria>': ...}. Chave pelo nome, não
+        pelo id: pão francês de outra padaria ainda é a 2ª vez do pão; e X-Bacon de uma hamburgueria
+        depois de Smash Burger de outra é a 2ª vez de hambúrguer (categoria conta 1x por pedido).
+        Devolve o que já tinha sido comprado antes: categoria primeiro, depois nomes."""
         chave = f'hist:{self.wa}'
         hist = self.ctx.armazem.get(chave) or {}
-        repetidos = []
+        repetidos, cats = [], []
         for i in itens:
             k = normalizar(i.get('nome'))
             if not k:
@@ -1281,6 +1309,15 @@ class Bot:
             hist[k] = h
             if h['vezes'] >= 2:
                 repetidos.append(h['nome'])
+            cat = categoria(i.get('nome'))
+            if cat and cat not in cats:
+                cats.append(cat)
+        for cat in cats:
+            h = hist.get(f'cat:{cat}') or {'nome': cat, 'vezes': 0}
+            h.update(vezes=h['vezes'] + 1, ultima=self.ctx.agora())
+            hist[f'cat:{cat}'] = h
+            if h['vezes'] >= 2:
+                repetidos.insert(0, cat)
         self.ctx.armazem[chave] = hist
         return repetidos
 
@@ -1384,8 +1421,28 @@ class Bot:
         if not dias or not ped:
             self.perguntar(T.DE_NADA, [T.B_PEDIR, T.B_MEU_PEDIDO], fase='acompanhando')
             return
-        self.ctx.recorrencias.criar(self.wa, ped, dias)
-        self.perguntar(T.recorrencia_ok(dias), [T.B_MEU_PEDIDO, T.B_INICIO], fase='acompanhando')
+        demo = bool(self.ctx.armazem.get('cfg:demo_rapido'))
+        pag = (self.u.get('pagamento_preferido') or {}).get('nome')
+        rec = self.ctx.recorrencias.criar(self.wa, ped, dias, pagamento=pag, ciclo=DEMO_SEGUNDOS if demo else None)
+        self.perguntar(T.recorrencia_ok(dias, demo), [T.B_MEU_PEDIDO, T.B_INICIO], fase='acompanhando')
+        if demo:
+            self.ctx.agendar_lembrete(self.wa, rec['proximo'])
+
+    def agendar(self, dias=None):
+        """"todo dia às 18h", "deixa no automático": a recorrência é nossa (o iFood não tem)."""
+        u = self.u
+        dias = dias if isinstance(dias, int) and 0 < dias <= 90 else 7
+        car = u.get('carrinho') or {}
+        if car.get('itens'):  # no meio do pedido: agenda assim que este sair
+            u['agendar_depois'] = dias
+            self.repetir_pergunta(T.agendar_depois(dias))
+            return
+        ped = (u.get('pedidos') or [None])[0]
+        if not ped:
+            self.perguntar(T.AGENDAR_SEM_PEDIDO, T.MENU, fase='pedido')
+            return
+        self.perguntar(T.oferecer_repetir(ped.get('resumo')),
+                       [(f'rec:{dias}', T.frequencia(dias).capitalize()), T.B_REC_NAO], fase='recorrencia')
 
     def responder_lembrete(self, arg):
         oque, _, rid = arg.partition(':')
@@ -1399,6 +1456,7 @@ class Bot:
             if not self.garantir_endereco({'acao': 'botao', 'botao': f'lem:pedir:{rid}'}):
                 return
             self.ctx.recorrencias.respondido(self.wa, rid)
+            self._direto = {'teto': rec.get('total')}  # o "sim" aqui é a confirmação do pedido
             self._refazer(rec['pedido_id'], rec.get('loja'))
         elif oque == 'parar':
             self.ctx.recorrencias.remover(self.wa, rid)
@@ -1417,9 +1475,7 @@ class Bot:
         if not rec:
             return False
         self.ctx.recorrencias.avisado(self.wa, rec['id'])
-        self.perguntar(T.lembrete(rec.get('resumo', '')),
-                       [(f'lem:pedir:{rec["id"]}', T.B_LEMBRETE_PEDIR), (f'lem:hoje:{rec["id"]}', T.B_LEMBRETE_HOJE_NAO),
-                        (f'lem:parar:{rec["id"]}', T.B_LEMBRETE_PARAR)], fase='lembrete')
+        self.perguntar(T.lembrete(rec, self.u.get('endereco')), botoes_lembrete(rec), fase='lembrete')
         return True
 
     # ================================================================== erros

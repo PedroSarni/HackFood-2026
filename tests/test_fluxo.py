@@ -327,7 +327,7 @@ def test_historico_conta_as_compras_e_oferece_lembrete_na_segunda():
     m = pedido_ate_o_resumo(Mundo())
     m.tocar('ok:')
     hist = m.armazem[f'hist:{m.wa}']
-    assert [h['vezes'] for h in hist.values()] == [1]  # 1ª compra: registrou, sem lembrete
+    assert [h['vezes'] for k, h in hist.items() if not k.startswith('cat:')] == [1]  # 1ª compra: registrou, sem lembrete
     m.wpp.limpar()
     m.enviar('quero pao')  # mesma compra de novo (endereço e CPF já guardados)
     m.tocar('pick:')
@@ -338,7 +338,7 @@ def test_historico_conta_as_compras_e_oferece_lembrete_na_segunda():
     if m.estado()['fase'] == 'cpf':
         m.enviar('529.982.247-25')
     m.tocar('ok:')
-    assert [h['vezes'] for h in m.armazem[f'hist:{m.wa}'].values()] == [2]
+    assert [h['vezes'] for k, h in m.armazem[f'hist:{m.wa}'].items() if not k.startswith('cat:')] == [2]
     assert any(i.startswith('rec:') for i in m.wpp.todos_ids())
 
 
@@ -368,9 +368,64 @@ def test_recorrencia_e_pedir_de_novo():
     m.agora += 7 * 86400 + 60
     m.enviar('oi')
     assert any(i.startswith('lem:pedir:') for i in m.wpp.todos_ids()[-3:])
+    texto = m.wpp.saida[-1][1]['texto']
+    assert 'Podemos pedir aqui pra enviar na sua casa?' in texto and 'PIX' in texto
+    origem = m.estado()['pedidos'][0]['id']
+    m.tocar('lem:pedir:')  # o "sim" do lembrete é a confirmação: pede na hora, sem resumo de novo
+    assert m.mcp.chamadas_de('createCart')[-1] == {'orderId': origem}
+    assert len(m.mcp.chamadas_de('submitOrder')) == 2
+    assert m.estado()['fase'] == 'acompanhando'
+    assert not any(i.startswith('rec:') for i in m.wpp.todos_ids()[-3:])  # já é recorrente
+
+
+def test_lembrete_com_preco_mais_alto_mostra_resumo_antes():
+    m = pedido_ate_o_resumo(Mundo())
+    _ja_pediu_isso_antes(m)
+    m.tocar('ok:')
+    m.tocar('rec:7')
+    rec = m.ctx.recorrencias._todas(m.wa)[0]
+    m.ctx.recorrencias._mudar(m.wa, rec['id'], total=1.0)  # "da última vez" bem mais barato
+    m.agora += 7 * 86400 + 60
+    m.enviar('oi')
     m.tocar('lem:pedir:')
-    assert m.mcp.chamadas_de('createCart')[-1] == {'orderId': m.estado()['pedidos'][0]['id']}
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1
     assert m.estado()['fase'] == 'confirmar'
+    assert 'preço mudou' in m.wpp.saida[-1][1]['texto']
+
+
+def test_segunda_vez_da_mesma_categoria_oferece_recorrencia():
+    m = pedido_ate_o_resumo(Mundo())
+    m.armazem[f'hist:{m.wa}'] = {'cat:pão': {'nome': 'pão', 'vezes': 1, 'ultima': 0}}  # outro pão, outra loja
+    m.tocar('ok:')
+    assert any(i.startswith('rec:') for i in m.wpp.todos_ids())
+    assert 'segunda vez de *pão*' in m.wpp.saida[-1][1]['texto']
+
+
+def test_agendar_no_meio_do_pedido_oferece_depois_que_sai():
+    m = pedido_ate_o_resumo(Mundo())
+    m.llm.resposta = {'acao': 'agendar', 'numero': 1, 'resposta': 'não consigo agendar'}
+    m.enviar('quero isso todo dia as 18h')
+    m.llm.resposta = None
+    assert 'todo dia' in m.wpp.saida[-1][1]['texto']
+    assert m.estado()['fase'] == 'confirmar'  # continua no resumo
+    m.tocar('ok:')
+    assert 'rec:1' in m.wpp.todos_ids()
+    m.tocar('rec:1')
+    assert m.ctx.recorrencias._todas(m.wa)[0]['dias'] == 1
+
+
+def test_modo_demo_lembrete_vence_em_1_minuto():
+    m = pedido_ate_o_resumo(Mundo())
+    _ja_pediu_isso_antes(m)
+    m.armazem['cfg:demo_rapido'] = True
+    agendados = []
+    m.ctx._agendar_lembrete = lambda wid, quando: agendados.append(quando)
+    m.tocar('ok:')
+    m.tocar('rec:30')
+    assert agendados == [m.agora + 60]
+    m.agora += 61
+    m.enviar('oi')
+    assert any(i.startswith('lem:pedir:') for i in m.wpp.todos_ids()[-3:])
 
 
 def test_meu_pedido_mostra_status():

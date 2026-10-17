@@ -100,7 +100,7 @@ Intenção que o modelo devolve (`ESQUEMA` em `interpretar.py`):
 acao       comprar | mais_opcoes | escolher | sim | nao | quantidade | endereco |
            ver_pedido | finalizar | tirar_item | cancelar | acompanhar | repetir |
            ajuda | saudacao | agradecer | sair | apagar_dados | parar_lembrete |
-           fora_do_escopo | nao_entendi
+           agendar | fora_do_escopo | nao_entendi
 itens      [{termo, quantidade?, tipo_loja, observacao?}]   (quando acao=comprar)
 numero     1, 2, 3...                                       (quando escolher/quantidade)
 texto      o endereço, quando acao=endereco
@@ -219,10 +219,16 @@ Sequência obrigatória do iFood, que o fluxo (`finalizar`) respeita:
   iFood indica (`agentHints.retryMessage`) e para quando ele diz (`pollingStop`). Cada mudança de
   status vira uma mensagem no WhatsApp ("saiu pra entrega", "o entregador chegou"). Isso resolve
   a falta de notificação automática da API.
-- **Recorrência** (`src/bot/recorrencia.py`): a pessoa pode pedir pra ser lembrada ("toda
-  semana"). No dia, o bot manda "Hora de pedir de novo? [Pedir de novo]". Um toque refaz o
-  carrinho igual (via `createCart(orderId)`) e segue pro resumo — **nunca compra sozinho**. Dentro
-  da janela de 24h o lembrete vai direto; fora dela precisa de template aprovado pela Meta.
+- **Recorrência** (`src/bot/recorrencia.py`): o MCP não tem recorrência nativa, então ela é nossa.
+  O bot oferece "deixar no automático" na 2ª compra do mesmo item **ou da mesma categoria**, de
+  qualquer loja (X-Bacon numa e Smash Burger noutra = 2º hambúrguer; `categoria()`), ou quando a
+  pessoa pede ("todo dia às 18h" = `acao=agendar`, até no meio de um pedido). No dia, o bot manda
+  "Podemos pedir aqui pra enviar na sua casa?" com itens, loja, endereço, pagamento e valor da
+  última vez. **"Sim, pode pedir" é a confirmação**: refaz o carrinho (`createCart(orderId)`) e
+  fecha o pedido na hora; se o total subiu mais de 10%, mostra o resumo antes. Sem o sim, nada é
+  pedido nem cobrado. Dentro da janela de 24h o lembrete vai direto; fora dela precisa de template
+  aprovado pela Meta. Demo: `modal run scripts/modo.py --rapido on` faz qualquer frequência vencer
+  em 1 minuto (função `lembrete_na_hora`, sem esperar o cron de 15 min).
 
 ---
 

@@ -266,21 +266,66 @@ def pedido_feito(numero=None, tempo=None, codigo_entrega=None, tipo_pagamento=No
 
 
 OFERECER_REPETIR = 'Quer que eu te lembre de pedir isso de novo? 🔁'
+
+
+def oferecer_repetir(oque):
+    """Oferta a partir da 2ª compra do item/categoria. Deixa claro o combinado: no dia eu pergunto,
+    e só peço com o "sim" da pessoa."""
+    if not oque:
+        return OFERECER_REPETIR
+    return (f'Opa, segunda vez de *{oque}* por aqui! 😋 Bateu fome, já sabe: é só chamar.\n\n'
+            '🔁 Quer deixar no automático? No dia combinado eu te chamo aqui com tudo pronto: '
+            'mesmo pedido, mesmo endereço, mesma forma de pagamento. '
+            'Você só responde *sim* e eu peço pra entregar na sua casa. '
+            'Sem precisar procurar de novo, é pra facilitar sua vida. 💜\n\n'
+            'Nada é pedido nem cobrado sem o seu sim, e dá pra parar quando quiser.')
+
+
 B_REC_SEMANA = ('rec:7', 'Toda semana')
 B_REC_MES = ('rec:30', 'Todo mês')
 B_REC_NAO = ('rec:0', 'Não precisa')
 
 
-def recorrencia_ok(dias):
-    quando = 'toda semana' if dias == 7 else 'todo mês' if dias == 30 else f'a cada {dias} dias'
-    return f'Combinado! ✅ Eu te lembro {quando}. Pra parar, é só escrever *parar lembrete*.'
+def frequencia(dias):
+    return {1: 'todo dia', 7: 'toda semana', 15: 'a cada 15 dias', 30: 'todo mês'}.get(dias, f'a cada {dias} dias')
 
 
-def lembrete(resumo_pedido):
-    return f'🔔 Hora de pedir de novo?\n\n{resumo_pedido}\n\nToque em *Pedir de novo* que eu monto tudo igual.'
+def agendar_depois(dias):
+    return (f'Fechado! 🔁 Assim que esse pedido sair, eu deixo ele no automático *{frequencia(dias)}*: '
+            'no dia eu te chamo aqui e só peço com o seu *sim*. 😉\nVamos terminar o de hoje?')
 
 
-B_LEMBRETE_PEDIR = 'Pedir de novo'
+AGENDAR_SEM_PEDIDO = ('Bora deixar no automático! 🔁 Primeiro me diga o que você quer pedir: '
+                      'depois que ele sair, eu combino com você o dia de repetir. 😋')
+
+
+def recorrencia_ok(dias, demo=False):
+    quando = frequencia(dias)
+    extra = '\n\n⏩ _Modo demonstração: o tempo passa rápido, te chamo daqui a 1 minuto._' if demo else ''
+    return (f'Combinado! ✅ Fica no automático {quando}: no dia eu te chamo aqui e, com o seu *sim*, '
+            f'o pedido sai na hora. 🛵\nPra parar, é só escrever *parar lembrete*.{extra}')
+
+
+def lembrete(rec, endereco=None):
+    """No dia: pergunta se pode pedir, mostrando tudo que vai ser cobrado. O "sim" é a confirmação."""
+    if isinstance(rec, str):
+        rec = {'resumo': rec}
+    linhas = ['🔔 Chegou o dia! Tá com fome de quê? A gente já sabe. 😋', '', f'🧾 {rec.get("resumo") or ""}']
+    if rec.get('loja'):
+        linhas.append(f'🏪 {rec["loja"]}')
+    if endereco:
+        linhas.append(f'🏠 {endereco.get("apelido") or "Endereço"}: {endereco.get("texto") or ""}'.rstrip(': '))
+    if rec.get('pagamento'):
+        linhas.append(f'💳 {rec["pagamento"]}')
+    if rec.get('total'):
+        linhas.append(f'💰 Da última vez: {reais(rec["total"])} (pode variar um pouquinho)')
+    linhas += ['', '*Podemos pedir aqui pra enviar na sua casa?*',
+               'Se tocar em *Sim, pode pedir*, eu faço o pedido agora nessa forma de pagamento.']
+    return '\n'.join(linhas)
+
+
+PRECO_SUBIU = '⚠️ O preço mudou desde a última vez, então confere antes de eu pedir:'
+B_LEMBRETE_PEDIR = 'Sim, pode pedir'
 B_LEMBRETE_HOJE_NAO = 'Hoje não'
 B_LEMBRETE_PARAR = 'Parar lembretes'
 LEMBRETE_PARADO = 'Pronto, não vou mais lembrar desse pedido. 🙂'
@@ -303,11 +348,28 @@ STATUS = {  # códigos do trackOrder (doc do portal); o código em si nunca é m
     'DELIVERY_ARRIVED_AT_DESTINATION': '📍 O entregador chegou! Pode ir receber.',
     'DELIVERED': '✅ Pedido entregue. Bom proveito! 😋',
     'CANCELLED': '❌ Seu pedido foi cancelado. Confira no app do iFood.',
+    'CANCELED': '❌ Seu pedido foi cancelado. Confira no app do iFood.',
+    'CONCLUDED': '✅ Pedido concluído. Bom proveito! 😋',
 }
 
 
 def status_pedido(codigo, descricao=''):
-    return STATUS.get(codigo) or f'📦 {descricao or codigo}'
+    """Código novo do iFood (a lista da doc não é fechada) cai aqui: a descrição vem em inglês,
+    então nunca mostra ela crua ("Order was completed.")."""
+    if codigo in STATUS:
+        return STATUS[codigo]
+    d = f'{codigo or ""} {descricao or ""}'.lower()
+    if any(k in d for k in ('complet', 'conclu', 'deliver', 'finish')):
+        return STATUS['CONCLUDED']
+    if 'cancel' in d:
+        return STATUS['CANCELLED']
+    if 'prepar' in d:
+        return STATUS['PREPARING']
+    if any(k in d for k in ('confirm', 'accept')):
+        return STATUS['CONFIRMED']
+    if any(k in d for k in ('dispatch', 'way', 'route', 'picked')):
+        return STATUS['ON_THE_WAY']
+    return '📦 Seu pedido teve uma atualização. Os detalhes estão no app do iFood.'
 
 
 # --- conta ------------------------------------------------------------------------------

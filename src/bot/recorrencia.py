@@ -1,8 +1,12 @@
 """Compra recorrente: "me lembra de pedir isso toda semana".
 
+O MCP do iFood não tem recorrência nativa (nem pra mercado), então ela é nossa: a partir da 2ª
+compra do mesmo item OU da mesma categoria ("hambúrguer" de qualquer loja) o bot oferece.
 Cada lembrete guarda o pedido de origem (o iFood refaz o carrinho com createCart(orderId)).
-Nada é comprado sozinho: o lembrete só oferece o botão "Pedir de novo" e o fluxo normal
-termina no resumo com "Confirmar pedido".
+Nada é comprado sozinho: no dia o bot pergunta "podemos pedir?" mostrando itens, endereço,
+valor e pagamento, e só o "Sim, pode pedir" fecha o pedido (esse toque é a confirmação).
+
+Modo demo (`modal run scripts/modo.py --rapido on`): qualquer frequência vence em 1 minuto.
 
 Janela de 24h da Meta: mensagem livre só até 24h depois da última mensagem da pessoa. Lembrete
 de semana quase sempre cai fora dela, então:
@@ -18,6 +22,33 @@ import secrets
 import time
 
 JANELA = 23.5 * 3600
+DEMO_SEGUNDOS = 60
+
+# palavra no nome do item -> categoria. Ordem importa: a 1ª que bater ganha.
+CATEGORIAS = [
+    ('hambúrguer', ('hamburguer', 'burger', 'burguer', 'x-', 'x ', 'smash', 'cheddar bacon')),
+    ('pizza', ('pizza', 'calzone')),
+    ('açaí', ('acai',)),
+    ('sushi', ('sushi', 'temaki', 'sashimi', 'uramaki', 'hot roll', 'poke')),
+    ('pastel', ('pastel',)),
+    ('esfiha', ('esfiha', 'esfirra')),
+    ('marmita', ('marmita', 'marmitex', 'prato feito', 'pf ', 'executivo')),
+    ('lanche', ('lanche', 'sanduiche', 'beirute', 'hot dog', 'cachorro quente')),
+    ('frango', ('frango frito', 'balde', 'fried chicken', 'nuggets')),
+    ('sorvete', ('sorvete', 'milkshake', 'milk shake')),
+    ('café', ('cafe', 'cappuccino', 'capuccino', 'latte')),
+    ('pão', ('pao ', 'paes', 'baguete', 'bisnaga')),
+]
+
+
+def categoria(nome):
+    """'X-Bacon Duplo' -> 'hambúrguer'. Sem acento e minúsculo; None se não reconhecer."""
+    import unicodedata
+    t = unicodedata.normalize('NFKD', str(nome or '')).encode('ascii', 'ignore').decode().lower() + ' '
+    for cat, chaves in CATEGORIAS:
+        if any(t.startswith(c) or f' {c}' in t for c in chaves):
+            return cat
+    return None
 
 
 class Recorrencias:
@@ -34,11 +65,13 @@ class Recorrencias:
         else:
             self.dic.pop(wa_id, None)
 
-    def criar(self, wa_id, pedido, dias):
+    def criar(self, wa_id, pedido, dias, pagamento=None, ciclo=None):
+        """`ciclo` em segundos substitui `dias` só na 1ª vez (modo demo: vence em 1 minuto)."""
         recs = [r for r in self._todas(wa_id) if r.get('pedido_id') != pedido['id']]
         rec = {'id': secrets.token_hex(3), 'pedido_id': pedido['id'], 'dias': int(dias),
                'resumo': pedido.get('resumo', ''), 'loja': pedido.get('loja'),
-               'proximo': self.agora() + int(dias) * 86400, 'avisado': False}
+               'total': pedido.get('total'), 'pagamento': pagamento, 'ciclo': ciclo,
+               'proximo': self.agora() + (ciclo or int(dias) * 86400), 'avisado': False}
         recs.append(rec)
         self._gravar(wa_id, recs[-10:])
         return rec
@@ -81,7 +114,7 @@ def botoes_lembrete(rec):
             (f'lem:parar:{rec["id"]}', T.B_LEMBRETE_PARAR)]
 
 
-def disparar_vencidos(estado, wpp, dic_rec=None, agora=None):
+def disparar_vencidos(estado, wpp, dic_rec=None, agora=None, so=None):
     """Cron: avisa quem tem lembrete vencido. Devolve contadores pro log."""
     import modal
 
@@ -91,16 +124,17 @@ def disparar_vencidos(estado, wpp, dic_rec=None, agora=None):
     template = os.environ.get('TEMPLATE_LEMBRETE', '')
     cont = {'janela': 0, 'template': 0, 'adiado': 0, 'erro': 0}
     store = Recorrencias(dic_rec, agora=lambda: agora)
-    for wa_id in list(dic_rec.keys()):
+    for wa_id in ([so] if so else list(dic_rec.keys())):
         rec = store.vencido_sem_aviso(wa_id)
         if not rec:
             continue
         u = estado.get(f'u:{wa_id}') or {}
         try:
             if agora - float(u.get('ultima_msg') or 0) < JANELA:
-                wpp.botoes(wa_id, T.lembrete(rec.get('resumo', '')), botoes_lembrete(rec))
+                texto = T.lembrete(rec, u.get('endereco'))
+                wpp.botoes(wa_id, texto, botoes_lembrete(rec))
                 u['fase'] = 'lembrete'
-                u['pergunta'] = {'texto': T.lembrete(rec.get('resumo', '')),
+                u['pergunta'] = {'texto': texto,
                                  'botoes': [list(b) for b in botoes_lembrete(rec)],
                                  'titulos': [b[1] for b in botoes_lembrete(rec)]}
                 estado[f'u:{wa_id}'] = u

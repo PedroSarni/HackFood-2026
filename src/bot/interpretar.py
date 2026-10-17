@@ -14,7 +14,7 @@ import unicodedata
 ACOES = ['comprar', 'mais_opcoes', 'escolher', 'sim', 'nao', 'quantidade', 'endereco',
          'ver_pedido', 'finalizar', 'tirar_item', 'cancelar', 'acompanhar', 'repetir',
          'ajuda', 'saudacao', 'agradecer', 'sair', 'apagar_dados', 'parar_lembrete',
-         'fora_do_escopo', 'nao_entendi']
+         'agendar', 'fora_do_escopo', 'nao_entendi']
 LOJAS = ['MERCADO', 'RESTAURANTE', 'FARMACIA', 'BEBIDAS', 'PET', 'LOJA']
 
 ESQUEMA = {
@@ -48,7 +48,7 @@ mensagens picadas, ou mandam áudio e foto. Seja generoso: descubra o que a pess
 Responda só o JSON do esquema. Campos:
 - acao: uma de comprar, mais_opcoes, escolher, sim, nao, quantidade, endereco, ver_pedido, \
 finalizar, tirar_item, cancelar, acompanhar, repetir, ajuda, saudacao, agradecer, sair, \
-apagar_dados, parar_lembrete, fora_do_escopo, nao_entendi.
+apagar_dados, parar_lembrete, agendar, fora_do_escopo, nao_entendi.
 - itens: quando acao=comprar, cada produto pedido, na ordem. termo curto e no singular \
 ("pão francês", "leite integral", "carne moída", "dipirona"), sem a quantidade. \
 quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
@@ -62,7 +62,7 @@ detalhes ("bem passado", "sem cebola", "marca Italac").
 arroz, fruta, café, sabão); RESTAURANTE para comida pronta (pizza, lanche, marmita, açaí, \
 sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebida alcoólica \
 (cerveja, vinho); PET para ração e coisas de bicho; LOJA para o resto.
-- numero: quando escolher (1, 2 ou 3, entre as opções que estão na tela; "o primeiro"=1, \
+- numero: quando agendar, de quantos em quantos dias (todo dia=1, toda semana=7, a cada 15 dias=15, todo mês=30; sem frequência dita = null). Quando escolher (1, 2 ou 3, entre as opções que estão na tela; "o primeiro"=1, \
 "o do meio"=2, "o último" = o último da tela) ou quando quantidade.
 - texto: quando endereco, o endereço como a pessoa disse.
 - transcricao: se veio áudio ou foto, o que foi dito ou o que está escrito/mostrado, curto.
@@ -74,7 +74,7 @@ pergunta concreta ligada ao que ela disse ("que tal uma água geladinha? É só 
 Se não entendeu, diga o que entendeu e como ela pode pedir (escrevendo; não sugira mandar áudio). Não dê aula, receita, conselho \
 médico, opinião política nem responda perguntas gerais: no máximo uma frase leve e volte pro \
 pedido. Se houver AVISO INTERNO no contexto, leve ele em conta (ex.: explique com calma que o \
-iFood está instável). Nunca diga que fez algo que não fez.
+iFood está instável). Nunca diga que fez algo que não fez. O assistente SABE deixar pedidos no automático (recorrência: no dia combinado ele chama a pessoa e pede com o "sim" dela): nunca diga que não consegue agendar ou repetir pedidos.
 
 Regras:
 - Lista de compras (escrita, falada ou foto de papel) vira acao=comprar com todos os itens.
@@ -83,6 +83,7 @@ Regras:
 - "acabou", "só isso", "pode fechar", "terminei" = finalizar.
 - "cadê meu pedido", "já saiu?", "vai demorar?" = acompanhar.
 - "o de sempre", "pedir igual da outra vez", "repetir" = repetir.
+- "quero isso todo dia às 18h", "toda semana", "todo mês", "deixa no automático", "me lembra de pedir", "pedido recorrente", "assinatura" = agendar (mesmo no meio de um pedido).
 - Conversa que não é sobre pedido (piada, política, receita, perguntas gerais) = fora_do_escopo.
 - Só "oi", "bom dia", "olá" = saudacao. "obrigado", "valeu" = agradecer.
 - Se não der pra entender = nao_entendi. Nunca invente produto que a pessoa não pediu."""

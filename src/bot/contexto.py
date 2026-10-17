@@ -32,7 +32,8 @@ def modo_mock(estado=None):
 
 class Contexto:
     def __init__(self, wpp, armazem, chamador_mcp, gerar_json, link_login, iniciar_rastreio,
-                 recorrencias, agora=time.time, revogar=None, dormir=time.sleep, geocoder=None):
+                 recorrencias, agora=time.time, revogar=None, dormir=time.sleep, geocoder=None,
+                 agendar_lembrete=None):
         self.wpp = wpp
         self.armazem = armazem
         self._chamador = chamador_mcp       # (wa_id) -> função chamar(tool, **args)
@@ -44,6 +45,7 @@ class Contexto:
         self._revogar = revogar
         self.dormir = dormir
         self._geocoder = geocoder       # (texto) -> endereço canônico | None (só resolve CEP)
+        self._agendar_lembrete = agendar_lembrete  # (wa_id, quando) -> dispara o lembrete nessa hora
 
     def ifood(self, wa_id):
         return Ifood(self._chamador(wa_id))
@@ -62,6 +64,14 @@ class Contexto:
 
     def link_login(self, wa_id):
         return self._link_login(wa_id)
+
+    def agendar_lembrete(self, wa_id, quando):
+        """Modo demo: o cron de 15 min é lento pra apresentação, então dispara na hora certa."""
+        try:
+            if self._agendar_lembrete:
+                self._agendar_lembrete(wa_id, quando)
+        except Exception as e:  # noqa: BLE001 - o cron de 15 min pega de qualquer jeito
+            print(f'agendar lembrete falhou: {e!r}')
 
     def iniciar_rastreio(self, wa_id, pedido_id):
         try:
@@ -148,6 +158,9 @@ def contexto_producao(estado, wpp, wa_id=None):
         # que o Modal não hidratou ("Function has not been hydrated", rastreio nunca começava)
         modal.Function.from_name(modulo_app.APP, 'acompanhar_pedido').spawn(wid, pedido_id)
 
+    def lembrar(wid, quando):
+        modal.Function.from_name(modulo_app.APP, 'lembrete_na_hora').spawn(wid, quando)
+
     def revogar(tok):
         if not modo_mock(estado):
             ifood_mcp.revogar(_cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET'),
@@ -156,4 +169,5 @@ def contexto_producao(estado, wpp, wa_id=None):
     return Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador,
                     gerar_json=lambda s, p, e: llm.gerar_json(s, p, e),
                     link_login=modulo_app.novo_link_login, iniciar_rastreio=rastrear,
-                    recorrencias=rec, revogar=revogar, geocoder=geocoder.normalizar)
+                    recorrencias=rec, revogar=revogar, geocoder=geocoder.normalizar,
+                    agendar_lembrete=lembrar)
