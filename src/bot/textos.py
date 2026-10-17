@@ -163,7 +163,9 @@ B_ESCREVER = ('outra', '✏️ Escrever de novo')
 
 
 def quantos(nome):
-    return f'Quantos *{nome}* você quer?\nToque no número, ou escreva.'
+    # "unidades" concorda sempre com "Quantas"; "de <nome>" serve pra qualquer produto, sem
+    # risco de gênero errado ("Quantos Picanha" ficava torto)
+    return f'Quantas unidades de *{nome}* você quer?\nToque no número, ou escreva.'
 
 
 def escolha_opcao(grupo, n, total):
@@ -177,7 +179,7 @@ def colocado(qtd, nome):
 
 
 def proximo_da_lista(termo):
-    return f'Agora vamos ao próximo: *{termo}* 👇'
+    return f'Agora vamos procurar *{termo}*: 👇'
 
 
 def mais_alguma(total):
