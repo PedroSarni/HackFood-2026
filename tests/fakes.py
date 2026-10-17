@@ -225,6 +225,9 @@ class LlmFake:
             raise ErroLLM('fake fora do ar')
         if self.resposta is not None:
             return self.resposta, 'fake', 0.01
+        if 'manter' in esquema['properties']:  # filtro de relevância: mantém tudo, na ordem
+            n = sum(1 for linha in partes[0][1].split('\n') if linha[:1].isdigit())
+            return {'manter': list(range(n))}, 'fake', 0.01
         if 'acao' not in esquema['properties']:  # o tutor de erros (src/bot/tutor.py)
             return {'texto': '[tutor] Calma, o iFood deu uma travadinha 😅 Toque em Tentar de novo.'}, 'fake', 0.01
         from src.bot.interpretar import normalizar

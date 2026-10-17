@@ -25,11 +25,12 @@ ESQUEMA = {
             'type': 'OBJECT',
             'properties': {
                 'termo': {'type': 'STRING', 'description': 'o produto, curto, sem quantidade'},
+                'busca': {'type': 'STRING', 'description': 'o que digitar na busca do iFood pra achar ESSE produto'},
                 'quantidade': {'type': 'INTEGER', 'nullable': True},
                 'tipo_loja': {'type': 'STRING', 'enum': LOJAS},
                 'observacao': {'type': 'STRING', 'nullable': True},
             },
-            'required': ['termo', 'tipo_loja']}},
+            'required': ['termo', 'busca', 'tipo_loja']}},
         'numero': {'type': 'INTEGER', 'nullable': True},
         'texto': {'type': 'STRING', 'nullable': True},
         'transcricao': {'type': 'STRING', 'nullable': True},
@@ -52,6 +53,11 @@ apagar_dados, parar_lembrete, fora_do_escopo, nao_entendi.
 ("pão francês", "leite integral", "carne moída", "dipirona"), sem a quantidade. \
 quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
 detalhes ("bem passado", "sem cebola", "marca Italac").
+- busca: o texto que vai na busca do iFood, que é burra (casa com nome de loja e com sabor). \
+1 a 4 palavras, como o produto aparece num catálogo. Se a palavra pura engana, desambigue: \
+"cebola" -> "cebola in natura" (senão vem salgadinho sabor cebola), "limão" -> "limão tahiti", \
+"frango" -> "frango congelado" no mercado ou "frango assado" no restaurante, "coca" -> \
+"coca-cola". Se não engana, repita o termo ("coxinha", "dipirona", "arroz").
 - tipo_loja: MERCADO para alimento, bebida não alcoólica, limpeza e higiene (pão, leite, carne, \
 arroz, fruta, café, sabão); RESTAURANTE para comida pronta (pizza, lanche, marmita, açaí, \
 sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebida alcoólica \
@@ -201,7 +207,8 @@ def interpretar(llm, estado, partes, aviso=None):
         if not termo:
             continue
         qtd = it.get('quantidade')
-        itens.append({'termo': termo,
+        busca = ' '.join(str(it.get('busca') or '').split())[:60] or termo
+        itens.append({'termo': termo, 'busca': busca,
                       'quantidade': qtd if isinstance(qtd, int) and 0 < qtd <= 99 else None,
                       'tipo_loja': it.get('tipo_loja') if it.get('tipo_loja') in LOJAS else 'MERCADO',
                       'observacao': (it.get('observacao') or '')[:140] or None})

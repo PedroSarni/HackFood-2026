@@ -176,7 +176,7 @@ def test_rajada_vira_uma_interpretacao_so():
     m.wpp.limpar()
     antes = m.llm.chamadas
     m.enviar('oi', 'quero', 'leite', 'por favor')
-    assert m.llm.chamadas == antes + 1
+    assert m.llm.chamadas == antes + 2  # 1 interpretação pra rajada toda + 1 filtro de relevância da busca
     assert [t for t, _ in m.wpp.saida].count('carrossel') == 1  # uma resposta só: um carrossel do leite
 
 
@@ -522,3 +522,19 @@ def test_tutor_fora_do_ar_volta_pro_texto_fixo():
     m.wpp.limpar()
     m.enviar('quero leite')
     assert T.ERRO.split('\n')[0] in m.wpp.textos()[-1]
+
+
+# --- busca precisa (cebola não é salgadinho de cebola) ---------------------------------------
+
+def test_busca_vai_pro_ifood_desambiguada_e_cai_pro_termo_se_nao_achar():
+    m = Mundo()
+    endereco_pronto(m)
+    m.llm.resposta = {'acao': 'comprar', 'itens': [{'termo': 'leite', 'busca': 'leite in natura xyz',
+                                                    'tipo_loja': 'MERCADO'}]}
+    antes = len(m.mcp.chamadas_de('searchOffers'))
+    m.enviar('quero leite')
+    consultas = [c['query'] for c in m.mcp.chamadas_de('searchOffers')[antes:]]
+    assert consultas[0] == 'leite in natura xyz'  # 1º a busca precisa do Gemini
+    if len(consultas) > 1:
+        assert consultas[1] == 'leite'           # nada? tenta o termo puro
+    assert m.wpp.cards()

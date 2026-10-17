@@ -14,7 +14,7 @@ import os
 import time
 import traceback
 
-from src.bot import ranking, tutor
+from src.bot import ranking, relevancia, tutor
 from src.bot import textos as T
 from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import cpf_em, igual_a_botao, interpretar, normalizar, numero_em, regra_rapida
@@ -779,9 +779,17 @@ class Bot:
         u = self.u
         car = u.get('carrinho') or {}
         loja_id = car.get('loja_id') if car.get('itens') else None
-        ofertas, proxima = self.ctx.ifood(self.wa).buscar(
-            pedido['termo'], u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
-        ofertas = ranking.ordenar(ofertas, pedido)
+        # 1º o que a pessoa quer: busca desambiguada pelo Gemini ("cebola in natura", não "cebola"),
+        # depois o filtro tira o que não é o produto (a busca do iFood casa com nome de loja e sabor);
+        # só então a ordem do ranking. Se a busca precisa não achar nada, tenta o termo puro.
+        ofertas, proxima = [], None
+        for consulta in dict.fromkeys(x for x in (pedido.get('busca'), pedido['termo']) if x):
+            achadas, proxima = self.ctx.ifood(self.wa).buscar(
+                consulta, u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
+            ofertas = ranking.ordenar(relevancia.filtrar(self.ctx.llm, achadas, pedido), pedido)
+            if ofertas:
+                pedido['consulta_usada'] = consulta
+                break
         u['atual'] = pedido
         if not ofertas:
             botoes = [T.B_PULAR, T.B_ESCREVER] if u.get('fila') else [T.B_ESCREVER, T.B_INICIO]
@@ -858,9 +866,10 @@ class Bot:
         if lst['pos'] >= len(lst['ofertas']):
             if lst.get('proxima'):  # acabou o que já veio: aí sim busca a página seguinte
                 novas, prox = self.ctx.ifood(self.wa).buscar(
-                    lst['termo'], u['endereco'], lst.get('tipo_loja') or 'MERCADO',
+                    (lst.get('pedido') or {}).get('consulta_usada') or lst['termo'], u['endereco'], lst.get('tipo_loja') or 'MERCADO',
                     loja_id=lst.get('loja_id'), pagina=lst['proxima'])
                 ja = {o['item_id'] for o in lst['ofertas']}
+                novas = relevancia.filtrar(self.ctx.llm, novas, lst.get('pedido') or {'termo': lst['termo']})
                 lst['ofertas'] += [o for o in ranking.ordenar(novas, lst.get('pedido') or {}) if o['item_id'] not in ja]
                 lst['proxima'] = prox
             if lst['pos'] >= len(lst['ofertas']):

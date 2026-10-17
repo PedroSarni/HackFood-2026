@@ -218,7 +218,8 @@ def test_igual_a_botao_aceita_o_texto_do_botao_digitado():
 def test_interpretar_limpa_saida_ruim_do_modelo():
     llm = lambda s, p, e: ({'acao': 'comprar', 'itens': [{'termo': '  pão  ', 'quantidade': 500, 'tipo_loja': 'XYZ'}]}, 'm', 0)
     r = I.interpretar(llm, {}, [('texto', 'pao')])
-    assert r['itens'] == [{'termo': 'pão', 'quantidade': None, 'tipo_loja': 'MERCADO', 'observacao': None}]
+    assert r['itens'] == [{'termo': 'pão', 'busca': 'pão', 'quantidade': None, 'tipo_loja': 'MERCADO',
+                           'observacao': None}]  # sem busca do modelo, busca = termo
     assert I.interpretar(lambda s, p, e: ({'acao': 'hackear'}, 'm', 0), {}, [])['acao'] == 'nao_entendi'
 
 
