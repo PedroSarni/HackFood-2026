@@ -1,7 +1,7 @@
 ---
 slug: docs-contexto
 owner: Davi de Alcantara Lima
-status: active
+status: done
 started: 2026-10-17 15:52
 ---
 
@@ -22,4 +22,7 @@ Sobe 4 documentos de contexto em docs/ (evento, referências de mercado, estado 
 
 ## Onde está (preencher ao terminar)
 
-- (preencher)
+- `docs/contexto-evento.md` — regras do evento, agenda, critérios, entregáveis, fatos do MCP do iFood, log de falas, pendências e bugs do MCP (entregável 06)
+- `docs/referencias.md` — referências de mercado (Lu/Magalu, Ailo/iFood, Klarna) e posicionamento
+- `docs/estado.md` — estado do projeto: ideia, pronto, em andamento, bloqueios, próximos passos e horários de corte
+- `docs/decisoes.md` — diário de decisões do time (mais novo no topo)
