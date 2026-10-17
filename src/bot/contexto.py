@@ -11,7 +11,7 @@ import time
 
 from src.bot.ifood import Ifood, PrecisaLogin
 from src.bot.recorrencia import Recorrencias
-from src.shared import geocoder, ifood_mcp, llm
+from src.shared import geocoder, ifood_mcp, llm, scribe
 
 
 def _cfg(nome):
@@ -33,7 +33,7 @@ def modo_mock(estado=None):
 class Contexto:
     def __init__(self, wpp, armazem, chamador_mcp, gerar_json, link_login, iniciar_rastreio,
                  recorrencias, agora=time.time, revogar=None, dormir=time.sleep, geocoder=None,
-                 agendar_lembrete=None):
+                 agendar_lembrete=None, transcritor=None):
         self.wpp = wpp
         self.armazem = armazem
         self._chamador = chamador_mcp       # (wa_id) -> função chamar(tool, **args)
@@ -46,6 +46,7 @@ class Contexto:
         self.dormir = dormir
         self._geocoder = geocoder       # (texto) -> endereço canônico | None (só resolve CEP)
         self._agendar_lembrete = agendar_lembrete  # (wa_id, quando) -> dispara o lembrete nessa hora
+        self._transcritor = transcritor  # (mime, bytes) -> texto (Scribe); None = o Gemini ouve o áudio
 
     def ifood(self, wa_id):
         return Ifood(self._chamador(wa_id))
@@ -61,6 +62,16 @@ class Contexto:
 
     def baixar_midia(self, media_id):
         return self.wpp.baixar_midia(media_id)
+
+    def transcrever(self, mime, dados):
+        """Áudio -> texto (Scribe). None = desligado ou falhou: aí o Gemini ouve o áudio, como antes."""
+        if not self._transcritor:
+            return None
+        try:
+            return self._transcritor(mime, dados)
+        except Exception as e:  # noqa: BLE001 - plano B é o Gemini ouvir
+            print(f'scribe falhou: {e!r}')
+            return None
 
     def link_login(self, wa_id):
         return self._link_login(wa_id)
@@ -141,17 +152,21 @@ def chamador_real(armazem, wa_id):
     return chamar
 
 
-def contexto_producao(estado, wpp, wa_id=None):
+def contexto_producao(estado, wpp, wa_id=None, origem=None):
+    """`origem` marca as mensagens no diário do painel ('rastreio' = aviso de status do pedido)."""
     import modal
 
     from src import app as modulo_app
+    from src.shared import painel
     from src.shared.mcp_fake import McpFake
 
+    diario = painel.diario_producao()
+    wpp = painel.EspiaoWhatsApp(wpp, diario, origem)
     rec = Recorrencias(modal.Dict.from_name('hackfood-recorrencias', create_if_missing=True))
     def chamador(wid):  # decide a cada uso: o interruptor do modo demo vale sem deploy
         if modo_mock(estado):
-            return McpFake(armazem=estado, chave=f'mock:{wid}').chamar
-        return chamador_real(estado, wid)
+            return painel.espiar_mcp(McpFake(armazem=estado, chave=f'mock:{wid}').chamar, diario, wid)
+        return painel.espiar_mcp(chamador_real(estado, wid), diario, wid)
 
     def rastrear(wid, pedido_id):
         # pelo nome no app publicado: no container o app roda como `app` e este `src.app` é uma 2ª cópia
@@ -166,8 +181,10 @@ def contexto_producao(estado, wpp, wa_id=None):
             ifood_mcp.revogar(_cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET'),
                               tok.get('refresh_token') or tok.get('access_token', ''))
 
-    return Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador,
+    ctx = Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador,
                     gerar_json=lambda s, p, e: llm.gerar_json(s, p, e),
                     link_login=modulo_app.novo_link_login, iniciar_rastreio=rastrear,
                     recorrencias=rec, revogar=revogar, geocoder=geocoder.normalizar,
-                    agendar_lembrete=lembrar)
+                    agendar_lembrete=lembrar, transcritor=scribe.transcrever if scribe.ligado() else None)
+    ctx.diario = diario
+    return ctx

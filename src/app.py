@@ -66,7 +66,13 @@ def rodada(wa_id: str, seq: int, espera: float, mid: str = ''):
             return 'fila vazia'
         from src.bot.contexto import contexto_producao
         from src.bot.fluxo import Bot
-        Bot(contexto_producao(estado, wpp, wa_id)).processar(wa_id, msgs)
+        from src.shared import painel
+        ctx = contexto_producao(estado, wpp, wa_id)
+        painel.anotar_entrada(ctx.diario, wa_id, msgs)
+        try:
+            Bot(ctx).processar(wa_id, msgs)
+        finally:
+            ctx.diario.descarregar()
         return f'{len(msgs)} mensagem(ns)'
     finally:
         caixa.soltar_trava(wa_id, seq)
@@ -98,7 +104,7 @@ def acompanhar_pedido(wa_id: str, pedido_id: str):
     from src.bot.contexto import contexto_producao
     from src.bot.rastreio import acompanhar
     from src.shared.whatsapp import WhatsApp
-    acompanhar(contexto_producao(estado, WhatsApp(), wa_id), wa_id, pedido_id)
+    acompanhar(contexto_producao(estado, WhatsApp(), wa_id, origem='rastreio'), wa_id, pedido_id)
 
 
 @app.function(image=imagem, secrets=segredos, timeout=120)
@@ -119,8 +125,13 @@ def ferramentas_reais(wa_id: str):
 def lembretes():
     """Recorrência: avisa quem tem compra repetida vencendo (botão "Pedir de novo")."""
     from src.bot.recorrencia import disparar_vencidos
+    from src.shared import painel
     from src.shared.whatsapp import WhatsApp
-    return disparar_vencidos(estado, WhatsApp())
+    diario = painel.diario_producao()
+    try:
+        return disparar_vencidos(estado, painel.EspiaoWhatsApp(WhatsApp(), diario, 'lembrete'))
+    finally:
+        diario.descarregar()
 
 
 @app.function(image=imagem, secrets=segredos, timeout=900)
@@ -128,8 +139,13 @@ def lembrete_na_hora(wa_id: str, quando: float):
     """Modo demo: espera até `quando` e manda o lembrete só dessa pessoa (sem esperar o cron)."""
     from src.bot.recorrencia import disparar_vencidos
     from src.shared.whatsapp import WhatsApp
+    from src.shared import painel
     time.sleep(max(0, min(840, quando - time.time())) + 1)
-    return disparar_vencidos(estado, WhatsApp(), so=wa_id)
+    diario = painel.diario_producao()
+    try:
+        return disparar_vencidos(estado, painel.EspiaoWhatsApp(WhatsApp(), diario, 'lembrete'), so=wa_id)
+    finally:
+        diario.descarregar()
 
 
 # --- web ------------------------------------------------------------------------------
