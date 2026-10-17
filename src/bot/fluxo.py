@@ -611,13 +611,6 @@ class Bot:
         self.u['endereco'] = end
         self._endereco_mudou()
 
-    def _perto(self):
-        """Onde a pessoa costuma estar, pra puxar o geocodificador grátis pra cidade certa."""
-        for e in [self.u.get('endereco')] + list(self.u.get('enderecos') or []):
-            if e and e.get('lat') is not None:
-                return e['lat'], e['lng']
-        return None
-
     def _geocodificar_ifood(self, consultas):
         """Passo 1 do createAddress com a 1ª consulta que der resultado."""
         r = {}
@@ -633,10 +626,9 @@ class Bot:
         return r
 
     def receber_endereco(self, texto):
-        # o geocode do iFood erra com texto bagunçado: um geocodificador grátis arruma antes
-        # ("rua episcopal 1500 ap 3 sanca" -> "Rua Episcopal, 1500 - Centro, São Carlos - SP").
-        # Invisível pra pessoa; se ele não achar, vai o texto dela mesmo
-        norm = self.ctx.normalizar_endereco(texto, self._perto())
+        # CEP solto deixa o geocode do iFood perdido (já mandou pro Canadá): o CEP vira rua/bairro/cidade
+        # antes (src/shared/geocoder.py). Invisível pra pessoa; se não resolver, vai o texto dela mesmo
+        norm = self.ctx.normalizar_endereco(texto)
         r = self._geocodificar_ifood([norm['texto'], texto] if norm else [texto])
         if r.get('criado'):
             self._endereco_salvo(r['criado'])

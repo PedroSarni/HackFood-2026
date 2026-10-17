@@ -150,11 +150,10 @@ em `src/bot/fluxo.py`) segue a orientação da própria API:
      *Casa*?").
    - **vários, sem histórico** → mostra as opções pela etiqueta (Casa, Trabalho).
    - **nenhum** → pede o endereço e salva na conta.
-   Antes de ir pro iFood, o texto passa por um geocodificador grátis (`src/shared/geocoder.py`:
-   CEP -> BrasilAPI/ViaCEP, texto livre -> Nominatim/OSM, preso a ~30 km da pessoa quando já há um
-   endereço dela). Ele tira o complemento e devolve `Rua X, 123 - Bairro, Cidade - UF`, que o geocode
-   do iFood acha de primeira; também completa bairro/coordenadas que o iFood não devolver. A pessoa
-   não vê nada disso. Se ele não achar, ou o iFood não aceitar o texto arrumado, vai o texto original.
+   Quando a mensagem tem **CEP**, ele é resolvido antes (`src/shared/geocoder.py`: BrasilAPI, cai pro
+   ViaCEP) e o iFood recebe `Rua X, 123 - Bairro, Cidade - UF, CEP`: CEP solto deixa o geocode do iFood
+   perdido (`01310-100, 1578` já deu Canadá). Texto com nome de rua vai direto, porque o iFood entende
+   bem mesmo bagunçado. A pessoa não vê nada disso; se não resolver, vai o texto original.
 2. Endereço novo usa `createAddress` em dois passos (regra do iFood): primeiro o texto livre
    vira uma lista de *candidatos* (geocodificação, sem salvar nada); a pessoa escolhe; se o
    bairro não veio, o bot pergunta; aí confirma com o `candidateId` + complemento + bairro, e o

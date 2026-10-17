@@ -1,69 +1,34 @@
-"""Geocodificador gratuito que arruma o endereço ANTES de ir pro iFood.
+"""Resolve CEP ANTES de ir pro iFood.
 
-O geocode do createAddress erra fácil com texto bagunçado ("rua episcopal 1500 apto 3 sanca").
-Aqui o texto vira um endereço canônico ("Rua Episcopal, 1500 - Centro, São Carlos - SP"), que o
-iFood acha de primeira, e de quebra vêm bairro e coordenadas pra completar o que o iFood não
-devolver. Tudo invisível pra pessoa: qualquer falha devolve None e o bot segue com o texto original.
-
-Fontes (grátis, sem chave): CEP -> BrasilAPI (cai pro ViaCEP); texto livre -> Nominatim (OSM,
-máx. 1 req/s e User-Agent obrigatório).
+O geocode do createAddress entende bem texto bagunçado com nome de rua ("rua episcopal 1500 ap 3
+sao carlos" acha certinho), mas CEP solto o deixa perdido: em 17/10 "01310-100, 1578" virou
+Canadá, "20040-002, 100" Amsterdã e "13560-010, 1200" Belo Horizonte. Então só quando a mensagem
+tem CEP: CEP -> rua/bairro/cidade (BrasilAPI, cai pro ViaCEP; grátis, sem chave) e o iFood recebe
+"Avenida Paulista, 1578 - Bela Vista, São Paulo - SP, 01310-100". Invisível pra pessoa: qualquer
+falha devolve None e o bot segue com o texto original.
 """
 import functools
 import re
-import unicodedata
 
 import httpx
 
-NOMINATIM = 'https://nominatim.openstreetmap.org/search'
 BRASILAPI = 'https://brasilapi.com.br/api/cep/v2/{}'
 VIACEP = 'https://viacep.com.br/ws/{}/json/'
-AGENTE = {'User-Agent': 'hackfood-bot/1.0 (araujo.fabio@usp.br)'}
 TEMPO = 4
 
-UFS = {'acre': 'AC', 'alagoas': 'AL', 'amapa': 'AP', 'amazonas': 'AM', 'bahia': 'BA', 'ceara': 'CE',
-       'distrito federal': 'DF', 'espirito santo': 'ES', 'goias': 'GO', 'maranhao': 'MA',
-       'mato grosso': 'MT', 'mato grosso do sul': 'MS', 'minas gerais': 'MG', 'para': 'PA',
-       'paraiba': 'PB', 'parana': 'PR', 'pernambuco': 'PE', 'piaui': 'PI', 'rio de janeiro': 'RJ',
-       'rio grande do norte': 'RN', 'rio grande do sul': 'RS', 'rondonia': 'RO', 'roraima': 'RR',
-       'santa catarina': 'SC', 'sao paulo': 'SP', 'sergipe': 'SE', 'tocantins': 'TO'}
-
 _CEP = re.compile(r'\b(\d{5})-?(\d{3})\b')
-# complemento atrapalha o geocode: sai antes da busca ("apto 12", "bloco b", "casa 2", "fundos")
 _COMPL = re.compile(r'\b(apto?|apart\w*|ap|bloco|bl|casa|sala|lote|lt|quadra|qd|torre|andar|conj\w*|cj)'
-                    r'\.?\s*[\w-]{0,4}\b|\bfundos\b', re.I)
-
-
-def _sem_acento(s):
-    return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode().lower()
-
-
-def _uf(estado):
-    estado = (estado or '').strip()
-    return estado.upper() if len(estado) == 2 else UFS.get(_sem_acento(estado), estado)
+                    r'\.?\s*[\w-]{0,4}\b', re.I)
 
 
 def _numero(texto, rua=''):
     """Número da casa = último número solto que sobra (tira CEP, complemento e os números do
     nome da rua, tipo "Rua 7 de Setembro")."""
-    t = _COMPL.sub(' ', _CEP.sub(' ', texto))
-    da_rua = re.findall(r'\d+', rua or '')
-    nums = re.findall(r'\b\d{1,6}\b', t)
-    for n in da_rua:
+    nums = re.findall(r'\b\d{1,6}\b', _COMPL.sub(' ', _CEP.sub(' ', texto)))
+    for n in re.findall(r'\d+', rua or ''):
         if n in nums:
             nums.remove(n)
     return nums[-1] if nums else ''
-
-
-_GENERICOS = {'jardim', 'jd', 'vila', 'parque', 'pq', 'nucleo', 'residencial', 'conjunto', 'bairro',
-              'chacara', 'loteamento', 'cidade', 'recanto', 'de', 'da', 'do', 'das', 'dos'}
-
-
-def _citou_bairro(bairro, texto):
-    """"sylvio villari" conta como "Núcleo Residencial Sylvio Villari": ignora os prefixos genéricos."""
-    palavras = re.findall(r'\w+', _sem_acento(bairro))
-    nucleo = [p for p in palavras if p not in _GENERICOS] or palavras
-    escrito = set(re.findall(r'\w+', _sem_acento(texto)))
-    return all(p in escrito for p in nucleo)
 
 
 def _montar(rua, numero, bairro, cidade, uf, cep='', lat=None, lng=None):
@@ -78,89 +43,50 @@ def _montar(rua, numero, bairro, cidade, uf, cep='', lat=None, lng=None):
             'uf': uf or '', 'cep': cep, 'lat': lat, 'lng': lng}
 
 
-def _por_cep(cep, texto, http):
+def _consultar(cep, http):
+    """CEP -> (rua, bairro, cidade, uf, lat, lng) ou None."""
     try:
         d = http.get(BRASILAPI.format(cep), timeout=TEMPO).raise_for_status().json()
         coords = (d.get('location') or {}).get('coordinates') or {}
-        rua, bairro, cidade, uf = d.get('street'), d.get('neighborhood'), d.get('city'), d.get('state')
-        lat, lng = coords.get('latitude'), coords.get('longitude')
+        return (d.get('street'), d.get('neighborhood'), d.get('city'), d.get('state'),
+                coords.get('latitude'), coords.get('longitude'))
     except (httpx.HTTPError, ValueError):
-        try:
-            d = http.get(VIACEP.format(cep), timeout=TEMPO).raise_for_status().json()
-        except (httpx.HTTPError, ValueError):
-            return None
-        if d.get('erro'):
-            return None
-        rua, bairro, cidade, uf, lat, lng = d.get('logradouro'), d.get('bairro'), d.get('localidade'), d.get('uf'), None, None
-    if not rua:  # CEP geral da cidade: não diz a rua, melhor deixar o Nominatim tentar
-        return None
-    return _montar(rua, _numero(texto, rua), bairro, cidade, _uf(uf), cep,
-                   float(lat) if lat else None, float(lng) if lng else None)
-
-
-def _nominatim(consulta, perto, http):
-    q = {'q': consulta, 'countrycodes': 'br', 'format': 'jsonv2', 'addressdetails': 1, 'limit': 1,
-         'accept-language': 'pt-BR'}
-    if perto:  # trava perto da pessoa (~30 km), pra "rua das flores 10" não cair em outro estado
-        lat, lng = perto
-        q.update(viewbox=f'{lng - .3},{lat + .3},{lng + .3},{lat - .3}', bounded=1)
+        pass
     try:
-        r = http.get(NOMINATIM, params=q, headers=AGENTE, timeout=TEMPO).raise_for_status().json()
+        d = http.get(VIACEP.format(cep), timeout=TEMPO).raise_for_status().json()
     except (httpx.HTTPError, ValueError):
         return None
-    if not r or not (r[0].get('address') or {}).get('road'):
+    if d.get('erro'):
         return None
-    return r[0]
+    return d.get('logradouro'), d.get('bairro'), d.get('localidade'), d.get('uf'), None, None
 
 
-def normalizar(texto, perto=None, http=None):
-    """Texto livre -> endereço canônico pro iFood, ou None se não achou (aí use o texto original).
-    `perto` = (lat, lng) de onde a pessoa costuma estar, se souber."""
+def normalizar(texto, http=None):
+    """Texto com CEP -> endereço canônico pro iFood; sem CEP (ou CEP que não resolve) -> None."""
     texto = ' '.join((texto or '').split())
-    if len(texto) < 5:
+    m = _CEP.search(texto)
+    if not m:
         return None
-    perto = tuple(round(float(x), 2) for x in perto) if perto else None
+    cep = m.group(1) + m.group(2)
     if http is not None:
-        return _normalizar_com(texto, perto, http)
-    return _normalizar_cache(texto, perto)
+        return _resolver(cep, texto, http)
+    return _resolver_cache(cep, texto)
 
 
 @functools.lru_cache(maxsize=256)
-def _normalizar_cache(texto, perto):
+def _resolver_cache(cep, texto):
     with httpx.Client() as http:
-        return _normalizar_com(texto, perto, http)
+        return _resolver(cep, texto, http)
 
 
-def _normalizar_com(texto, perto, http):
+def _resolver(cep, texto, http):
     try:
-        m = _CEP.search(texto)
-        if m:
-            achado = _por_cep(m.group(1) + m.group(2), texto, http)
-            if achado:
-                return achado
-        limpo = ' '.join(_COMPL.sub(' ', _CEP.sub(' ', texto)).split()).strip(' ,-')
-        sem_numero = re.sub(r'\b\d{1,6}\b(?!.*\b\d{1,6}\b)', ' ', limpo)  # às vezes só acha sem o número
-        r = None
-        for consulta in dict.fromkeys((limpo, sem_numero)):
-            r = _nominatim(consulta, perto, http)
-            if r:
-                break
-        if not r:
+        achado = _consultar(cep, http)
+        if not achado or not achado[0]:  # CEP geral da cidade não diz a rua: vai o texto cru
             return None
-        a = r['address']
-        cidade = a.get('city') or a.get('town') or a.get('village') or a.get('municipality') or ''
-        # sem âncora (perto) e sem a pessoa citar a cidade, o OSM chuta qualquer "Rua 7 de Setembro"
-        # do Brasil: aí é melhor o iFood ver o texto cru do que um endereço de outro estado
-        if not perto and _sem_acento(cidade) not in _sem_acento(texto):
-            return None
-        rua = a['road']
-        # o número que a pessoa digitou ganha: o OSM devolve o do prédio mapeado mais perto (1578 -> 1600)
-        numero = _numero(texto, rua) or a.get('house_number') or ''
-        # bairro do OSM é o do trecho da rua, não o do número: só vai se a pessoa escreveu ele
-        bairro = next((b for b in (a.get('suburb'), a.get('neighbourhood'), a.get('quarter'))
-                       if b and _citou_bairro(b, texto)), '')
-        uf = (a.get('ISO3166-2-lvl4') or '').removeprefix('BR-') or _uf(a.get('state'))
-        return _montar(rua, numero, bairro, cidade, uf, lat=float(r['lat']), lng=float(r['lon']))
+        rua, bairro, cidade, uf, lat, lng = achado
+        return _montar(rua, _numero(texto, rua), bairro, cidade, (uf or '').upper(), cep,
+                       float(lat) if lat else None, float(lng) if lng else None)
     except Exception as e:  # noqa: BLE001 - ajuda opcional: nunca derruba o fluxo
-        print(f'geocoder grátis falhou: {e!r}')
+        print(f'consulta de CEP falhou: {e!r}')
         return None
