@@ -66,10 +66,12 @@ Detalhes no JSON do repo. Aqui só o que importa no dia a dia.
   publicado (`.../ifood/callback` no Modal) e `http://localhost:8080/callback`. Mesmos 3 escopos
 - Limitações descobertas ao testar (17/10, sem credencial: endpoints públicos e mock fiel à doc):
   - Discovery não aceita addressId: `userLocation` é sempre `{latitude, longitude}` (vem do `coordinates` do endereço)
-  - Cartão inviável por bot: `setCartPayment` exige `cardTokenId`, o `listPaymentMethods` sempre devolve null e não há
-    API de tokenização. Sobra PIX e vale. Não existe "pagar na entrega"
+  - Cartão: `setCartPayment` exige `cardTokenId`. O `listPaymentMethods` devolve PIX e um cartão de teste com
+    `cardTokenId` (não null) [testado, 17/10]. Não há API de tokenização. A decisão de só PIX e vales segue (docs/decisoes.md).
+    Não existe "pagar na entrega"
   - `submitOrder` devolve só `orderId`: nenhum código PIX copia-e-cola/QR em nenhuma tool
-  - Entrega agendada exige `selectedTimeSlotId`, mas os timeslots só têm `from`/`to` (sem ID)
+  - Entrega agendada exige `selectedTimeSlotId`; os timeslots têm `timeslotId` em mercado, e a chave vem omitida em
+    restaurante [testado, 17/10]
   - Opções do item → carrinho: o mapeamento `optionGroupId/optionId` → `options/customizations` não está claro.
     O bot tenta o modo A e cai pro B sozinho se o iFood recusar
 
