@@ -1224,6 +1224,7 @@ class Bot:
         u['pedidos'] = ([{'id': feito['id'], 'carrinho': car['id'], 'quando': self.ctx.agora(),
                           'loja': car.get('loja'), 'loja_id': car.get('loja_id'),
                           'resumo': ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens'])[:300],
+                          'itens': [i.get('item_id') or normalizar(i.get('nome')) for i in car['itens']],
                           'total': car.get('total')}] + (u.get('pedidos') or []))[:PEDIDOS_GUARDADOS]
         u['carrinho'] = None
         u['fila'] = []
@@ -1241,7 +1242,11 @@ class Bot:
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
                                   detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')))
         self.ctx.iniciar_rastreio(self.wa, feito['id'])
-        self.perguntar(T.OFERECER_REPETIR, [T.B_REC_SEMANA, T.B_REC_MES, T.B_REC_NAO], fase='recorrencia')
+        # lembrete só quando a compra se repete: na 1ª vez de um item ninguém quer ser cobrado de rotina
+        if _repetiu(u['pedidos'][0], u['pedidos'][1:]):
+            self.perguntar(T.OFERECER_REPETIR, [T.B_REC_SEMANA, T.B_REC_MES, T.B_REC_NAO], fase='recorrencia')
+        else:
+            u['fase'] = 'acompanhando'
 
     def mudar(self, _arg=None):
         if not self.u.get('carrinho'):
@@ -1413,6 +1418,17 @@ class Bot:
                 msg = self._tutor('ifood_fora', msg)
             self.perguntar(msg, [T.B_TENTAR, T.B_INICIO])
 
+
+def _chaves_do_pedido(p):
+    """ids dos itens + nomes do resumo ("2x Pão, 1x Leite"); pedido antigo só tem o resumo."""
+    nomes = {normalizar(x.split('x ', 1)[-1]) for x in (p.get('resumo') or '').split(', ') if x}
+    return set(p.get('itens') or []) | nomes
+
+
+def _repetiu(pedido, anteriores):
+    """O pedido tem algum item que já veio num pedido anterior?"""
+    atual = _chaves_do_pedido(pedido)
+    return any(atual & _chaves_do_pedido(p) for p in anteriores)
 
 def _falha_do_ifood(cod):
     """Erro de infraestrutura do iFood (fora do ar, firewall, rede), não de regra de negócio."""

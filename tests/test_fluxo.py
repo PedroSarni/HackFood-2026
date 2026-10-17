@@ -317,8 +317,22 @@ def test_pizza_pergunta_o_tamanho_e_monta_options_no_formato_do_carrinho():
 
 # --- depois do pedido --------------------------------------------------------------------
 
+def _ja_pediu_isso_antes(m):
+    e = m.estado()
+    e['pedidos'] = [{'id': 'pedido-antigo', 'itens': [e['carrinho']['itens'][0]['item_id']], 'resumo': ''}]
+    m.armazem[f'u:{m.wa}'] = e
+
+
+def test_primeiro_pedido_de_um_item_nao_oferece_lembrete():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    assert not any(i.startswith('rec:') for i in m.wpp.todos_ids())
+    assert m.estado()['fase'] == 'acompanhando'
+
+
 def test_recorrencia_e_pedir_de_novo():
     m = pedido_ate_o_resumo(Mundo())
+    _ja_pediu_isso_antes(m)  # lembrete só aparece quando a compra se repete
     m.tocar('ok:')
     m.tocar('rec:7')
     recs = m.ctx.recorrencias._todas(m.wa)
