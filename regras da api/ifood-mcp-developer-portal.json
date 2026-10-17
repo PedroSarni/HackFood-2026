@@ -1,0 +1,234 @@
+{
+  "meta": {
+    "fonte": "https://mcp-developer.ifood.com.br (docs + llms.txt)",
+    "data_consulta": "2026-10-17",
+    "versao_portal": "0.27.0",
+    "ultima_atualizacao_doc": "Outubro 2026",
+    "idiomas": ["pt-BR", "en", "es"],
+    "proposito": "Expor o marketplace do iFood como servidor MCP para que agentes de IA busquem ofertas, montem carrinho, paguem e acompanhem pedidos em nome de um usuário iFood"
+  },
+  "arquitetura": {
+    "gateway_unico": "https://consumer-mcp.ifood.com.br/marketplace",
+    "observacao_gateway": "Um único MCP (gateway) reúne os 4 domínios; não é preciso instalar cada domínio separadamente",
+    "dominios": ["User", "Offer Discovery", "Cart", "Order Tracking"],
+    "total_tools": 24,
+    "protocolo": "MCP sobre HTTP, JSON-RPC 2.0",
+    "identidade": "Gateway injeta userId via header HTTP a partir do token; o agente nunca envia nem vê userId",
+    "http_status": "Gateway normaliza tudo para 200 OK; erros vêm no corpo JSON (submitOrder retorna 201)",
+    "convencoes": {
+      "chaves_json": "lowerCamelCase",
+      "enums": "SCREAMING_SNAKE_CASE",
+      "ids": "UUID v4 (addressId, cartId, itemId, cartItemId, merchantId, paymentMethodId, campaignId); candidateId e nextPageToken são strings opacas",
+      "moeda": "BRL em decimal (ex.: 32.90)",
+      "paginacao": "pageSize padrão 10, máximo 25; nextPageToken opaco; hasMore boolean",
+      "agentHints": "Presente em sucesso e erro orientando a próxima ação"
+    },
+    "urls_citadas_no_llms_txt": {
+      "auth_dev": "https://dev-auth.ifood.com.br",
+      "auth_prod": "https://auth.ifood.com.br",
+      "mcp_gateway_dev": "https://dev-api-mcp.ifood.com",
+      "mcp_gateway_prod": "https://api-mcp.ifood.com",
+      "aviso": "Esses hosts divergem do gateway consumer-mcp.ifood.com.br usado nos guias de instalação; a doc parece misturar versões"
+    },
+    "endpoints_auth": ["GET /authorize", "POST /token", "GET /userinfo", "POST /introspect", "POST /revoke"],
+    "pontos_de_entrada_oauth": {
+      "any2app_onelink": "https://app.ifood.com.br/F4X4/authorize",
+      "login_web": "https://id.ifood.com.br/authorize"
+    }
+  },
+  "clientes_suportados_para_instalacao": [
+    {"cliente": "Claude Code (VS Code)", "comando": "claude mcp add --transport http iFood https://consumer-mcp.ifood.com.br/marketplace --client-id CLIENT_ID --client-secret", "autorizacao": "/mcp no Claude Code abre o fluxo OAuth no navegador"},
+    {"cliente": "Claude Desktop", "comando": "mesmo comando do Claude Code", "autorizacao": "/mcp no app"},
+    {"cliente": "Cursor IDE", "config": "Settings > MCP > Add new MCP server (Type HTTP, URL, Client ID, Client Secret) ou ~/.cursor/mcp.json"},
+    {"cliente": "Google Gemini CLI", "comando": "gemini mcp add -s user --transport http iFood https://consumer-mcp.ifood.com.br/marketplace + bloco oauth em ~/.gemini/settings.json", "autorizacao": "/mcp auth iFood"},
+    {"cliente": "ChatGPT", "requisito": "Plus, Pro, Team, Enterprise ou Edu com Developer Mode", "observacao": "Cliente público: só precisa de Client ID (PKCE), sem Client Secret"}
+  ],
+  "mcps": {
+    "user_mcp": {
+      "descricao": "Identidade do usuário e endereços de entrega",
+      "qtd_tools": 3,
+      "tools": [
+        {"nome": "getUser", "efeito": "read-only", "retorna": "nome, email, telefone, formas de pagamento, dados comportamentais por tier", "quando_usar": "cumprimentar, personalizar, validar scopes", "quando_nao_usar": "para endereços (listAddresses); dados de outro usuário (impossível)", "pre_requisitos": "usuário autenticado"},
+        {"nome": "listAddresses", "efeito": "read-only", "retorna": "endereços salvos com alias e análises comportamentais (ordersByMerchantTypeWeekdayAndShift, topMerchantTypes, topWeekDayShift, isLastUsedAddress, isMostUsedAddress30d)", "quando_usar": "SEMPRE primeiro em qualquer fluxo de entrega", "observacoes": "Sem parâmetros; contagens vêm como string e precisam ser convertidas"},
+        {"nome": "createAddress", "efeito": "cria endereço persistente, idempotente via candidateId", "fluxos": ["two-step: geocode (address) -> candidates[] com candidateId -> confirmar com candidateId + complement/alias/reference/neighborhood", "single-shot: address + complement + alias quando match SINGLE e bairro resolvível (createdDirectly: true)"], "quando_usar": "após listAddresses vazio ou usuário escolher 'novo'", "quando_nao_usar": "inventar candidateId; colocar bairro em complement/reference"}
+      ],
+      "fluxo_por_cenario": {
+        "0_enderecos": "perguntar endereço -> createAddress",
+        "1_endereco": "usar direto, informar pelo alias, sem confirmação",
+        "2_ou_mais": "com dados comportamentais inferir o mais provável e confirmar pelo alias; sem dados apresentar opções"
+      },
+      "fora_do_escopo": ["autenticação/login", "histórico e status de pedidos", "pagamento", "catálogo de lojas e itens", "editar ou excluir endereço (não há tool)"]
+    },
+    "offer_discovery_mcp": {
+      "descricao": "Busca e navegação no marketplace; somente leitura",
+      "qtd_tools": 6,
+      "verticais_merchantType": ["RESTAURANT", "GROCERIES", "LIQUORSTORE", "DRUGSTORE", "PETSTORE", "SHOPPING"],
+      "resultKind": ["MERCHANT", "ITEM"],
+      "tools": [
+        {"nome": "searchOffers", "uso": "busca por termo descritivo (query) + refinements estruturados (maxItemPrice, maxDistanceKm, dieta, itemTaxonomy, merchantId)", "pre_requisitos": "query descritivo + userLocation", "regra": "qualificadores como 'barata' ou 'perto' nunca vão na query, vão em refinements"},
+        {"nome": "browseOffers", "uso": "explorar inventário geo-filtrado por vertical sem termo de busca; navegação por taxonomia", "pre_requisitos": "userLocation válida"},
+        {"nome": "getRecommendations", "uso": "listas curadas por contentMode: favoritos, pedidos recentes, recomendados, ofertas, destaques", "pre_requisitos": "usuário autenticado", "observacao": "orderId de RECENT_ORDERS é opaco, serve só para reordenar no Cart"},
+        {"nome": "listItemTaxonomy", "uso": "taxonomia global de categorias de um vertical; pública, sem userId nem userLocation", "retorna": "IDs canônicos para refinements.itemTaxonomy"},
+        {"nome": "getMerchant", "uso": "detalhes estáticos: menu, horários, métodos de entrega, mínimo de pedido, avaliações, itens em destaque", "regra": "nunca inventar merchantId; obter de searchOffers/browseOffers"},
+        {"nome": "getItem", "uso": "detalhe completo do item: optionGroups, customizações, preço, preço promocional, alérgenos, nutrição", "regra": "nunca inventar itemId; chamar antes de addItemToCart"}
+      ],
+      "campos_promocionais": ["promotionalUnitPrice", "promotionalFee"],
+      "fora_do_escopo": ["carrinho, pagamento, pedidos", "autenticação/OAuth/webview", "tool dedicada de cardápio (usar browseOffers/searchOffers com refinements.merchantId)", "qualquer escrita ou efeito colateral"],
+      "limites": ["pageSize máximo 25", "IDs de taxonomia só vêm de listItemTaxonomy ou facets.itemTaxonomy em runtime; nunca hardcodar"]
+    },
+    "cart_mcp": {
+      "descricao": "Montar e confirmar pedido; 13 tools atômicas sem operation enum",
+      "qtd_tools": 13,
+      "tools": [
+        {"nome": "createCart", "entradas": "Caminho A: merchantId + addressId + items[]; Caminho B: orderId sozinho (reordenar). Opcionais: deliveryMethod, paymentMethod", "observacao": "não idempotente; sempre cria carrinho novo; os dois caminhos são mutuamente exclusivos"},
+        {"nome": "getCart", "entradas": "cartId", "retorna": "itens, totalizadores, opções de entrega e pagamento"},
+        {"nome": "getCartDeliveryMethods", "entradas": "cartId", "retorna": "métodos de entrega (agora, agendado etc.), prazos, custos, time slots", "regra": "obrigatório antes de setCartDelivery"},
+        {"nome": "addItemToCart", "entradas": "cartId, itemId, quantity, options[] (obrigatório, mesmo vazio), customerNote opcional", "regra": "salvar o cartItemId retornado"},
+        {"nome": "updateCartItem", "entradas": "cartId, cartItemId, itemId, quantity, options[], customerNote opcional", "regra": "usar cartItemId, não itemId"},
+        {"nome": "removeItemFromCart", "entradas": "cartId, cartItemId", "aviso": "carrinho vazio gera erro em submitOrder"},
+        {"nome": "listVouchers", "entradas": "cartId", "retorna": "cupons aplicáveis com code, campaignId e efeito (FIXED/PERCENTAGE)"},
+        {"nome": "setVoucher", "entradas": "cartId, code, campaignId", "regra": "par exato vindo de listVouchers; nunca inventar ou reutilizar"},
+        {"nome": "removeVoucher", "entradas": "cartId", "observacao": "idempotente"},
+        {"nome": "setCartDelivery", "entradas": "cartId, deliveryMethodId, selectedTimeSlotId opcional", "regra": "obrigatório antes de submitOrder"},
+        {"nome": "listPaymentMethods", "entradas": "merchantId (GET com query param)", "retorna": "cartão, PIX, vale etc."},
+        {"nome": "setCartPayment", "entradas": "cartId, paymentMethodId, cardTokenId opcional", "regra": "obrigatório antes de submitOrder"},
+        {"nome": "submitOrder", "entradas": "cartId, userConsent (obrigatório true), document opcional (CPF, CNPJ ou passaporte)", "efeito": "cria pedido, cobra pagamento, inicia preparação; retorna orderId", "pre_requisitos": "≥1 item, entrega setada, pagamento setado, consentimento explícito do usuário"}
+      ],
+      "sequencia_obrigatoria": "createCart -> addItemToCart -> getCartDeliveryMethods -> setCartDelivery -> listPaymentMethods -> setCartPayment -> (listVouchers -> setVoucher opcional) -> submitOrder",
+      "modelo_item": "Item -> Option (optionId, name, quantity, customerNote) -> Customization (customizationId, name, quantity, customerNote); valores válidos vêm de getItem",
+      "tres_ids_distintos": {
+        "itemId": "do catálogo (Offer Discovery); usado em addItemToCart, createCart, updateCartItem",
+        "cartItemId": "atribuído ao entrar no carrinho; usado em updateCartItem e removeItemFromCart",
+        "cartId": "retornado por createCart; usado em quase todas as tools"
+      },
+      "erros_comuns_de_agentes": ["usar itemId onde cartItemId é exigido", "pular getCartDeliveryMethods antes de setCartDelivery", "omitir options[]", "pular setCartPayment", "hardcodar code/campaignId de cupom", "não salvar cartItemId", "recriar carrinho já existente", "omitir userConsent", "seguir cegamente suggestedActions[].tool", "esquecer de pedir CPF/CNPJ antes de submitOrder", "enviar orderId junto com merchantId/addressId/items"],
+      "formato_erro": "chave 'error' (singular) na raiz com code, message, details, impact, suggestedActions, userFriendlyMessage — divergência conhecida do schema canônico",
+      "fora_do_escopo": ["busca e detalhe de itens", "endereços e identidade", "rastreamento pós-checkout", "reembolsos e cancelamentos (ainda não contratados)", "OAuth, webview, registro de integrador"]
+    },
+    "order_tracking_mcp": {
+      "descricao": "Pós-checkout, somente leitura",
+      "qtd_tools": 2,
+      "tools": [
+        {"nome": "trackOrder", "entradas": "orderId", "retorna": "status {code, description}, statusHistory resumido (3-5 transições, timestamp embutido na description), agentHints {retryMessage, moreStatusEvents, pollingStop, stopMessage}", "regra_polling": "intervalo ditado por agentHints.retryMessage; parar quando pollingStop: true; campos inativos vêm como null"},
+        {"nome": "getOrder", "entradas": "orderId", "retorna": "merchant, itens, pagamento em BRL, endereço, código de verificação; dados imutáveis, cache seguro", "observacao": "sem campo de status"}
+      ],
+      "exemplos_status_code": ["ON_THE_WAY", "DELIVERY_ARRIVED_AT_DESTINATION", "DELIVERED"],
+      "erros": ["ORDER_NOT_FOUND", "ORDER_ACCESS_DENIED"],
+      "formato_erro": "campos na raiz: errorType, code, message, retryable, suggestion",
+      "fora_do_escopo": ["carrinho, checkout, pagamento", "reembolsos e cancelamentos (ainda não contratados)", "pedir de novo / 'o de sempre' (futuro domínio Order Placement)", "gestão do pedido do lado do restaurante"],
+      "modelo": "polling, não push/webhook"
+    }
+  },
+  "autenticacao": {
+    "padrao": "OAuth 2.1 Authorization Code + PKCE + OpenID Connect; iFood atua como IdP/SSO",
+    "passos": ["solicitar autorização", "processar callback (validar state)", "trocar code por tokens", "renovar tokens", "revogar tokens"],
+    "tokens": {"access_token": "~1 hora", "refresh_token": "~30 dias", "revogaveis": true, "recomendacao": "renovar com 5 min de antecedência; nunca guardar refresh token em localStorage"},
+    "jornadas": [
+      {"nome": "Any2App", "contexto": "app mobile com app iFood instalado", "entrada": "OneLink https://app.ifood.com.br/F4X4/authorize detecta o app; sem app cai para Login WEB", "metricas_llms_txt": "70-80% de sucesso, <5 s", "restricao": "redirect_uri deve ser HTTPS via Universal Link (iOS) ou App Link (Android); custom schemes (scheme://) não são suportados"},
+      {"nome": "Login WEB no navegador", "contexto": "qualquer dispositivo, sem app iFood; fallback universal", "entrada": "https://id.ifood.com.br/authorize", "metricas_llms_txt": "80-90% de sucesso, 1-3 min", "identificador": "telefone ou e-mail + código de verificação"},
+      {"nome": "Login WEB: Pending Action", "contexto": "desktop, totem, servidor, CLI ou agente de IA; começa na web e aprova no app iFood do celular via push", "metricas_llms_txt": "60-70% de sucesso", "fallbacks": ["sem app no celular: Login WEB no navegador", "recusa: access_denied", "sem conta: cadastro no dispositivo inicial"]}
+    ],
+    "cadastro_no_fluxo": "usuário sem conta cria no próprio fluxo (telefone validado, e-mail validado, nome) e segue para consentimento sem novo login",
+    "consentimento": {"quando": "obrigatório, pedido uma única vez", "personalizavel": "título, imagem e termos de privacidade por cliente", "revogacao": "em 'Contas Conectadas' no app iFood; interrompe o compartilhamento e encerra a sessão imediatamente"},
+    "tipos_de_cliente": {"confidencial": "backend; client_id + client_secret + redirect_uri", "publico": "frontend/mobile; client_id + redirect_uri + PKCE, sem secret"},
+    "escopos": {
+      "modelo_em_duas_etapas": "na criação do agente escolhe-se 3 escopos de acesso; após homologação o portal libera os escopos técnicos mcp.* que vão na requisição",
+      "escopos_de_acesso": [
+        {"nome": "Dados de usuário", "permite": "identificar usuário, perfil básico, endereços"},
+        {"nome": "Descoberta de conteúdo", "permite": "feeds, recomendações, busca, avaliações; ativa Dados de usuário"},
+        {"nome": "Criação de pedidos", "permite": "carrinho, pagamentos simulados, status de entrega; ativa todos"}
+      ],
+      "escopos_tecnicos": {
+        "mcp.user": ["mcp.user.basic.read", "mcp.user.advanced.read (CPF/CNPJ)", "mcp.user.addresses.read", "mcp.user.behavior.read", "mcp.user.addresses.write"],
+        "mcp.discovery": ["mcp.discovery.search.read", "mcp.discovery.browse.read", "mcp.discovery.recommendation.read", "mcp.discovery.details.read"],
+        "mcp.cart": ["mcp.cart.read", "mcp.cart.write", "mcp.cart.checkout", "mcp.cart.payment", "mcp.orders.read"]
+      },
+      "escopos_oidc_llms_txt": ["openid (obrigatório)", "profile", "email", "phone", "address"],
+      "outros_citados_llms_txt": ["user:read/write", "discovery:read", "cart:read/write", "order:read/track", "merchant_admin (admins)"],
+      "restricao": "não é possível escolher escopos técnicos individualmente; pedir escopo não liberado retorna invalid_scope"
+    },
+    "erros_auth": {
+      "nao_retryable": ["INVALID_CLIENT", "MISSING_CANDIDATE_ID", "AUTHENTICATION_REQUIRED", "access_denied", "invalid_scope"],
+      "retryable": ["SERVICE_UNAVAILABLE (backoff 2-5 s, máx 3 tentativas)", "PLACE_NOT_FOUND (pedir ao usuário verificar endereço)"]
+    },
+    "checklist_seguranca": ["HTTPS em tudo", "client_secret só no backend", "validar state (CSRF)", "renovar antes de expirar", "revogar no logout", "HttpOnly cookies na web", "Keychain/Keystore no mobile", "respeitar escopos aprovados", "logar eventos de segurança"]
+  },
+  "onboarding": {
+    "conta_portal": {
+      "perfis": [
+        {"tipo": "Pessoal / Estudante", "validacao": "nenhuma", "acesso": "sandbox grátis"},
+        {"tipo": "Profissional", "validacao": "CNPJ/registro comercial, aprovação de conformidade em 24-48h", "acesso": "sandbox + produção"}
+      ],
+      "dados_pedidos": ["e-mail e senha (8+ chars, 1 número, 1 maiúscula, 1 minúscula)", "nome completo e CPF", "CNPJ, razão social, nome fantasia e CNAE (só Profissional)", "telefone", "verificação por e-mail", "2FA obrigatório"]
+    },
+    "agente": {
+      "campos": ["logo (PNG/SVG/JPG, 1 MB, quadrado)", "nome", "descrição de uma frase", "Redirect URL (http ou https)", "URL pública de Termos de Uso", "URL pública de Política de Privacidade", "escopos de acesso"],
+      "aprovacao": "passa por análise de segurança do iFood; credenciais só após aprovação; sem notificação por e-mail, acompanhar em 'Meus agents'",
+      "credenciais": "Client ID exibido; Client Secret gerado sob demanda e mostrado uma única vez"
+    },
+    "conta_de_teste": {
+      "o_que_e": "conta iFood de consumidor exclusiva para testes, escopo ONLY_TEST_AGENT, nunca vira conta real",
+      "pre_requisito": "agente aprovado ou parcialmente aprovado",
+      "caracteristicas": ["e-mail automático @test.ifood.com.br", "telefone fictício (DDD terminado em zero, prefixo não começa com 9) que não recebe SMS", "OTP exibido no portal, regenerado manualmente"],
+      "limites": ["máximo 10 contas por usuário do portal", "excluídas 15 dias após a criação", "não fazem pedidos reais", "não acessam funcionalidades não lançadas", "pagamento real em pedido de teste (ex.: PIX) não é reembolsado"]
+    }
+  },
+  "limitacoes": {
+    "funcionais": [
+      "Sem cancelamento nem reembolso de pedidos",
+      "Sem tool de repedido 'o de sempre' no Order Tracking (reordenar existe só via createCart(orderId))",
+      "Sem lado do restaurante: aceite de pedido, painel de preparo, gestão de loja",
+      "Sem tool de cardápio dedicada",
+      "Sem push/webhook: rastreamento por polling na cadência do servidor",
+      "Sem editar ou excluir endereço (só listar e criar)",
+      "createCart com orderId ignora merchantId/addressId/items: não dá para reordenar e alterar na mesma chamada",
+      "Pagamento sempre em BRL",
+      "CPF/CNPJ exigido pela regulação brasileira; passaporte para estrangeiros",
+      "pageSize máximo 25; statusHistory limitado a 3-5 eventos por chamada",
+      "Histórico de pedidos só acessível por orderId obtido em submitOrder ou via getRecommendations(RECENT_ORDERS)"
+    ],
+    "acesso_e_homologacao": [
+      "Conta Pessoal/Estudante só acessa sandbox",
+      "Produção exige conta Profissional com CNPJ, aprovação de conformidade (24-48h) e homologação de segurança do agente",
+      "Aprovação do agente não notifica por e-mail",
+      "Escopos técnicos só são liberados após homologação e não podem ser escolhidos individualmente",
+      "Client Secret é mostrado uma única vez",
+      "Contas de teste: máximo 10, expiram em 15 dias, sem pedidos reais",
+      "Redirect URI deve ser HTTPS; custom schemes não aceitos",
+      "Any2App depende do app iFood instalado"
+    ],
+    "tecnicas": [
+      "Gateway normaliza tudo para HTTP 200; sucesso/erro é detectado pela presença de 'error' no corpo",
+      "Cada MCP usa um formato de erro diferente (errors[] no Discovery, error singular no Cart, campos na raiz no Order Tracking) — divergência admitida pela própria doc",
+      "access_token ~1h, refresh_token ~30 dias",
+      "Agente nunca vê userId; impossível operar em nome de outro usuário",
+      "Contagens comportamentais vêm como string",
+      "IDs de taxonomia mudam em runtime; não hardcodar",
+      "Quickstart da home (@ifood/mcp-sdk, mcp.ifood.dev/catalog) não bate com o restante da doc; llms.txt cita outros hosts (dev-api-mcp.ifood.com, auth.ifood.com.br)",
+      "Rate limiting e quotas existem (citados nos Termos) mas os valores não são publicados"
+    ],
+    "juridicas_termos_de_uso": [
+      "Sem dados reais nem credenciais corporativas no sandbox",
+      "Proibido contornar rate limits, quotas, auditoria ou kill switch",
+      "Proibido revender, sublicenciar ou compartilhar acesso e credenciais",
+      "Dados pessoais só para a finalidade do serviço; proibido transferir a terceiros (mesmo anonimizados) ou subcontratar tratamento sem autorização escrita",
+      "Dados pessoais sensíveis não podem ir para prompts, contexto, memória, treinamento, logs ou outputs",
+      "Incidente de segurança deve ser notificado ao iFood em até 24h via Suporte > Chamados",
+      "Proibido divulgar a relação com o iFood, listá-lo como cliente/parceiro ou usar a marca sem aprovação prévia",
+      "Ao publicar componente, o desenvolvedor concede ao iFood licença não exclusiva, mundial, gratuita, transferível e sublicenciável",
+      "iFood pode suspender com aviso de 5 dias úteis, ou imediatamente em risco iminente (comunicando em 48h)",
+      "Confidencialidade por 3 anos após o término, com multa no valor total do contrato",
+      "Encerramento não gera indenização; revogação imediata de credenciais e exclusão de dados pessoais",
+      "Proibido induzir agente a ignorar instruções de segurança ou executar ação destrutiva/financeira sem supervisão",
+      "Componentes de produção precisam de owner, inventário e homologação técnica e de segurança"
+    ]
+  },
+  "fluxo_completo_de_pedido": [
+    "User MCP: listAddresses -> (createAddress se necessário) -> addressId",
+    "Offer Discovery: searchOffers/browseOffers/getRecommendations -> getMerchant -> getItem -> merchantId, itemId, options",
+    "Cart: createCart -> addItemToCart -> getCartDeliveryMethods -> setCartDelivery -> listPaymentMethods -> setCartPayment -> (listVouchers -> setVoucher) -> submitOrder(userConsent: true, document?) -> orderId",
+    "Order Tracking: trackOrder (polling até pollingStop) / getOrder (detalhes estáticos)"
+  ],
+  "casos_de_uso_citados": ["assistente pessoal", "automação corporativa", "concierge empresarial", "acessibilidade por voz", "pedido de almoço para equipe via assistente de voz"],
+  "suporte": "Slack - Autenticação (citado no llms.txt); Suporte do Developer Portal > Chamados"
+}
