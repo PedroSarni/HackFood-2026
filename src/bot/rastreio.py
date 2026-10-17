@@ -10,10 +10,12 @@ import time
 from src.bot import textos as T
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 
-INTERVALO = 60
-MIN_INTERVALO = 20
+# leve de propósito: o firewall do iFood barra IP por volume (17/10) e pedido de conta de teste nunca
+# chega em "entregue", então cada pedido de teste ficava consultando por horas.
+INTERVALO = 90
+MIN_INTERVALO = 60
 MAX_INTERVALO = 300
-DURACAO_MAX = 4 * 3600
+DURACAO_MAX = 90 * 60
 FINAIS = {'DELIVERED', 'CONCLUDED', 'CANCELLED', 'CANCELED'}
 
 
@@ -44,7 +46,8 @@ def acompanhar(ctx, wa_id, pedido_id, dormir=time.sleep, relogio=time.time):
         except ErroMCP as e:
             falhas += 1
             print(f'rastreio {pedido_id}: {e!r}')
-            if falhas >= 5 or 'NOT_FOUND' in str(e.codigo) or 'ACCESS_DENIED' in str(e.codigo):
+            if falhas >= 3 or 'NOT_FOUND' in str(e.codigo) or 'ACCESS_DENIED' in str(e.codigo) \
+                    or str(e.codigo).startswith('HTTP_4'):  # barrado/recusado: insistir só piora
                 return 'erro'
             dormir(INTERVALO)
             continue

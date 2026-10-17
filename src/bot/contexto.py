@@ -19,8 +19,15 @@ def _cfg(nome):
     return '' if v == 'PREENCHER' else v
 
 
-def modo_mock():
-    return _cfg('IFOOD_MOCK') in ('1', 'true', 'sim')
+def modo_mock(estado=None):
+    """Mock ligado pelo secret (IFOOD_MOCK=1) OU pelo interruptor do armazém (scripts/modo.py),
+    que vale na hora, sem deploy: plano B se o iFood barrar a gente no meio da apresentação."""
+    if _cfg('IFOOD_MOCK') in ('1', 'true', 'sim'):
+        return True
+    try:
+        return bool(estado is not None and estado.get('cfg:mock'))
+    except Exception:  # noqa: BLE001 - armazém fora do ar não liga o mock sozinho
+        return False
 
 
 class Contexto:
@@ -99,12 +106,26 @@ def chamador_real(armazem, wa_id):
         return tok
 
     def chamar(ferramenta, **args):
+        # disjuntor COMPARTILHADO: se qualquer container viu o firewall do iFood barrar, todos param
+        # (cada container tem o seu IP e o seu freio; sem isso os outros seguiam batendo na porta)
+        try:
+            barrado_ate = float(armazem.get('ifood_bloqueado_ate') or 0)
+        except Exception:  # noqa: BLE001
+            barrado_ate = 0
+        if barrado_ate > ifood_mcp._freio['bloqueado_ate']:
+            ifood_mcp._freio['bloqueado_ate'] = barrado_ate
         tok = tokens_validos()
         try:
-            return ifood_mcp.ClienteMCP(tok['access_token']).chamar(ferramenta, **args)
-        except ifood_mcp.SemAutorizacao:
-            tok = tokens_validos(forcar=True)
-            return ifood_mcp.ClienteMCP(tok['access_token']).chamar(ferramenta, **args)
+            try:
+                return ifood_mcp.ClienteMCP(tok['access_token']).chamar(ferramenta, **args)
+            except ifood_mcp.SemAutorizacao:
+                tok = tokens_validos(forcar=True)
+                return ifood_mcp.ClienteMCP(tok['access_token']).chamar(ferramenta, **args)
+        except ifood_mcp.ErroMCP:
+            local = ifood_mcp._freio['bloqueado_ate']
+            if local > barrado_ate:
+                armazem['ifood_bloqueado_ate'] = local
+            raise
 
     return chamar
 
@@ -116,12 +137,10 @@ def contexto_producao(estado, wpp, wa_id=None):
     from src.shared.mcp_fake import McpFake
 
     rec = Recorrencias(modal.Dict.from_name('hackfood-recorrencias', create_if_missing=True))
-    if modo_mock():
-        def chamador(wid):
+    def chamador(wid):  # decide a cada uso: o interruptor do modo demo vale sem deploy
+        if modo_mock(estado):
             return McpFake(armazem=estado, chave=f'mock:{wid}').chamar
-    else:
-        def chamador(wid):
-            return chamador_real(estado, wid)
+        return chamador_real(estado, wid)
 
     def rastrear(wid, pedido_id):
         # pelo nome no app publicado: no container o app roda como `app` e este `src.app` é uma 2ª cópia
@@ -129,7 +148,7 @@ def contexto_producao(estado, wpp, wa_id=None):
         modal.Function.from_name(modulo_app.APP, 'acompanhar_pedido').spawn(wid, pedido_id)
 
     def revogar(tok):
-        if not modo_mock():
+        if not modo_mock(estado):
             ifood_mcp.revogar(_cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET'),
                               tok.get('refresh_token') or tok.get('access_token', ''))
 

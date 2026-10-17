@@ -228,8 +228,9 @@ def test_interpretar_limpa_saida_ruim_do_modelo():
 def test_segundos_da_dica_do_ifood():
     assert segundos_da_dica('Please call again in 60 seconds for updates') == 60
     assert segundos_da_dica('consulte em 2 minutos') == 120
-    assert segundos_da_dica(None) == 60
-    assert segundos_da_dica('Please check your card details') == 60
+    from src.bot.rastreio import INTERVALO
+    assert segundos_da_dica(None) == INTERVALO
+    assert segundos_da_dica('Please check your card details') == INTERVALO
 
 
 def test_rastreio_avisa_cada_mudanca_e_para_no_polling_stop():
@@ -292,3 +293,50 @@ def test_ritmo_espaca_as_chamadas(monkeypatch):
     for _ in range(4):
         M._esperar_vez()
     assert len(esperas) == 3 and all(s > 0 for s in esperas)
+
+
+def test_disjuntor_e_compartilhado_entre_containers(monkeypatch):
+    """Um container viu o 403 do Akamai: o armazém avisa e o outro nem chega a chamar."""
+    import time
+    import httpx
+    import pytest
+    from src.bot.contexto import chamador_real
+    from src.shared import ifood_mcp as M
+    armazem = {'tok:1': {'access_token': 'a', 'refresh_token': 'r', 'expira_em': time.time() + 3600},
+               'ifood_bloqueado_ate': time.time() + 120}
+    postou = []
+    real = M.ClienteMCP.__init__
+
+    def init(self, token, url=M.GATEWAY, http=None):
+        real(self, token, url, httpx.Client(transport=httpx.MockTransport(
+            lambda req: postou.append(1) or httpx.Response(200, json={}))))
+    monkeypatch.setattr(M.ClienteMCP, '__init__', init)
+    with pytest.raises(M.ErroMCP) as e:
+        chamador_real(armazem, '1')('getUser')
+    assert 'pausa' in str(e.value) and not postou
+
+
+def test_bloqueio_visto_aqui_vai_pro_armazem(monkeypatch):
+    import time
+    import httpx
+    import pytest
+    from src.bot.contexto import chamador_real
+    from src.shared import ifood_mcp as M
+    armazem = {'tok:1': {'access_token': 'a', 'refresh_token': 'r', 'expira_em': time.time() + 3600}}
+    real = M.ClienteMCP.__init__
+
+    def init(self, token, url=M.GATEWAY, http=None):
+        real(self, token, url, httpx.Client(transport=httpx.MockTransport(
+            lambda req: httpx.Response(403, text='Access Denied'))))
+    monkeypatch.setattr(M.ClienteMCP, '__init__', init)
+    with pytest.raises(M.ErroMCP):
+        chamador_real(armazem, '1')('getUser')
+    assert armazem['ifood_bloqueado_ate'] > time.time() + 200
+
+
+def test_interruptor_do_modo_demo_vale_sem_deploy(monkeypatch):
+    from src.bot import contexto
+    monkeypatch.delenv('IFOOD_MOCK', raising=False)
+    assert not contexto.modo_mock({})
+    assert contexto.modo_mock({'cfg:mock': True})
+    assert not contexto.modo_mock(None)

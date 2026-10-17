@@ -223,7 +223,8 @@ def web():
             return paginas.tela('⏰', 'Esse link venceu',
                                 'Volte pro WhatsApp e toque de novo em "Entrar no iFood".',
                                 'Voltar pro WhatsApp', voltar)
-        if _cfg('IFOOD_MOCK') in ('1', 'true', 'sim'):
+        from src.bot.contexto import modo_mock
+        if modo_mock(estado):
             # modo demo: sem OAuth de verdade. 1º a tela de consentimento (nossa, não do iFood);
             # só quando a pessoa toca em "Permitir" (go=1) marca como logada e segue a conversa.
             if request.query_params.get('go') != '1':
