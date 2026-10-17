@@ -11,7 +11,7 @@ import time
 
 from src.bot.ifood import Ifood, PrecisaLogin
 from src.bot.recorrencia import Recorrencias
-from src.shared import ifood_mcp, llm
+from src.shared import geocoder, ifood_mcp, llm
 
 
 def _cfg(nome):
@@ -25,7 +25,7 @@ def modo_mock():
 
 class Contexto:
     def __init__(self, wpp, armazem, chamador_mcp, gerar_json, link_login, iniciar_rastreio,
-                 recorrencias, agora=time.time, revogar=None, dormir=time.sleep):
+                 recorrencias, agora=time.time, revogar=None, dormir=time.sleep, geocoder=None):
         self.wpp = wpp
         self.armazem = armazem
         self._chamador = chamador_mcp       # (wa_id) -> função chamar(tool, **args)
@@ -36,9 +36,13 @@ class Contexto:
         self.agora = agora
         self._revogar = revogar
         self.dormir = dormir
+        self._geocoder = geocoder       # (texto, perto) -> endereço canônico | None
 
     def ifood(self, wa_id):
         return Ifood(self._chamador(wa_id))
+
+    def normalizar_endereco(self, texto, perto=None):
+        return self._geocoder(texto, perto) if self._geocoder else None
 
     def logado(self, wa_id):
         return bool(self.armazem.get(f'tok:{wa_id}'))
@@ -130,4 +134,4 @@ def contexto_producao(estado, wpp, wa_id=None):
     return Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador,
                     gerar_json=lambda s, p, e: llm.gerar_json(s, p, e),
                     link_login=modulo_app.novo_link_login, iniciar_rastreio=rastrear,
-                    recorrencias=rec, revogar=revogar)
+                    recorrencias=rec, revogar=revogar, geocoder=geocoder.normalizar)

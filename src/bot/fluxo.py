@@ -585,6 +585,9 @@ class Bot:
             cands = []
         if cands and cands[0].get('lat') is not None:
             return {**end, 'lat': cands[0]['lat'], 'lng': cands[0]['lng']}
+        norm = self.ctx.normalizar_endereco(end.get('texto') or '')
+        if norm and norm['lat'] is not None:
+            return {**end, 'lat': norm['lat'], 'lng': norm['lng']}
         self.dizer('Não consegui achar a localização desse endereço. 😕 Vamos cadastrar de novo?')
         self.pedir_endereco()
         return None
@@ -608,17 +611,42 @@ class Bot:
         self.u['endereco'] = end
         self._endereco_mudou()
 
+    def _perto(self):
+        """Onde a pessoa costuma estar, pra puxar o geocodificador grátis pra cidade certa."""
+        for e in [self.u.get('endereco')] + list(self.u.get('enderecos') or []):
+            if e and e.get('lat') is not None:
+                return e['lat'], e['lng']
+        return None
+
+    def _geocodificar_ifood(self, consultas):
+        """Passo 1 do createAddress com a 1ª consulta que der resultado."""
+        r = {}
+        for consulta in dict.fromkeys(consultas):
+            try:
+                r = self.ctx.ifood(self.wa).geocodificar(consulta)
+            except ErroMCP as e:
+                if str(e.codigo) not in ('PLACE_NOT_FOUND', 'MISSING_ADDRESS'):
+                    raise
+                r = {}
+            if r.get('criado') or r.get('candidatos'):
+                break
+        return r
+
     def receber_endereco(self, texto):
-        try:
-            r = self.ctx.ifood(self.wa).geocodificar(texto)
-        except ErroMCP as e:
-            if str(e.codigo) not in ('PLACE_NOT_FOUND', 'MISSING_ADDRESS'):
-                raise
-            r = {}
+        # o geocode do iFood erra com texto bagunçado: um geocodificador grátis arruma antes
+        # ("rua episcopal 1500 ap 3 sanca" -> "Rua Episcopal, 1500 - Centro, São Carlos - SP").
+        # Invisível pra pessoa; se ele não achar, vai o texto dela mesmo
+        norm = self.ctx.normalizar_endereco(texto, self._perto())
+        r = self._geocodificar_ifood([norm['texto'], texto] if norm else [texto])
         if r.get('criado'):
             self._endereco_salvo(r['criado'])
             return
         cands = r.get('candidatos') or []
+        for c in cands if norm else []:  # completa o que o iFood não devolveu (evita perguntar o bairro)
+            if not c.get('bairro') and norm['bairro']:
+                c['bairro'] = norm['bairro']
+            if c.get('lat') is None and norm['lat'] is not None:
+                c['lat'], c['lng'] = norm['lat'], norm['lng']
         if not cands:
             self.dizer(T.ENDERECO_NAO_ACHEI)
             self.u['fase'] = 'endereco'
