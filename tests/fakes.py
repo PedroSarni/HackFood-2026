@@ -99,7 +99,8 @@ class LlmFake:
             raise ErroLLM('fake fora do ar')
         if self.resposta is not None:
             return self.resposta, 'fake', 0.01
-        texto = ' '.join(p[1] for p in partes[1:] if p[0] == 'texto').lower()
+        from src.bot.interpretar import normalizar
+        texto = normalizar(' '.join(p[1] for p in partes[1:] if p[0] == 'texto'))
         if any(p[0] == 'arquivo' for p in partes):
             texto += ' pao'  # o "áudio" fala pão
         itens = []
@@ -107,7 +108,7 @@ class LlmFake:
                             ('pizza', 'RESTAURANTE'), ('dipirona', 'FARMACIA')):
             if termo in texto:
                 itens.append({'termo': termo, 'tipo_loja': loja, 'quantidade': None, 'observacao': None})
-        if 'mais' in texto and 'opç' in texto or 'outras' in texto:
+        if 'mais opcoes' in texto or 'outras' in texto:
             return {'acao': 'mais_opcoes'}, 'fake', 0.01
         if 'piada' in texto or 'presidente' in texto:
             return {'acao': 'fora_do_escopo'}, 'fake', 0.01
