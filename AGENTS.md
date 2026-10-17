@@ -145,10 +145,12 @@ Quem fiscaliza: `.githooks/commit-msg`, `.githooks/pre-push` e o CI `.github/wor
 [Conventional Commits](https://www.conventionalcommits.org/), descrição em **português**, no imperativo, até 72 caracteres:
 
 ```
-feat(auth): adiciona login com Google
-fix(cart): corrige total com cupom
+feat(auth): porteiro agora pede documento (login com Google)
+fix(cart): cupom parou de dar desconto em dobro
 ```
 
+- Descrição sempre começando com **letra minúscula** e com um toque **engraçadinho**, mas que ainda diga
+  o que mudou. Graça sem informação não vale: `fix: arrumei uns trem` é proibido.
 - Tipos: `feat`, `fix`, `refactor`, `perf`, `style`, `test`, `docs`, `chore`, `build`.
 - Escopo = área do claim.
 - Um commit = uma mudança lógica. Nada de `wip`, `update`, `ajustes`.
