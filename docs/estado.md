@@ -1,7 +1,7 @@
 # Estado do projeto
 
 > Atualizar a cada ~1h ou depois de entrega importante. Quem terminou o trabalho atualiza.
-> Última atualização: 17/10 16h59 por Davi
+> Última atualização: 17/10 20h15 por Davi
 
 ## Ideia escolhida
 Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital): botões sempre, 3 opções por vez com Mais opções, texto, áudio e foto, várias mensagens seguidas, e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência, usando o MCP do iFood como agente externo. Ainda a decidir: pedido em grupo e áudio de saída (item B2).
@@ -11,6 +11,7 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - docs/whatsapp.md (Cloud API da Meta, número e token emprestados do handwrite_bot)
 - Resumo do MCP do iFood em "regras da api/"
 - Agente "HackFood Agent" aprovado no portal do iFood em menos de 1h
+- QA do MCP real concluído (conta de teste): achados no contexto-evento.md §8
 
 ## No ar agora (17/10 ~17h10) — MODO REAL
 - Agente "Compras pelo WhatsApp" APROVADO no portal. Credenciais reais no secret `hackathon-ifood`
@@ -24,10 +25,10 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 
 ## Em andamento
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
-- Fabio: 2º agente "Compras pelo WhatsApp" criado às ~16h05 e em análise no iFood (item C1) com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
+- Fabio: 2º agente "Compras pelo WhatsApp" (criado às ~16h05) já APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
+- Pedro: `Frontend/Rascunho_Dash` (dashboard de analytics, só dados simulados), sem claim ainda
 
 ## Bloqueado ou esperando
-- MCP real: o agente do Davi foi aprovado em cerca de 1h, mas POST /token no id.ifood.com.br devolve invalid_client com o secret recém gerado (testado por post, por Basic e sem secret). Levar a um mentor (item A2). O Fabio está criando um 2º agente com redirect no backend (item C1).
 - Ordem de prioridade dos itens (ranking): esperando a regra do time; entra só em `src/bot/ranking.py`
 
 ## Próximo passo
@@ -52,10 +53,12 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 ### Produto
 - [ ] B1 Regra da ordem de prioridade dos itens (ranking). Davi decide, Fabio implementa em src/bot/ranking.py
 - [ ] B2 Decidir se pedido em grupo, áudio de saída e foto entram ou ficam fora — time
+- [ ] B3 (futuro) Mockar cupom e clube, se der tempo — time
 ### MCP real
-- [ ] C1 Credenciais reais funcionando no bot (2º agente do Fabio) — Fabio
+- [x] C1 Credenciais reais funcionando no bot (2º agente do Fabio) — Fabio
 - [ ] C2 Primeiro pedido real na conta de teste, sem PIX real — Fabio e Davi
 - [ ] C3 Registrar bugs e inconsistências do MCP na seção 8 do contexto-evento.md (contínuo) — todos
+- [ ] C5 Fabio avaliar 5 pontos do QA no ifood.py — Fabio
 ### Entregáveis (travar às 11h30 de domingo)
 - [ ] D1 01 Proposta de Negócio — Davi
 - [ ] D2 02 Desenho de Solução — a definir
