@@ -25,7 +25,7 @@ def modo_mock():
 
 class Contexto:
     def __init__(self, wpp, armazem, chamador_mcp, gerar_json, link_login, iniciar_rastreio,
-                 recorrencias, agora=time.time, revogar=None):
+                 recorrencias, agora=time.time, revogar=None, dormir=time.sleep):
         self.wpp = wpp
         self.armazem = armazem
         self._chamador = chamador_mcp       # (wa_id) -> função chamar(tool, **args)
@@ -35,6 +35,7 @@ class Contexto:
         self.recorrencias = recorrencias
         self.agora = agora
         self._revogar = revogar
+        self.dormir = dormir
 
     def ifood(self, wa_id):
         return Ifood(self._chamador(wa_id))

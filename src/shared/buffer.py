@@ -14,7 +14,16 @@ vira uma bagunça de respostas cruzadas. Desenho:
 
 Fila e dicionário são injetados: em produção modal.Queue/modal.Dict, nos testes um fake.
 """
+import secrets
 import time
+
+
+def nova_seq():
+    """Identificador da mensagem na rajada. Só a igualdade importa ("ainda sou a última?"),
+    então é aleatório: time_ns() repete em chamadas seguidas (o relógio do Windows tem
+    resolução de milissegundos) e duas rodadas achariam que são a última."""
+    return secrets.randbits(63)
+
 
 # segundos de silêncio esperados depois de cada tipo de mensagem
 ESPERA_BOTAO = 0.6     # toque é deliberado; o respiro só pega toque duplo
@@ -52,7 +61,7 @@ class Caixa:
 
     def guardar(self, wa_id, msg):
         """Chamado pelo webhook. Devolve a seq que a rodada deve receber."""
-        seq = time.time_ns()
+        seq = nova_seq()
         self.fila.put(msg, partition=wa_id)
         self.dic.put(f'prim:{wa_id}', self.relogio(), skip_if_exists=True)
         self.dic[f'ult:{wa_id}'] = seq

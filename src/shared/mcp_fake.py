@@ -2,35 +2,40 @@
 
 Serve pra desenvolver, testar e fazer demo sem credencial (o agente do portal está em
 análise). `chamar()` tem a mesma assinatura do ClienteMCP real e levanta ErroMCP do mesmo
-jeito, então quem usa não sabe a diferença. As respostas imitam o formato documentado
-(lowerCamelCase, IDs UUID, preço decimal em BRL, paginação com nextPageToken).
+jeito, então quem usa não sabe a diferença. As respostas seguem os exemplos das páginas da
+doc do portal (resultKind/results, CartDetailsResponse na raiz, `errors` objeto no User e
+Discovery, `error` no Cart, campos na raiz no Order Tracking).
+
+Também imita as exigências que derrubam agente na vida real: `options` obrigatório (mesmo
+vazio), getCartDeliveryMethods antes do setCartDelivery, paymentMethodId UUID (não "PIX"),
+cartão sem cardTokenId recusado, userConsent obrigatório, carrinho excluído ao tirar o último
+item, opções obrigatórias do item.
 
 O estado (endereços, carrinhos, pedidos) fica em `armazem[chave]`: em produção, o mesmo
 modal.Dict do bot, então sobrevive entre uma mensagem e outra.
-
-Uso: McpFake().chamar('searchOffers', query='pão', userLocation={'addressId': ...})
 """
 import copy
 import unicodedata
 import uuid
 
-from src.shared.ifood_mcp import ErroMCP
+from src.shared.ifood_mcp import ErroMCP, _erro_em
 
 LOJAS = {
-    'm1': ('Mercado Bom Preço', 'GROCERIES', {'min': 25, 'max': 35}, 4.99),
-    'm2': ('Supermercado Central', 'GROCERIES', {'min': 40, 'max': 55}, 0.0),
-    'm3': ('Padaria Pão Quente', 'GROCERIES', {'min': 15, 'max': 25}, 3.49),
-    'r1': ('Pizzaria Bella Napoli', 'RESTAURANT', {'min': 35, 'max': 50}, 6.90),
-    'r2': ('Cantina da Vó', 'RESTAURANT', {'min': 30, 'max': 40}, 4.50),
-    'f1': ('Drogaria Saúde', 'DRUGSTORE', {'min': 20, 'max': 30}, 2.99),
-    'b1': ('Adega do Zé', 'LIQUORSTORE', {'min': 25, 'max': 35}, 5.00),
-    'p1': ('Pet Feliz', 'PETSTORE', {'min': 40, 'max': 60}, 7.90),
+    'm1': ('Mercado Bom Preço', 'GROCERIES', {'min': 25, 'max': 35}, 4.99, 4.6, 1.2),
+    'm2': ('Supermercado Central', 'GROCERIES', {'min': 40, 'max': 55}, 0.0, 4.4, 2.8),
+    'm3': ('Padaria Pão Quente', 'GROCERIES', {'min': 15, 'max': 25}, 3.49, 4.8, 0.6),
+    'r1': ('Pizzaria Bella Napoli', 'RESTAURANT', {'min': 35, 'max': 50}, 6.90, 4.7, 2.1),
+    'r2': ('Cantina da Vó', 'RESTAURANT', {'min': 30, 'max': 40}, 4.50, 4.9, 1.0),
+    'f1': ('Drogaria Saúde', 'DRUGSTORE', {'min': 20, 'max': 30}, 2.99, 4.5, 0.9),
+    'b1': ('Adega do Zé', 'LIQUORSTORE', {'min': 25, 'max': 35}, 5.00, 4.3, 1.7),
+    'p1': ('Pet Feliz', 'PETSTORE', {'min': 40, 'max': 60}, 7.90, 4.6, 3.3),
 }
 
-# (loja, nome, descrição, preço, promo, grupos)
+# grupo: (nome, minSelections, maxSelections, [(opção, preço adicional)])
 _PIZZA = [('Tamanho', 1, 1, [('Média (6 fatias)', 0), ('Grande (8 fatias)', 12.0)]),
           ('Borda', 0, 1, [('Sem borda', 0), ('Catupiry', 8.0), ('Cheddar', 8.0)])]
 _MARMITA = [('Acompanhamento', 1, 1, [('Arroz e feijão', 0), ('Arroz e purê', 0), ('Salada', 0)])]
+# (loja, nome, descrição, preço, promo, grupos)
 CATALOGO = [
     ('m3', 'Pão francês', 'Pacote com 10 unidades', 8.90, 7.90, None),
     ('m1', 'Pão francês', 'Pacote com 10 unidades', 9.50, None, None),
@@ -45,6 +50,7 @@ CATALOGO = [
     ('m2', 'Leite integral', 'Caixa 1 litro', 5.29, None, None),
     ('m1', 'Leite desnatado', 'Caixa 1 litro', 5.69, None, None),
     ('m2', 'Leite em pó', 'Lata 400 g', 21.90, 18.90, None),
+    ('m3', 'Leite integral', 'Caixa 1 litro', 5.99, None, None),
     ('m1', 'Carne moída (patinho)', 'Bandeja 500 g', 22.90, None, None),
     ('m2', 'Picanha bovina', 'Peça aprox. 1 kg', 89.90, 79.90, None),
     ('m1', 'Contrafilé em bife', 'Bandeja 500 g', 34.90, None, None),
@@ -54,10 +60,12 @@ CATALOGO = [
     ('m1', 'Arroz branco tipo 1', 'Pacote 5 kg', 27.90, 24.90, None),
     ('m2', 'Feijão carioca', 'Pacote 1 kg', 8.99, None, None),
     ('m1', 'Café torrado e moído', 'Pacote 500 g', 18.90, None, None),
+    ('m3', 'Café torrado e moído', 'Pacote 250 g', 10.90, None, None),
     ('m2', 'Açúcar refinado', 'Pacote 1 kg', 4.99, None, None),
     ('m1', 'Banana prata', 'Cacho aprox. 1 kg', 6.90, None, None),
     ('m2', 'Ovos brancos', 'Bandeja com 12', 11.90, 10.49, None),
     ('m1', 'Manteiga com sal', 'Pote 200 g', 12.90, None, None),
+    ('m3', 'Manteiga com sal', 'Pote 200 g', 13.50, None, None),
     ('m2', 'Sabão em pó', 'Caixa 1,6 kg', 24.90, 21.90, None),
     ('r1', 'Pizza de calabresa', 'Calabresa, cebola e azeitona', 49.90, None, _PIZZA),
     ('r1', 'Pizza de muçarela', 'Muçarela, tomate e orégano', 46.90, 42.90, _PIZZA),
@@ -73,13 +81,17 @@ CATALOGO = [
     ('p1', 'Ração para cães adultos', 'Pacote 3 kg', 59.90, 49.90, None),
     ('p1', 'Ração para gatos', 'Pacote 1 kg', 29.90, None, None),
 ]
-SINONIMOS = {'pao': ['pao'], 'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
-             'remedio': ['dipirona', 'paracetamol'], 'cerveja': ['cerveja'], 'racao': ['racao'],
-             'marmita': ['marmita'], 'almoco': ['marmita', 'sopa'], 'leite': ['leite']}
-PAGAMENTOS = [('PIX', 'PIX'), ('Dinheiro na entrega', 'CASH'), ('Cartão na entrega', 'OFFLINE_CARD')]
-STATUS = [('CONFIRMED', 'Pedido confirmado pela loja'), ('PREPARING', 'Pedido em preparo'),
-          ('ON_THE_WAY', 'Pedido saiu para entrega'), ('DELIVERY_ARRIVED_AT_DESTINATION', 'Entregador chegou'),
-          ('DELIVERED', 'Pedido entregue')]
+SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
+             'remedio': ['dipirona', 'paracetamol'], 'racao': ['racao'], 'almoco': ['marmita', 'sopa'],
+             'refeicao': ['marmita'], 'frios': ['manteiga']}
+PAGAMENTOS = [('CREDIT_CARD', 'Cartão de Crédito'), ('DEBIT_CARD', 'Cartão de Débito'), ('PIX', 'PIX'),
+              ('MEAL_VOUCHER', 'Vale Refeição')]
+STATUS = [('ORDER_CREATED', 'Order created.'), ('CONFIRMED', 'Merchant confirmed the order.'),
+          ('PREPARING', 'Merchant is preparing the order.'), ('DISPATCHED', 'Merchant released order for delivery.'),
+          ('ON_THE_WAY', 'Delivery person is on the way.'),
+          ('DELIVERY_ARRIVED_AT_DESTINATION', 'Delivery person arrived at order delivery address.'),
+          ('DELIVERED', 'Order delivered to the customer.')]
+COORD = {'latitude': -22.0087, 'longitude': -47.8909}  # São Carlos
 
 
 def _n(s):
@@ -96,23 +108,36 @@ def _img(nome):
     return f'https://placehold.co/800x500/1f8f4e/ffffff/png?text={texto}'
 
 
-def _item(i):
-    loja, nome, desc, preco, promo, grupos = CATALOGO[i]
-    d = {'itemId': _uid('item', i), 'merchantId': _uid('loja', loja), 'name': nome, 'description': desc,
-         'unitDescription': desc, 'unitPrice': preco, 'imageUrl': _img(nome), 'available': True}
-    if promo:
-        d['promotionalUnitPrice'] = promo
-    return d
-
-
 def _loja(chave):
-    nome, tipo, eta, taxa = LOJAS[chave]
-    return {'merchantId': _uid('loja', chave), 'name': nome, 'merchantType': tipo, 'deliveryTime': eta,
-            'deliveryFee': taxa, 'isOpen': True}
+    nome, _tipo, eta, taxa, nota, dist = LOJAS[chave]
+    return {'merchantId': _uid('loja', chave), 'merchantName': nome,
+            'merchantLogoUrl': _img(nome), 'reviewRating': nota, 'isOpen': True,
+            'deliveryMethod': {'deliveryMethodMode': 'DELIVERY', 'fee': taxa, 'promotionalFee': None,
+                               'estimatedMinutes': eta},
+            'straightLineDistanceKm': dist, 'nextOpenAt': None}
+
+
+def _resultado_item(i):
+    lj, nome, _desc, preco, promo, _g = CATALOGO[i]
+    r = {'itemId': _uid('item', i), 'itemName': nome, 'itemImageUrl': _img(nome), 'unitPrice': preco,
+         'merchant': _loja(lj), 'matchScore': 0.9}
+    if promo:
+        r['promotionalUnitPrice'] = promo
+    return r
 
 
 _ITEM_POR_ID = {_uid('item', i): i for i in range(len(CATALOGO))}
 _LOJA_POR_ID = {_uid('loja', k): k for k in LOJAS}
+
+
+def _erro_discovery(codigo, msg, retry=False):
+    return ErroMCP(codigo, msg, tentar_de_novo=retry,
+                   bruto={'errors': {'mcpCode': -32301, 'code': codigo, 'message': msg, 'retryable': retry}})
+
+
+def _erro_cart(codigo, msg, amigavel):
+    return ErroMCP(codigo, msg, para_usuario=amigavel,
+                   bruto={'error': {'code': codigo, 'message': msg, 'details': {}, 'userFriendlyMessage': amigavel}})
 
 
 class McpFake:
@@ -126,21 +151,23 @@ class McpFake:
     def _st(self):
         st = self.armazem.get(self.chave)
         if not st:
-            st = {'enderecos': [], 'carrinhos': {}, 'pedidos': {}, 'seq': 0}
+            st = {'enderecos': [], 'carrinhos': {}, 'pedidos': {}, 'candidatos': {}, 'seq': 0}
         return copy.deepcopy(st)
-
-    def _gravar(self, st):
-        self.armazem[self.chave] = st
 
     def chamar(self, ferramenta, **args):
         args = {k: v for k, v in args.items() if v is not None}
-        self.chamadas.append((ferramenta, args))
+        self.chamadas.append((ferramenta, copy.deepcopy(args)))
         fn = getattr(self, f't_{ferramenta}', None)
         if not fn:
-            raise ErroMCP('TOOL_NOT_FOUND', f'tool {ferramenta} não existe')
+            raise ErroMCP('RPC_-32602', f'Unknown tool: {ferramenta}')
         st = self._st()
-        r = fn(st, **args)
-        self._gravar(st)
+        try:
+            r = fn(st, **args)
+        finally:
+            self.armazem[self.chave] = st
+        erro = _erro_em(r)  # mesmo tratamento do cliente real (ex.: erro do Order Tracking na raiz)
+        if erro:
+            raise erro
         return r
 
     def chamadas_de(self, ferramenta):
@@ -149,293 +176,397 @@ class McpFake:
     # --- User ---
 
     def t_getUser(self, st):
-        return {'user': {'name': 'Cliente Teste', 'email': 'cliente@test.ifood.com.br', 'phone': '+55 16 90000-0000'}}
+        return {'success': True, 'data': {'fullName': 'Maria Aparecida', 'email': 'maria@test.ifood.com.br',
+                                          'phone': '5520900000000'},
+                'agentHints': {'suggestedNextAction': 'Use the user name.'}}
 
     def t_listAddresses(self, st):
-        return {'addresses': st['enderecos']}
+        if not st['enderecos']:
+            return {'results': [], 'agentHints': {'noResultsGuidance': 'No saved addresses found.'}}
+        return {'results': st['enderecos'], 'agentHints': {'addressCount': len(st['enderecos'])}}
 
     def t_createAddress(self, st, address=None, candidateId=None, complement=None, alias=None,
                         neighborhood=None, reference=None):
         if candidateId:
-            cand = st.get('candidatos', {}).get(candidateId)
+            cand = st['candidatos'].get(candidateId)
             if not cand:
-                raise ErroMCP('MISSING_CANDIDATE_ID', 'candidateId desconhecido')
-            end = {'addressId': _uid('end', self.chave, len(st['enderecos'])), 'alias': alias or 'Casa',
-                   'streetName': cand['streetName'], 'streetNumber': cand['streetNumber'],
-                   'neighborhood': neighborhood or cand['neighborhood'], 'city': cand['city'],
-                   'complement': complement or '', 'isLastUsedAddress': True, 'isMostUsedAddress30d': True}
+                raise ErroMCP('MISSING_CANDIDATE_ID', 'candidateId desconhecido',
+                              bruto={'errors': {'mcpCode': -32304, 'code': 'MISSING_CANDIDATE_ID'}})
+            bairro = neighborhood or cand['location']['neighborhood']
+            if not bairro:
+                raise ErroMCP('MISSING_NEIGHBORHOOD', 'bairro obrigatório', tentar_de_novo=False,
+                              bruto={'errors': {'mcpCode': -32301, 'code': 'MISSING_NEIGHBORHOOD'}})
+            loc = {**cand['location'], 'neighborhood': bairro}
+            partes = [loc['street'], loc['number']] + ([complement] if complement else []) + [bairro, loc['city'], loc['state']]
+            end = {'addressId': _uid('end', self.chave, candidateId), 'alias': alias,
+                   'formattedAddress': ', '.join(p for p in partes if p), 'location': loc,
+                   'complement': complement, 'reference': reference, 'coordinates': dict(COORD),
+                   'isLastUsedAddress': True, 'isMostUsedAddress30d': True}
             for e in st['enderecos']:
                 e['isLastUsedAddress'] = False
-            st['enderecos'].append(end)
-            return {'address': end, 'created': True}
+            st['enderecos'] = [e for e in st['enderecos'] if e['addressId'] != end['addressId']] + [end]
+            return {**end, 'agentHints': {'nextStepWhenUserPicksAddress': 'Address saved.'}}
         texto = (address or '').strip()
+        if not texto:
+            raise ErroMCP('MISSING_ADDRESS', 'endereço vazio', bruto={'errors': {'code': 'MISSING_ADDRESS'}})
         if not any(ch.isdigit() for ch in texto) or len(texto) < 8:
-            raise ErroMCP('PLACE_NOT_FOUND', 'endereço não encontrado', tentar_de_novo=True)
+            raise ErroMCP('PLACE_NOT_FOUND', 'endereço não encontrado', tentar_de_novo=False,
+                          bruto={'errors': {'mcpCode': -32301, 'code': 'PLACE_NOT_FOUND'}})
         rua, _, resto = texto.partition(',')
         numero = ''.join(ch for ch in resto if ch.isdigit())[:6] or '1'
-        cands = {}
-        for bairro in ('Centro', 'Jardim São Paulo'):
-            cid = _uid('cand', texto, bairro)
-            cands[cid] = {'candidateId': cid, 'streetName': rua.strip().title(), 'streetNumber': numero,
-                          'neighborhood': bairro, 'city': 'São Carlos - SP',
-                          'formattedAddress': f'{rua.strip().title()}, {numero} - {bairro}, São Carlos - SP'}
-        st['candidatos'] = cands
-        return {'match': 'MULTIPLE', 'candidates': list(cands.values())}
+        sem_bairro = 'sem bairro' in _n(texto)  # gatilho de teste pro fluxo do bairro
+        bairros = [''] if sem_bairro else ['Centro', 'Jardim São Paulo']
+        cands = []
+        for bairro in bairros:
+            cid = f'cand-{_uid(texto, bairro)[:8]}'
+            loc = {'street': rua.strip().title(), 'number': numero, 'neighborhood': bairro,
+                   'city': 'São Carlos', 'state': 'SP'}
+            c = {'candidateId': cid, 'location': loc, 'postalCode': '13560-000', 'coordinates': dict(COORD),
+                 'formattedAddress': ', '.join(p for p in (loc['street'], numero, bairro, 'São Carlos', 'SP') if p)}
+            st['candidatos'][cid] = c
+            cands.append(c)
+        return {'matchConfidence': 'SINGLE' if len(cands) == 1 else 'MULTIPLE', 'candidates': cands,
+                'agentHints': {'confirmAddressGuidance': 'Confirm with the user.'}}
 
     # --- Offer Discovery ---
 
-    def t_searchOffers(self, st, query='', userLocation=None, refinements=None, pageSize=10, nextPageToken=None):
-        if not userLocation:
-            raise ErroMCP('INVALID_LOCATION', 'userLocation obrigatório')
+    def t_searchOffers(self, st, query='', userLocation=None, resultKind='MERCHANT', merchantType=None,
+                       refinements=None, pageSize=10, nextPageToken=None):
+        if not isinstance(userLocation, dict) or 'latitude' not in userLocation:
+            raise _erro_discovery('MISSING_LOCATION', 'No delivery location provided.', True)
+        if not _n(query).strip():
+            raise _erro_discovery('INVALID_QUERY', 'The search query is empty.', True)
         refin = refinements or {}
-        termos = _n(query).split()
         alvos = set()
-        for t in termos:
+        for t in _n(query).split():
             alvos.update(SINONIMOS.get(t, [t]))
-        tipo = refin.get('merchantType')
-        loja = refin.get('merchantId')
-        teto = refin.get('maxItemPrice')
         achados = []
-        for i, (lj, nome, desc, preco, promo, _g) in enumerate(CATALOGO):
-            if tipo and LOJAS[lj][1] != tipo:
+        for i, (lj, nome, _d, preco, promo, _g) in enumerate(CATALOGO):
+            if merchantType and LOJAS[lj][1] != merchantType:
                 continue
-            if loja and _uid('loja', lj) != loja:
+            if refin.get('merchantId') and _uid('loja', lj) != refin['merchantId']:
                 continue
-            if teto and (promo or preco) > float(teto):
+            if refin.get('maxItemPrice') and (promo or preco) > float(refin['maxItemPrice']):
                 continue
             nn = _n(nome)
-            if alvos and not any(a in nn for a in alvos):
+            if not any(a in nn for a in alvos):
                 continue
             achados.append(i)
         tam = max(1, min(int(pageSize or 10), 25))
         ini = int(nextPageToken or 0)
         pagina = achados[ini:ini + tam]
         mais = ini + tam < len(achados)
-        return {'results': [{'resultKind': 'ITEM', 'item': _item(i), 'merchant': _loja(CATALOGO[i][0])} for i in pagina],
-                'hasMore': mais, 'nextPageToken': str(ini + tam) if mais else None}
+        if resultKind == 'ITEM':
+            results = [_resultado_item(i) for i in pagina]
+        else:
+            vistos, results = set(), []
+            for i in pagina:
+                if CATALOGO[i][0] not in vistos:
+                    vistos.add(CATALOGO[i][0])
+                    results.append(_loja(CATALOGO[i][0]))
+        resp = {'resultKind': resultKind, 'interpretedQuery': query, 'results': results, 'facets': {},
+                'nextPageToken': str(ini + tam) if mais else None, 'hasMore': mais, 'agentHints': {}}
+        if not results:
+            resp['agentHints'] = {'noResultsGuidance': f"No results found for '{query}' in this area."}
+        return resp
 
-    def t_browseOffers(self, st, userLocation=None, merchantType='GROCERIES', **_):
-        return self.t_searchOffers(st, '', userLocation, {'merchantType': merchantType})
+    def t_browseOffers(self, st, merchantType=None, userLocation=None, resultKind='MERCHANT', **kw):
+        if not merchantType:
+            raise _erro_discovery('MISSING_MERCHANT_VERTICAL', 'merchantType is required for browseOffers.', True)
+        return self.t_searchOffers(st, 'a', userLocation, resultKind, merchantType, **kw)
 
-    def t_getMerchant(self, st, merchantId):
+    def t_getMerchant(self, st, merchantId, userLocation=None):
         if merchantId not in _LOJA_POR_ID:
-            raise ErroMCP('MERCHANT_NOT_FOUND', 'loja não encontrada')
-        return {'merchant': _loja(_LOJA_POR_ID[merchantId])}
+            raise _erro_discovery('MERCHANT_NOT_FOUND', 'merchant not found')
+        lj = _LOJA_POR_ID[merchantId]
+        return {**_loja(lj), 'merchantType': LOJAS[lj][1], 'minimumOrderAmount': 15.0,
+                'deliveryMethods': [{'deliveryMethodId': 'ECONOMIC', 'deliveryMethodMode': 'DELIVERY',
+                                     'fee': LOJAS[lj][3], 'estimatedMinutes': LOJAS[lj][2]}]}
 
-    def t_getItem(self, st, itemId, merchantId=None):
+    def t_getItem(self, st, itemId, merchantId=None, userLocation=None):
+        if not isinstance(userLocation, dict):
+            raise _erro_discovery('MISSING_LOCATION', 'userLocation required', True)
         if itemId not in _ITEM_POR_ID:
-            raise ErroMCP('ITEM_NOT_FOUND', 'item não encontrado')
+            raise _erro_discovery('ITEM_NOT_FOUND', 'item not found')
         i = _ITEM_POR_ID[itemId]
-        d = _item(i)
-        grupos = []
-        for gi, (nome, mn, mx, ops) in enumerate(CATALOGO[i][5] or []):
-            grupos.append({'optionGroupId': _uid('grupo', i, gi), 'name': nome, 'min': mn, 'max': mx,
-                           'options': [{'optionId': _uid('op', i, gi, oi), 'name': on, 'price': op}
-                                       for oi, (on, op) in enumerate(ops)]})
-        d['optionGroups'] = grupos
-        return {'item': d}
+        lj, nome, desc, preco, promo, grupos = CATALOGO[i]
+        if merchantId and merchantId != _uid('loja', lj):
+            raise _erro_discovery('ITEM_MERCHANT_MISMATCH', 'item does not belong to merchant', True)
+        d = {'itemId': itemId, 'itemName': nome, 'merchantId': _uid('loja', lj), 'merchantName': LOJAS[lj][0],
+             'unitPrice': preco, 'itemDescription': desc, 'itemImageUrl': _img(nome),
+             'optionGroups': [{'optionGroupId': _uid('grupo', i, gi), 'name': gn, 'minSelections': mn,
+                               'maxSelections': mx,
+                               'options': [{'optionId': _uid('op', i, gi, oi), 'name': on, 'description': on,
+                                            'additionalPrice': op} for oi, (on, op) in enumerate(ops)]}
+                              for gi, (gn, mn, mx, ops) in enumerate(grupos or [])],
+             'agentHints': {'nextStep': 'Add this item to the active cart.'}}
+        if promo:
+            d['promotionalUnitPrice'] = promo
+        return d
 
-    def t_getRecommendations(self, st, contentMode='RECENT_ORDERS', **_):
+    def t_getRecommendations(self, st, contentMode=None, userLocation=None, resultKind='MERCHANT', **_):
         if contentMode != 'RECENT_ORDERS':
-            return {'items': []}
-        peds = sorted(st['pedidos'].values(), key=lambda p: -p['seq'])
-        return {'items': [{'orderId': p['orderId'], 'merchant': {'name': p['merchantName']},
-                           'items': [{'name': it['name'], 'quantity': it['quantity']} for it in p['items']]}
-                          for p in peds[:5]]}
+            return {'contentMode': contentMode, 'resultKind': resultKind, 'results': [], 'hasMore': False}
+        results = []
+        for p in sorted(st['pedidos'].values(), key=lambda p: -p['seq']):
+            for it in p['items']:
+                i = _ITEM_POR_ID[it['itemId']]
+                results.append({**_resultado_item(i), 'lastOrderId': p['orderId'], 'timesOrdered': 1,
+                                'lastOrderedAt': f'2026-10-{10 + p["seq"] % 9:02d}T12:00:00Z'})
+        return {'contentMode': 'RECENT_ORDERS', 'resultKind': 'ITEM', 'results': results[:25],
+                'nextPageToken': None, 'hasMore': False}
 
     # --- Cart ---
 
-    def _preco(self, i, opcoes):
-        preco = CATALOGO[i][4] or CATALOGO[i][3]
-        for gi, (_n2, _mn, _mx, ops) in enumerate(CATALOGO[i][5] or []):
-            for oi, (_on, op) in enumerate(ops):
-                if any(o.get('optionId') == _uid('op', i, gi, oi) for o in opcoes):
-                    preco += op
-        return round(preco, 2)
-
-    def _linha(self, st, item):
-        iid = item.get('itemId')
-        if iid not in _ITEM_POR_ID:
-            raise ErroMCP('ITEM_NOT_FOUND', 'item não encontrado')
-        if 'options' not in item:
-            raise ErroMCP('INVALID_PARAMS', 'options é obrigatório (pode ser [])')
-        i = _ITEM_POR_ID[iid]
+    def _opcoes_validas(self, i, options):
+        """Aceita o modo A (optionId = grupo, customizations = opções), como a doc descreve."""
         grupos = CATALOGO[i][5] or []
-        for gi, (nome, mn, _mx, ops) in enumerate(grupos):
-            escolhidas = [o for o in item['options'] if o.get('optionId') in {_uid('op', i, gi, oi) for oi in range(len(ops))}]
-            if len(escolhidas) < mn:
-                raise ErroMCP('MISSING_REQUIRED_OPTION', f'grupo obrigatório {nome}')
-        st['seq'] += 1
-        qtd = int(item.get('quantity') or 1)
-        unit = self._preco(i, item['options'])
-        return {'cartItemId': _uid('cartitem', self.chave, st['seq']), 'itemId': iid, 'name': CATALOGO[i][1],
-                'quantity': qtd, 'unitPrice': unit, 'totalPrice': round(unit * qtd, 2), 'options': item['options']}
+        escolhidas = {}
+        for o in options:
+            if 'quantity' not in o or 'customizations' not in o:
+                raise _erro_cart('INVALID_OPTION', 'Option.quantity e Option.customizations são obrigatórios',
+                                 'Opção inválida.')
+            gi = next((g for g in range(len(grupos)) if _uid('grupo', i, g) == o['optionId']), None)
+            if gi is None:
+                raise _erro_cart('INVALID_OPTION', f'optionId {o["optionId"]} não é um grupo deste item',
+                                 'Opção inválida.')
+            ids = {_uid('op', i, gi, oi): oi for oi in range(len(grupos[gi][3]))}
+            for c in o['customizations']:
+                if c.get('customizationId') not in ids:
+                    raise _erro_cart('INVALID_OPTION', 'customizationId inválido', 'Opção inválida.')
+                escolhidas.setdefault(gi, []).append(ids[c['customizationId']])
+        for gi, (gn, mn, mx, _ops) in enumerate(grupos):
+            n = len(escolhidas.get(gi, []))
+            if n < mn or n > mx:
+                raise _erro_cart('ITEM_NOT_AVAILABLE' if False else 'INVALID_OPTION',
+                                 f'grupo {gn}: escolha entre {mn} e {mx}', f'Escolha {gn}.')
+        return escolhidas
 
-    def _totais(self, car):
-        sub = round(sum(it['totalPrice'] for it in car['items']), 2)
-        taxa = LOJAS[_LOJA_POR_ID[car['merchantId']]][3]
-        desc = car.get('voucher', {}).get('discountValue', 0) if car.get('voucher') else 0
-        car['totals'] = {'subtotal': sub, 'deliveryFee': taxa, 'discount': desc,
-                         'total': round(max(0, sub + taxa - desc), 2)}
-        return car
+    def _linha(self, st, it):
+        iid = it.get('itemId')
+        if iid not in _ITEM_POR_ID:
+            raise _erro_cart('ITEM_NOT_AVAILABLE', 'item fora do cardápio', 'Esse item não está disponível.')
+        if 'options' not in it:
+            raise _erro_cart('INVALID_REQUEST', 'options é obrigatório (pode ser [])', 'Erro no pedido.')
+        i = _ITEM_POR_ID[iid]
+        escolhidas = self._opcoes_validas(i, it['options'])
+        unit = CATALOGO[i][4] or CATALOGO[i][3]
+        for gi, ois in escolhidas.items():
+            unit += sum(CATALOGO[i][5][gi][3][oi][1] for oi in ois)
+        st['seq'] += 1
+        return {'itemId': iid, 'cartItemId': _uid('cartitem', self.chave, st['seq']), 'name': CATALOGO[i][1],
+                'quantity': int(it.get('quantity') or 1), 'unitPrice': round(unit, 2),
+                'customerNote': it.get('customerNote'), 'options': it['options']}
+
+    def _resposta(self, car):
+        sub = round(sum(it['unitPrice'] * it['quantity'] for it in car['items']), 2)
+        taxa = LOJAS[_LOJA_POR_ID[car['merchant']['merchantId']]][3] if car.get('deliveryMethod') else 0.0
+        cupom = car.get('voucher', {}).get('valor', 0.0) if car.get('voucher') else 0.0
+        car['summary'] = {'totalName': 'Total', 'totalAmount': round(max(0.0, sub + taxa - cupom), 2),
+                          'subtotalName': 'Subtotal', 'subtotalAmount': sub,
+                          'deliveryFeeName': 'Taxa de entrega', 'deliveryFeeAmount': taxa,
+                          'feeTotalName': 'Taxas', 'feeTotalAmount': 0.0,
+                          'benefitsTotalName': 'Benefícios', 'benefitsTotalAmount': 0.0,
+                          'voucherTotalName': 'Cupom', 'voucherTotalAmount': cupom}
+        r = {k: v for k, v in car.items() if not k.startswith('_') and k != 'voucher'}
+        r['appDeeplink'] = f'ifoodapp://cart/{car["cartId"]}'
+        r['agentHints'] = {'nextStep': 'Configure entrega e pagamento antes de enviar o pedido.'}
+        return copy.deepcopy(r)
 
     def _carrinho(self, st, cid):
         car = st['carrinhos'].get(cid)
-        if not car:
-            raise ErroMCP('CART_NOT_FOUND', 'carrinho não encontrado')
+        if not car or car.get('_enviado'):
+            raise _erro_cart('CART_NOT_FOUND', f"O carrinho '{cid}' não foi encontrado.",
+                             'Carrinho não encontrado. Crie um novo carrinho.')
         return car
 
     def t_createCart(self, st, merchantId=None, addressId=None, items=None, orderId=None, **_):
-        if orderId and (merchantId or addressId or items):
-            raise ErroMCP('INVALID_PARAMS', 'orderId não combina com merchantId/addressId/items')
         if orderId:
             ped = st['pedidos'].get(orderId)
             if not ped:
-                raise ErroMCP('ORDER_NOT_FOUND', 'pedido não encontrado')
+                raise _erro_cart('ORDER_NOT_FOUND', 'pedido não encontrado', 'Pedido não encontrado.')
             merchantId, addressId = ped['merchantId'], ped['addressId']
             items = [{'itemId': it['itemId'], 'quantity': it['quantity'], 'options': it.get('options', [])}
                      for it in ped['items']]
         if merchantId not in _LOJA_POR_ID:
-            raise ErroMCP('MERCHANT_NOT_FOUND', 'loja não encontrada')
+            raise _erro_cart('MERCHANT_NOT_FOUND', 'merchant not found', 'Restaurante não encontrado.')
         if not addressId:
-            raise ErroMCP('INVALID_PARAMS', 'addressId obrigatório')
+            raise _erro_cart('INVALID_REQUEST', 'addressId obrigatório', 'Endereço não informado.')
+        if not items:
+            raise _erro_cart('CART_EMPTY', 'items vazio', 'Seu carrinho está vazio.')
+        linhas = [self._linha(st, it) for it in items]
+        for lin in linhas:
+            if CATALOGO[_ITEM_POR_ID[lin['itemId']]][0] != _LOJA_POR_ID[merchantId]:
+                raise _erro_cart('ITEM_NOT_AVAILABLE', 'item de outra loja', 'Esse item não é desta loja.')
         st['seq'] += 1
         cid = _uid('cart', self.chave, st['seq'])
-        car = {'cartId': cid, 'merchantId': merchantId, 'merchant': {'name': LOJAS[_LOJA_POR_ID[merchantId]][0]},
-               'addressId': addressId, 'items': [self._linha(st, it) for it in items or []]}
-        st['carrinhos'][cid] = self._totais(car)
-        return {'cart': car}
+        lj = _LOJA_POR_ID[merchantId]
+        end = next((e for e in st['enderecos'] if e['addressId'] == addressId), {})
+        loc = end.get('location') or {}
+        car = {'cartId': cid, 'merchant': {'merchantId': merchantId, 'merchantName': LOJAS[lj][0],
+                                           'orderMinimumPrice': 15.0, 'formattedAddress': 'Rua da Loja, 10'},
+               'items': linhas, 'deliveryAddress': {'streetName': loc.get('street'), 'streetNumber': loc.get('number'),
+                                                    'neighborhood': loc.get('neighborhood')},
+               'deliveryMethod': None, 'paymentMethod': None, 'fees': [], 'warning': None, '_endereco': addressId}
+        st['carrinhos'][cid] = car
+        return self._resposta(car)
 
     def t_getCart(self, st, cartId):
-        return {'cart': self._totais(self._carrinho(st, cartId))}
+        return self._resposta(self._carrinho(st, cartId))
 
-    def t_addItemToCart(self, st, cartId, itemId, quantity=1, options=None, customerNote=None, **_):
+    def t_addItemToCart(self, st, cartId, itemId, quantity=1, options=None, customerNote=None):
         car = self._carrinho(st, cartId)
         if options is None:
-            raise ErroMCP('INVALID_PARAMS', 'options é obrigatório (pode ser [])')
-        if _ITEM_POR_ID.get(itemId) is not None and _uid('loja', CATALOGO[_ITEM_POR_ID[itemId]][0]) != car['merchantId']:
-            raise ErroMCP('ITEM_FROM_OTHER_MERCHANT', 'item de outra loja')
-        linha = self._linha(st, {'itemId': itemId, 'quantity': quantity, 'options': options})
-        car['items'].append(linha)
-        self._totais(car)
-        return {'cartItemId': linha['cartItemId'], 'cart': car}
+            raise _erro_cart('INVALID_REQUEST', 'options é obrigatório (pode ser [])', 'Erro no pedido.')
+        if itemId in _ITEM_POR_ID and _uid('loja', CATALOGO[_ITEM_POR_ID[itemId]][0]) != car['merchant']['merchantId']:
+            raise _erro_cart('ITEM_NOT_AVAILABLE', 'item de outra loja', 'Esse item não é desta loja.')
+        car['items'].append(self._linha(st, {'itemId': itemId, 'quantity': quantity, 'options': options,
+                                             'customerNote': customerNote}))
+        return self._resposta(car)
 
-    def t_updateCartItem(self, st, cartId, cartItemId, itemId, quantity=1, options=None, **_):
+    def t_updateCartItem(self, st, cartId, cartItemId, itemId, quantity=1, options=None, customerNote=None):
         car = self._carrinho(st, cartId)
         for it in car['items']:
-            if it['cartItemId'] == cartItemId:
+            if it['cartItemId'] == cartItemId and it['itemId'] == itemId:
                 it['quantity'] = int(quantity)
-                it['totalPrice'] = round(it['unitPrice'] * it['quantity'], 2)
-                self._totais(car)
-                return {'cart': car}
-        raise ErroMCP('CART_ITEM_NOT_FOUND', 'cartItemId não encontrado')
+                return self._resposta(car)
+        raise _erro_cart('CART_ITEM_NOT_FOUND', 'cartItemId não encontrado', 'Item não encontrado no carrinho.')
 
     def t_removeItemFromCart(self, st, cartId, cartItemId):
         car = self._carrinho(st, cartId)
-        antes = len(car['items'])
-        car['items'] = [it for it in car['items'] if it['cartItemId'] != cartItemId]
-        if len(car['items']) == antes:
-            raise ErroMCP('CART_ITEM_NOT_FOUND', 'cartItemId não encontrado')
-        self._totais(car)
-        return {'cart': car}
+        restantes = [it for it in car['items'] if it['cartItemId'] != cartItemId]
+        if len(restantes) == len(car['items']):
+            raise _erro_cart('CART_ITEM_NOT_FOUND', 'cartItemId não encontrado', 'Item não encontrado no carrinho.')
+        if not restantes:
+            st['carrinhos'].pop(cartId, None)
+            return {'agentHints': {'cartDeletedAfterLastItemRemoved': 'O último item foi removido e o carrinho foi excluído.'}}
+        car['items'] = restantes
+        return self._resposta(car)
 
     def t_getCartDeliveryMethods(self, st, cartId):
         car = self._carrinho(st, cartId)
-        car['deliveryChecked'] = True
-        eta = LOJAS[_LOJA_POR_ID[car['merchantId']]][2]
-        taxa = LOJAS[_LOJA_POR_ID[car['merchantId']]][3]
-        return {'deliveryMethods': [
-            {'deliveryMethodId': _uid('ent', 'agora', car['merchantId']), 'name': 'Entregar agora', 'mode': 'DELIVERY',
-             'deliveryTime': eta, 'fee': taxa},
-            {'deliveryMethodId': _uid('ent', 'agendada', car['merchantId']), 'name': 'Agendar', 'mode': 'SCHEDULED',
-             'fee': taxa, 'timeSlots': [{'timeSlotId': _uid('slot', h), 'label': f'Hoje, {h}h-{h + 1}h'}
-                                        for h in (18, 19, 20)]}]}
+        car['_entregas_vistas'] = True
+        lj = _LOJA_POR_ID[car['merchant']['merchantId']]
+        eta, taxa = LOJAS[lj][2], LOJAS[lj][3]
+        return {'cartId': cartId, 'deliveryMethods': [
+            {'deliveryMethodId': 'DEFAULT', 'deliveryMethodMode': 'DELIVERY', 'deliveryMethodName': 'Entrega Padrão',
+             'fee': taxa, 'estimatedMinutes': eta, 'timeslots': None},
+            {'deliveryMethodId': 'EXPRESS', 'deliveryMethodMode': 'DELIVERY', 'deliveryMethodName': 'Entrega Expressa',
+             'fee': round(taxa + 6, 2), 'estimatedMinutes': {'min': max(10, eta['min'] - 10), 'max': eta['max'] - 10},
+             'timeslots': None},
+            {'deliveryMethodId': 'SCHEDULED', 'deliveryMethodMode': 'DELIVERY', 'deliveryMethodName': 'Entrega Agendada',
+             'fee': taxa, 'estimatedMinutes': {'min': 120, 'max': 180},
+             'timeslots': [{'from': '2026-10-18T18:00:00Z', 'to': '2026-10-18T18:30:00Z'}]},
+            {'deliveryMethodId': 'TAKEOUT', 'deliveryMethodMode': 'TAKEOUT', 'deliveryMethodName': 'Retirada no local',
+             'fee': 0.0, 'estimatedMinutes': {'min': 15, 'max': 25}, 'timeslots': None}],
+            'warning': None, 'agentHints': {}}
 
     def t_setCartDelivery(self, st, cartId, deliveryMethodId, selectedTimeSlotId=None):
         car = self._carrinho(st, cartId)
-        if not car.get('deliveryChecked'):
-            raise ErroMCP('DELIVERY_METHODS_NOT_LOADED', 'chame getCartDeliveryMethods antes')
-        car['delivery'] = {'deliveryMethodId': deliveryMethodId, 'timeSlotId': selectedTimeSlotId}
-        return {'cart': car}
+        if not car.get('_entregas_vistas'):
+            raise _erro_cart('DELIVERY_METHOD_UNAVAILABLE', 'chame getCartDeliveryMethods antes',
+                             'Esta modalidade de entrega não está disponível.')
+        nomes = {'DEFAULT': 'Entrega Padrão', 'EXPRESS': 'Entrega Expressa'}
+        if deliveryMethodId not in nomes:
+            raise _erro_cart('DELIVERY_METHOD_UNAVAILABLE', f'método {deliveryMethodId} indisponível',
+                             'Esta modalidade de entrega não está disponível.')
+        lj = _LOJA_POR_ID[car['merchant']['merchantId']]
+        car['deliveryMethod'] = {'deliveryMethodMode': 'DELIVERY', 'deliveryMethodName': nomes[deliveryMethodId],
+                                 'fee': LOJAS[lj][3], 'estimatedMinutes': LOJAS[lj][2], 'timeSlot': None}
+        return self._resposta(car)
 
     def t_listPaymentMethods(self, st, merchantId):
-        return {'paymentMethods': [{'paymentMethodId': _uid('pag', tipo, merchantId), 'name': nome, 'type': tipo}
-                                   for nome, tipo in PAGAMENTOS]}
+        if merchantId not in _LOJA_POR_ID:
+            raise _erro_cart('MERCHANT_NOT_FOUND', 'merchant not found', 'Restaurante não encontrado.')
+        return {'paymentMethods': [{'paymentMethodId': _uid('pag', kind, merchantId), 'kind': kind,
+                                    'displayName': nome, 'cardTokenId': None, 'brand': None, 'issuerBank': None}
+                                   for kind, nome in PAGAMENTOS],
+                'agentHints': {'nextStep': 'Para CREDIT_CARD e DEBIT_CARD, um cardTokenId será necessário.'}}
 
     def t_setCartPayment(self, st, cartId, paymentMethodId, cardTokenId=None):
         car = self._carrinho(st, cartId)
-        validos = {_uid('pag', tipo, car['merchantId']): tipo for _, tipo in PAGAMENTOS}
+        mid = car['merchant']['merchantId']
+        validos = {_uid('pag', kind, mid): (kind, nome) for kind, nome in PAGAMENTOS}
         if paymentMethodId not in validos:
-            raise ErroMCP('INVALID_PAYMENT_METHOD', 'paymentMethodId inválido (é UUID, não "PIX")')
-        car['payment'] = {'paymentMethodId': paymentMethodId, 'type': validos[paymentMethodId]}
-        return {'cart': car}
+            raise _erro_cart('PAYMENT_METHOD_UNAVAILABLE', f"A forma de pagamento '{paymentMethodId}' não é aceita.",
+                             'Esta forma de pagamento não é aceita por este restaurante. Escolha outra opção.')
+        kind, nome = validos[paymentMethodId]
+        if kind in ('CREDIT_CARD', 'DEBIT_CARD') and not cardTokenId:
+            raise _erro_cart('CARD_TOKEN_REQUIRED', 'cardTokenId obrigatório para cartão',
+                             'Para pagar com cartão, cadastre o cartão no app do iFood.')
+        car['paymentMethod'] = {'paymentMethodId': paymentMethodId, 'kind': kind, 'displayName': nome,
+                                'cardTokenId': cardTokenId, 'brand': None, 'issuerBank': None}
+        return self._resposta(car)
 
     def t_listVouchers(self, st, cartId):
-        car = self._totais(self._carrinho(st, cartId))
-        if car['totals']['subtotal'] < 30:
-            return {'vouchers': []}
-        return {'vouchers': [{'code': 'BEMVINDO5', 'campaignId': _uid('camp', 'bemvindo'),
-                              'description': 'R$ 5 de desconto', 'effect': 'FIXED', 'discountValue': 5.0}]}
+        car = self._carrinho(st, cartId)
+        sub = sum(it['unitPrice'] * it['quantity'] for it in car['items'])
+        if sub < 30:
+            return {'vouchers': [], 'agentHints': {'noResultsGuidance': 'Nenhum voucher se aplica.'}}
+        return {'vouchers': [{'code': 'VCH-5', 'campaignId': _uid('camp', 'vch5'), 'effectType': 'FIXED',
+                              'effectValue': 5.0, 'maxDiscountValue': None,
+                              'description': 'R$5 de desconto em pedidos acima de R$30', 'available': True}],
+                'agentHints': {}}
 
     def t_setVoucher(self, st, cartId, code, campaignId):
         car = self._carrinho(st, cartId)
-        if code != 'BEMVINDO5' or campaignId != _uid('camp', 'bemvindo'):
-            raise ErroMCP('INVALID_VOUCHER', 'cupom inválido')
-        car['voucher'] = {'code': code, 'campaignId': campaignId, 'discountValue': 5.0}
-        self._totais(car)
-        return {'cart': car}
+        if code != 'VCH-5' or campaignId != _uid('camp', 'vch5'):
+            raise _erro_cart('VOUCHER_INVALID', f"O voucher '{code}' não pôde ser aplicado.",
+                             'Este cupom não pode ser aplicado a este carrinho.')
+        car['voucher'] = {'code': code, 'valor': 5.0}
+        return self._resposta(car)
 
     def t_removeVoucher(self, st, cartId):
         car = self._carrinho(st, cartId)
         car.pop('voucher', None)
-        self._totais(car)
-        return {'cart': car}
+        return self._resposta(car)
 
     def t_submitOrder(self, st, cartId, userConsent=False, document=None):
         car = self._carrinho(st, cartId)
         if userConsent is not True:
-            raise ErroMCP('USER_CONSENT_REQUIRED', 'userConsent precisa ser true')
+            raise _erro_cart('CONSENT_REQUIRED', 'userConsent deve ser true',
+                             'Você precisa confirmar que deseja finalizar o pedido.')
+        faltam = [k for k in ('deliveryMethod', 'paymentMethod') if not car.get(k)]
         if not car['items']:
-            raise ErroMCP('EMPTY_CART', 'carrinho vazio')
-        if not car.get('delivery'):
-            raise ErroMCP('DELIVERY_NOT_SET', 'chame setCartDelivery antes')
-        if not car.get('payment'):
-            raise ErroMCP('PAYMENT_NOT_SET', 'chame setCartPayment antes')
-        if car.get('submitted'):
-            raise ErroMCP('CART_ALREADY_SUBMITTED', 'carrinho já virou pedido')
-        car['submitted'] = True
+            faltam.insert(0, 'items')
+        if faltam:
+            raise _erro_cart('CART_NOT_READY', f'Faltando: {faltam}',
+                             'Seu carrinho não está pronto. Configure ' + ', '.join(faltam) + '.')
+        car['_enviado'] = True
         st['seq'] += 1
         oid = _uid('pedido', self.chave, st['seq'])
-        st['pedidos'][oid] = {'orderId': oid, 'seq': st['seq'], 'merchantId': car['merchantId'],
-                              'merchantName': car['merchant']['name'], 'addressId': car['addressId'],
-                              'items': car['items'], 'totals': car['totals'], 'consultas': 0}
-        pedido = {'orderId': oid, 'shortId': str(4800 + st['seq'])}
-        if car['payment']['type'] == 'PIX':
-            pedido['pix'] = {'copyPaste': '00020126580014br.gov.bcb.pix0136' + oid.replace('-', '')[:32] + '5204000053039865802BR'}
-        return {'order': pedido}
+        st['pedidos'][oid] = {'orderId': oid, 'seq': st['seq'], 'merchantId': car['merchant']['merchantId'],
+                              'merchantName': car['merchant']['merchantName'], 'addressId': car['_endereco'],
+                              'items': car['items'], 'total': car['summary']['totalAmount'],
+                              'pagamento': car['paymentMethod']['displayName'], 'consultas': 0,
+                              'codigo': 'ABCD'[st['seq'] % 4] + str(1000 + st['seq'])}
+        return {'orderId': oid, 'agentHints': {'nextStep': 'Pedido enviado com sucesso! Comece a rastrear com trackOrder.'}}
 
     # --- Order Tracking ---
 
     def t_trackOrder(self, st, orderId):
         ped = st['pedidos'].get(orderId)
         if not ped:
-            return {'errorType': 'NOT_FOUND', 'code': 'ORDER_NOT_FOUND', 'message': 'pedido não encontrado',
-                    'retryable': False} if False else self._erro_rastreio()
+            return {'errorType': 'ResourceNotFoundError', 'code': 'ORDER_NOT_FOUND',
+                    'message': f"Order ID '{orderId}' not found", 'retryable': False,
+                    'suggestion': 'Do not attempt to look up this Order ID again.'}
         i = min(ped['consultas'], len(STATUS) - 1)
         ped['consultas'] += 1
         cod, desc = STATUS[i]
         fim = cod == 'DELIVERED'
         return {'status': {'code': cod, 'description': desc},
-                'statusHistory': [{'code': c, 'description': d} for c, d in STATUS[:i + 1]][-5:],
-                'agentHints': {'retryMessage': None if fim else 'Check again in 20 seconds',
-                               'pollingStop': fim, 'stopMessage': 'Pedido entregue' if fim else None}}
-
-    def _erro_rastreio(self):
-        raise ErroMCP('ORDER_NOT_FOUND', 'pedido não encontrado')
+                'statusHistory': [{'code': c, 'description': d} for c, d in reversed(STATUS[:i + 1])][:5],
+                'agentHints': {'retryMessage': None if fim else 'Please call again in 20 seconds for updates',
+                               'moreStatusEvents': None, 'pollingStop': True if fim else None,
+                               'stopMessage': 'Do not call this tool for this order.' if fim else None}}
 
     def t_getOrder(self, st, orderId):
         ped = st['pedidos'].get(orderId)
         if not ped:
-            raise ErroMCP('ORDER_NOT_FOUND', 'pedido não encontrado')
-        return {'order': {'orderId': orderId, 'merchant': {'name': ped['merchantName']}, 'items': ped['items'],
-                          'totals': ped['totals']}}
+            return {'errorType': 'ResourceNotFoundError', 'code': 'ORDER_NOT_FOUND',
+                    'message': f"Order ID '{orderId}' not found", 'retryable': True, 'suggestion': 'Retry.'}
+        return {'id': orderId, 'shortCode': ped['codigo'], 'merchant': ped['merchantName'],
+                'items': [f'{it["name"]} (x{it["quantity"]}, R$ {it["unitPrice"] * it["quantity"]:.2f})'
+                          for it in ped['items']],
+                'payment': f'{ped["pagamento"]} - Total R$ {ped["total"]:.2f}',
+                'delivery': {'address': 'Endereço do cliente', 'verificationCode': ped['codigo'][-4:]}}

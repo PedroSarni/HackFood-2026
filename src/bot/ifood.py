@@ -129,9 +129,11 @@ class Ifood:
         for c in _lista(d, 'candidates'):
             loc = _campo(c, 'location', padrao={}) or {}
             rua = ' '.join(str(x) for x in (loc.get('street'), loc.get('number')) if x)
+            coords = _campo(c, 'coordinates', padrao={}) or {}
             cands.append({'id': _campo(c, 'candidateId'), 'texto': _campo(c, 'formattedAddress', padrao=rua),
                           'titulo': rua or _campo(c, 'formattedAddress', padrao='')[:24],
-                          'bairro': loc.get('neighborhood') or '', 'endereco': texto})
+                          'bairro': loc.get('neighborhood') or '', 'endereco': texto,
+                          'lat': coords.get('latitude'), 'lng': coords.get('longitude')})
         return {'criado': None, 'candidatos': [c for c in cands if c['id']]}
 
     def criar_endereco(self, candidato, complemento='', apelido='Casa', bairro=None):

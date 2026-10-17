@@ -96,6 +96,20 @@ def acompanhar_pedido(wa_id: str, pedido_id: str):
     acompanhar(contexto_producao(estado, WhatsApp(), wa_id), wa_id, pedido_id)
 
 
+@app.function(image=imagem, secrets=segredos, timeout=120)
+def ferramentas_reais(wa_id: str):
+    """Diagnóstico: tools/list do gateway real com o token de quem já entrou. A doc não traz
+    os inputSchema; isto mostra os nomes e parâmetros de verdade.
+        .venv/Scripts/python.exe -m modal run -m src.app::ferramentas_reais --wa-id 55...
+    """
+    from src.bot.contexto import chamador_real
+    from src.shared import ifood_mcp
+    chamador_real(estado, wa_id)('getUser')  # renova o token se precisar
+    tok = estado.get(f'tok:{wa_id}')
+    tools = ifood_mcp.ClienteMCP(tok['access_token']).ferramentas()
+    return [{'name': t.get('name'), 'inputSchema': t.get('inputSchema')} for t in tools]
+
+
 @app.function(image=imagem, secrets=segredos, timeout=600, schedule=modal.Period(minutes=15))
 def lembretes():
     """Recorrência: avisa quem tem compra repetida vencendo (botão "Pedir de novo")."""
@@ -198,12 +212,19 @@ def web():
             return paginas.tela('⏰', 'Esse link venceu',
                                 'Volte pro WhatsApp e toque de novo em "Entrar no iFood".',
                                 'Voltar pro WhatsApp', voltar)
+        if _cfg('IFOOD_MOCK') in ('1', 'true', 'sim'):
+            # modo demo: sem OAuth de verdade; marca como logado e segue a conversa
+            await estado.put.aio(f'tok:{pedido["wa_id"]}', {'access_token': 'mock', 'refresh_token': 'mock',
+                                                            'expira_em': time.time() + 30 * 86400})
+            await depois_do_login.spawn.aio(pedido['wa_id'])
+            return paginas.tela('✅', 'Pronto, você entrou!', 'Modo de demonstração. Pode voltar pro '
+                                'WhatsApp: já te mandei uma mensagem lá.', 'Voltar pro WhatsApp', voltar)
         verificador, desafio = ifood_mcp.pkce()
         state = secrets.token_urlsafe(24)
         await estado.put.aio(f'oauth:{state}', {'wa_id': pedido['wa_id'], 'verificador': verificador,
                                                 'criado': time.time()})
         url = ifood_mcp.url_login(_cfg('IFOOD_CLIENT_ID'), CALLBACK, state, desafio,
-                                  _cfg('IFOOD_ESCOPOS') or 'openid')
+                                  _cfg('IFOOD_ESCOPOS') or None, app=_cfg('IFOOD_LOGIN_WEB') != '1')
         return RedirectResponse(url, status_code=302)
 
     @api.get('/ifood/callback', response_class=HTMLResponse)
@@ -236,7 +257,8 @@ def web():
 
 async def _guardar(caixa, wa_id, msg):
     """Caixa.guardar em versão assíncrona (o webhook não pode bloquear o loop)."""
-    seq = time.time_ns()
+    from src.shared.buffer import nova_seq
+    seq = nova_seq()
     await entrada.put.aio(msg, partition=wa_id)
     await estado.put.aio(f'prim:{wa_id}', time.time(), skip_if_exists=True)
     await estado.put.aio(f'ult:{wa_id}', seq)

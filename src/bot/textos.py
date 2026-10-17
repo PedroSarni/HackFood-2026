@@ -125,11 +125,15 @@ def card(oferta):
     if oferta.get('preco_antigo'):
         preco += f'  ~{reais(oferta["preco_antigo"])}~'
     linhas.append(f'💰 {preco}')
-    loja = oferta.get('loja') or ''
+    if oferta.get('loja'):
+        linhas.append(f'🏪 {oferta["loja"]}')
+    extras = []
+    if oferta.get('nota'):
+        extras.append(f'⭐ {str(oferta["nota"]).replace(".", ",")}')
     if oferta.get('tempo'):
-        loja += f' · 🛵 {oferta["tempo"]}'
-    if loja:
-        linhas.append(f'🏪 {loja}')
+        extras.append(f'🛵 {oferta["tempo"]}')
+    if extras:
+        linhas.append(' · '.join(extras))
     return '\n'.join(linhas)
 
 
@@ -194,11 +198,17 @@ def resumo(carrinho, endereco, entrega, pagamento, cupom=None):
     for it in carrinho['itens']:
         linhas.append(f'• {it["qtd"]}x {it["nome"]} — {reais(it.get("preco_total"))}')
     linhas.append('')
-    if carrinho.get('taxa_entrega') is not None:
-        taxa = 'grátis' if not carrinho['taxa_entrega'] else reais(carrinho['taxa_entrega'])
-        linhas.append(f'🛵 Entrega: {taxa}' + (f' · {entrega["tempo"]}' if entrega and entrega.get('tempo') else ''))
-    if cupom:
-        linhas.append(f'🎁 Desconto: -{reais(cupom.get("valor"))}' if cupom.get('valor') else '🎁 Cupom aplicado')
+    taxa_valor = carrinho.get('taxa_entrega')
+    if taxa_valor is None and entrega:
+        taxa_valor = entrega.get('preco')
+    if taxa_valor is not None or entrega:
+        taxa = 'grátis' if not taxa_valor else reais(taxa_valor)
+        linhas.append(f'🛵 Entrega: {taxa}' + (f' · chega em {entrega["tempo"]}' if entrega and entrega.get('tempo') else ''))
+    if carrinho.get('taxas'):
+        linhas.append(f'🧾 Taxas: {reais(carrinho["taxas"])}')
+    desconto = carrinho.get('desconto') or (cupom or {}).get('valor')
+    if desconto:
+        linhas.append(f'🎁 Desconto: -{reais(desconto)}')
     if endereco:
         linhas.append(f'🏠 {endereco.get("apelido") or "Endereço"}: {endereco.get("texto") or ""}'.rstrip(': '))
     if pagamento:
@@ -215,15 +225,19 @@ CANCELADO = 'Tudo bem, cancelei. Nada foi comprado. 🙂'
 ENVIANDO = 'Já estou fazendo seu pedido, só um instante... ⏳'
 
 
-def pedido_feito(numero, tempo=None):
-    t = f'\n🛵 Chega em {tempo}.' if tempo else ''
-    n = f'\nNúmero do pedido: *{numero}*' if numero else ''
-    return f'🎉 *Pedido feito!*{n}{t}\n\nEu te aviso aqui quando sair pra entrega.'
-
-
-def pix(codigo):
-    return ('💠 *Pague com PIX:* copie o código da próxima mensagem e cole no app do seu banco, '
-            'na opção *PIX Copia e Cola*.')
+def pedido_feito(numero=None, tempo=None, codigo_entrega=None, tipo_pagamento=None):
+    linhas = ['🎉 *Pedido feito!*']
+    if numero:
+        linhas.append(f'Número do pedido: *{numero}*')
+    if tempo:
+        linhas.append(f'🛵 Chega em {tempo}.')
+    if codigo_entrega:
+        linhas.append(f'🔑 Código de entrega: *{codigo_entrega}* (fale pro entregador)')
+    if tipo_pagamento == 'PIX':
+        # o submitOrder não devolve o código PIX (nem QR): o pagamento segue pelo app do iFood
+        linhas.append('💠 Pagamento por PIX: se o iFood pedir, o código aparece no app do iFood, no seu pedido.')
+    linhas.append('\nEu te aviso aqui quando sair pra entrega.')
+    return '\n'.join(linhas)
 
 
 OFERECER_REPETIR = 'Quer que eu te lembre de pedir isso de novo? 🔁'
@@ -253,15 +267,16 @@ SEM_PEDIDO = 'Você ainda não fez nenhum pedido por aqui. 🙂'
 QUAL_REPETIR = 'Qual pedido você quer repetir? 👇'
 NADA_PRA_REPETIR = 'Não achei pedidos antigos pra repetir. 🙂\nMe diga o que você quer pedir.'
 
-STATUS = {
+STATUS = {  # códigos do trackOrder (doc do portal); o código em si nunca é mostrado
+    'ORDER_CREATED': '🧾 Seu pedido foi registrado.',
+    'PAYMENT_DECLINED': '❌ O pagamento não passou. Confira no app do iFood ou faça o pedido de novo.',
     'CONFIRMED': '✅ A loja confirmou seu pedido.',
     'PREPARING': '👨‍🍳 Seu pedido está sendo preparado.',
-    'READY_FOR_PICKUP': '📦 Seu pedido está pronto.',
     'DISPATCHED': '🛵 Seu pedido saiu pra entrega!',
-    'ON_THE_WAY': '🛵 Seu pedido está a caminho!',
-    'DELIVERY_ARRIVED_AT_DESTINATION': '📍 O entregador chegou! Pode ir buscar.',
+    'ON_THE_WAY': '🛵 O entregador está a caminho!',
+    'ORDER_LATE': '⏰ Seu pedido está um pouco atrasado, mas continua a caminho.',
+    'DELIVERY_ARRIVED_AT_DESTINATION': '📍 O entregador chegou! Pode ir receber.',
     'DELIVERED': '✅ Pedido entregue. Bom proveito! 😋',
-    'CONCLUDED': '✅ Pedido entregue. Bom proveito! 😋',
     'CANCELLED': '❌ Seu pedido foi cancelado. Confira no app do iFood.',
 }
 

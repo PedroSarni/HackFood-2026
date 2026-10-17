@@ -24,6 +24,9 @@ POR_PAGINA = 3          # cards por vez ("Mais opções" mostra os próximos 3 d
 LISTAS_GUARDADAS = 3    # listas antigas que ainda aceitam toque de botão
 PEDIDOS_GUARDADOS = 10
 TRIVIAIS = {'saudacao', 'agradecer', 'sim'}
+# etapas em que um "oi" no meio não deve jogar o pedido fora: reapresenta a pergunta
+NO_MEIO_DO_PEDIDO = {'escolhendo', 'quantidade', 'opcao', 'mais', 'tirar', 'pagamento', 'cpf', 'confirmar',
+                     'mudar', 'endereco', 'endereco_escolha', 'endereco_lista', 'complemento', 'bairro'}
 
 
 def estado_novo():
@@ -124,7 +127,7 @@ class Bot:
                 self.wpp.texto(wa_id, T.logou(nome))
                 pend, u['pendente'] = u.get('pendente'), None
                 if pend:
-                    self.intencao(pend)
+                    self.botao(pend['botao']) if pend.get('acao') == 'botao' else self.intencao(pend)
                 else:
                     self.perguntar(T.PERGUNTA_PEDIDO, T.MENU, fase='pedido')
             self._protegido(seguir)
@@ -194,6 +197,9 @@ class Bot:
             self.menu(prefixo)
 
     def menu(self, prefixo=None, _arg=None):
+        if not self.logado():  # sem login nada funciona: o "menu" de quem não entrou é o botão de entrar
+            self.pedir_login()
+            return
         texto = prefixo or T.boas_vindas(self._primeiro_nome())
         if prefixo:
             texto += '\n\n' + T.PERGUNTA_PEDIDO
@@ -213,7 +219,7 @@ class Bot:
             'inicio': self.menu, 'repetir': self.repetir, 'meu_pedido': self.acompanhar,
             'ajuda': self.ajuda, 'pick': self.escolher_oferta, 'mais': self.mais_opcoes,
             'qtd': self.definir_qtd, 'opt': self.escolher_opcao, 'end': self.escolher_endereco,
-            'end_novo': self.pedir_endereco, 'cand': self.escolher_candidato,
+            'end_novo': self.pedir_endereco, 'end_lista': self._listar_enderecos, 'cand': self.escolher_candidato,
             'compl_nao': self.sem_complemento, 'fim': self.finalizar, 'tirar': self.perguntar_tirar,
             'rem': self.tirar_item, 'ent': self.escolher_entrega, 'pag': self.escolher_pagamento,
             'cpf_nao': self.sem_cpf, 'ok': self.confirmar, 'mudar': self.mudar,
@@ -261,6 +267,9 @@ class Bot:
                     self.sem_complemento()
                 else:
                     self.receber_complemento(texto)
+                return
+            if fase == 'bairro':
+                self.receber_bairro(texto)
                 return
             titulos = (u.get('pergunta') or {}).get('titulos') or []
             i = igual_a_botao(texto, titulos)
@@ -382,10 +391,10 @@ class Bot:
         elif a == 'inicio':
             self.menu()
         elif a == 'saudacao':
-            if fase in ('inicio', 'pedido', None) or not botoes:
-                self.saudar()
-            else:
+            if fase in NO_MEIO_DO_PEDIDO and botoes:
                 self.repetir_pergunta('Olá! 😊 Estávamos aqui:')
+            else:
+                self.saudar()
         elif a == 'agradecer':
             if fase in ('inicio', 'pedido', 'acompanhando', None):
                 self.dizer(T.DE_NADA)
@@ -417,10 +426,12 @@ class Bot:
         return self.ctx.logado(self.wa)
 
     def exigir_login(self, pendente):
+        """pendente: o que retomar depois do login, ['botao', id] ou uma intenção (dict)."""
         if self.logado():
             return True
-        self.u['pendente'] = ({'acao': 'botao', 'botao': pendente[1]} if pendente and pendente[0] == 'botao'
-                              else pendente)
+        if isinstance(pendente, (list, tuple)) and pendente and pendente[0] == 'botao':
+            pendente = {'acao': 'botao', 'botao': pendente[1]}
+        self.u['pendente'] = pendente
         self.pedir_login()
         return False
 
@@ -488,28 +499,55 @@ class Bot:
     # ================================================================== endereço
 
     def garantir_endereco(self, pendente):
+        """Regra da doc (listAddresses.agentHints): 1 endereço = usa e avisa, sem perguntar;
+        vários com histórico = sugere o provável e CONFIRMA numa pergunta; vários sem histórico
+        = mostra as opções; nenhum = pede o endereço e salva na conta."""
         u = self.u
-        if u.get('endereco'):
+        if u.get('endereco') and u['endereco'].get('lat') is not None:
             return True
         ends = self.ctx.ifood(self.wa).enderecos()
         if len(ends) == 1:
-            u['endereco'] = ends[0]
-            return True
+            u['endereco'] = self._com_coordenadas(ends[0])
+            return bool(u['endereco'])
         if ends:
-            melhor = next((e for e in ends if e.get('ultimo')), None) or next(
-                (e for e in ends if e.get('mais_usado')), None)
-            if melhor:
-                u['endereco'] = melhor
-                return True
             u['pendente'] = pendente
             u['enderecos'] = ends[:9]
-            botoes = [(f'end:{i}', e.get('apelido') or f'Endereço {i + 1}', e.get('texto', ''))
-                      for i, e in enumerate(ends[:9])] + [T.B_ENDERECO_NOVO + ('Cadastrar outro',)]
-            self.perguntar(T.QUAL_ENDERECO, botoes, fase='endereco_lista', rotulo='Ver endereços')
+            melhor = next((i for i, e in enumerate(ends) if e.get('ultimo')), None)
+            if melhor is None:
+                melhor = next((i for i, e in enumerate(ends) if e.get('mais_usado')), None)
+            if melhor is not None and melhor < 9:
+                e = ends[melhor]
+                self.perguntar(f'🏠 Entrego em *{e.get("apelido")}*?\n{e.get("texto", "")}',
+                               [(f'end:{melhor}', '✅ Sim, aqui'), ('end_lista', '📍 Outro endereço')],
+                               fase='endereco_lista')
+            else:
+                self._listar_enderecos()
             return False
         u['pendente'] = pendente
         self.pedir_endereco()
         return False
+
+    def _listar_enderecos(self, _arg=None):
+        ends = self.u.get('enderecos') or []
+        botoes = [(f'end:{i}', e.get('apelido') or f'Endereço {i + 1}', e.get('texto', ''))
+                  for i, e in enumerate(ends[:9])] + [T.B_ENDERECO_NOVO + ('Cadastrar outro',)]
+        self.perguntar(T.QUAL_ENDERECO, botoes, fase='endereco_lista', rotulo='Ver endereços')
+
+    def _com_coordenadas(self, end):
+        """A busca precisa de latitude/longitude. A doc avisa que o listAddresses pode vir sem
+        `coordinates`: aí geocodifica o texto do endereço (o passo 1 do createAddress não salva nada)."""
+        if end.get('lat') is not None:
+            return end
+        try:
+            cands = self.ctx.ifood(self.wa).geocodificar(end.get('texto') or '').get('candidatos') or []
+        except ErroMCP as e:
+            print(f'geocodificar endereço salvo falhou: {e!r}')
+            cands = []
+        if cands and cands[0].get('lat') is not None:
+            return {**end, 'lat': cands[0]['lat'], 'lng': cands[0]['lng']}
+        self.dizer('Não consegui achar a localização desse endereço. 😕 Vamos cadastrar de novo?')
+        self.pedir_endereco()
+        return None
 
     def pedir_endereco(self, _arg=None):
         self.u['novo_endereco'] = None
@@ -520,20 +558,32 @@ class Bot:
     def escolher_endereco(self, arg):
         ends = self.u.get('enderecos') or []
         try:
-            self.u['endereco'] = ends[int(arg)]
+            end = ends[int(arg)]
         except (ValueError, IndexError):
             self.repetir_pergunta(T.BOTAO_VELHO)
             return
+        end = self._com_coordenadas(end)
+        if not end:
+            return
+        self.u['endereco'] = end
         self._endereco_mudou()
 
     def receber_endereco(self, texto):
-        r = self.ctx.ifood(self.wa).geocodificar(texto)
+        try:
+            r = self.ctx.ifood(self.wa).geocodificar(texto)
+        except ErroMCP as e:
+            if str(e.codigo) not in ('PLACE_NOT_FOUND', 'MISSING_ADDRESS'):
+                raise
+            r = {}
+        if r.get('criado'):
+            self._endereco_salvo(r['criado'])
+            return
         cands = r.get('candidatos') or []
         if not cands:
             self.dizer(T.ENDERECO_NAO_ACHEI)
             self.u['fase'] = 'endereco'
             return
-        self.u['novo_endereco'] = {'texto': texto, 'candidatos': cands[:9], 'escolhido': None}
+        self.u['novo_endereco'] = {'texto': texto, 'candidatos': cands[:9], 'escolhido': None, 'bairro': None}
         if len(cands) == 1:
             self.escolher_candidato('0')
             return
@@ -549,8 +599,22 @@ class Bot:
             self.repetir_pergunta(T.BOTAO_VELHO)
             return
         self.u['novo_endereco'] = novo
+        if not novo['escolhido'].get('bairro'):  # geocodificação sem bairro: a doc manda perguntar
+            self.dizer(f'📍 {novo["escolhido"].get("texto", "")}\n\nQual é o *bairro*? Escreva aqui. 🙂')
+            self.u['fase'] = 'bairro'
+            self.u['pergunta'] = {'texto': 'Qual é o bairro?', 'botoes': [], 'titulos': []}
+            return
         self.perguntar(f'📍 {novo["escolhido"].get("texto", "")}\n\n{T.PEDIR_COMPLEMENTO}',
                        [T.B_SEM_COMPLEMENTO], fase='complemento')
+
+    def receber_bairro(self, texto):
+        novo = self.u.get('novo_endereco') or {}
+        if not novo.get('escolhido'):
+            self.pedir_endereco()
+            return
+        novo['bairro'] = ' '.join(texto.split())[:60]
+        self.u['novo_endereco'] = novo
+        self.perguntar(T.PEDIR_COMPLEMENTO, [T.B_SEM_COMPLEMENTO], fase='complemento')
 
     def sem_complemento(self, _arg=None):
         self.receber_complemento('')
@@ -561,9 +625,24 @@ class Bot:
         if not cand:
             self.pedir_endereco()
             return
-        end = self.ctx.ifood(self.wa).criar_endereco(cand, complemento=texto.strip()[:80], apelido='Casa')
+        apelido = 'Casa' if not self.u.get('enderecos') else f'Endereço {len(self.u["enderecos"]) + 1}'
+        try:
+            end = self.ctx.ifood(self.wa).criar_endereco(cand, complemento=texto.strip()[:80], apelido=apelido,
+                                                         bairro=novo.get('bairro'))
+        except ErroMCP as e:
+            if str(e.codigo) == 'MISSING_NEIGHBORHOOD':
+                self.dizer('Faltou o *bairro*. Qual é o bairro? Escreva aqui. 🙂')
+                self.u['fase'] = 'bairro'
+                return
+            raise
+        if end.get('lat') is None:
+            end.update({'lat': cand.get('lat'), 'lng': cand.get('lng')})
+        self._endereco_salvo(end)
+
+    def _endereco_salvo(self, end):
         self.u['endereco'] = end
         self.u['novo_endereco'] = None
+        self.u['enderecos'] = None
         self.dizer(T.endereco_salvo(end.get('apelido') or 'Casa', end.get('texto', '')))
         self._endereco_mudou()
 
@@ -594,7 +673,7 @@ class Bot:
         car = u.get('carrinho') or {}
         loja_id = car.get('loja_id') if car.get('itens') else None
         ofertas, proxima = self.ctx.ifood(self.wa).buscar(
-            pedido['termo'], u['endereco']['id'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
+            pedido['termo'], u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
         ofertas = ranking.ordenar(ofertas, pedido)
         u['atual'] = pedido
         if not ofertas:
@@ -659,7 +738,7 @@ class Bot:
         if lst['pos'] >= len(lst['ofertas']):
             if lst.get('proxima'):  # acabou o que já veio: aí sim busca a página seguinte
                 novas, prox = self.ctx.ifood(self.wa).buscar(
-                    lst['termo'], u['endereco']['id'], lst.get('tipo_loja') or 'MERCADO',
+                    lst['termo'], u['endereco'], lst.get('tipo_loja') or 'MERCADO',
                     loja_id=lst.get('loja_id'), pagina=lst['proxima'])
                 ja = {o['item_id'] for o in lst['ofertas']}
                 lst['ofertas'] += [o for o in ranking.ordenar(novas, lst.get('pedido') or {}) if o['item_id'] not in ja]
@@ -690,8 +769,8 @@ class Bot:
                            'Termine este pedido primeiro, depois a gente faz outro.',
                            [T.B_FINALIZAR, T.B_OUTRA])
             return
-        item = self.ctx.ifood(self.wa).item(of['item_id'], of['loja_id'])
-        item.setdefault('nome', of['nome'])
+        item = self.ctx.ifood(self.wa).item(of['item_id'], of['loja_id'], u['endereco'])
+        item['nome'] = item.get('nome') or of['nome']
         pedido = (u['listas'][lid].get('pedido') or u.get('atual') or {})
         u['escolha'] = {'oferta': of, 'item': item, 'qtd': pedido.get('quantidade'),
                         'obs': pedido.get('observacao'), 'opcoes': [], 'grupo': 0, 'feitas': 0}
@@ -764,16 +843,21 @@ class Bot:
         car = u.get('carrinho')
         linha = {'item_id': of['item_id'], 'qtd': int(esc['qtd']), 'opcoes': esc['opcoes'], 'obs': esc.get('obs')}
         if not car or not car.get('id'):
-            car = api.criar_carrinho(of['loja_id'], u['endereco']['id'], [linha])
-            car['loja'] = of.get('loja')
+            novo = api.criar_carrinho(of['loja_id'], u['endereco']['id'], [linha])
+            antes = {}
         else:
-            api.adicionar(car['id'], linha)
-            car = {**api.carrinho(car['id']), 'loja': car.get('loja')}
-        # o carrinho do iFood não guarda as opções do jeito que precisamos pra refazer: guarda aqui
-        for it in car.get('itens') or []:
-            if it.get('item_id') == of['item_id'] and not it.get('opcoes'):
+            antes = {i['cart_item_id']: i for i in car.get('itens') or []}
+            novo = api.adicionar(car['id'], linha)
+        novo['loja'] = novo.get('loja') or (car or {}).get('loja') or of.get('loja')
+        # guardamos as opções escolhidas de cada linha pra conseguir refazer o carrinho depois
+        # (mudança de endereço); a linha nova é o cartItemId que não existia antes
+        for it in novo.get('itens') or []:
+            velho = antes.get(it['cart_item_id'])
+            if velho:
+                it['opcoes'], it['obs'] = velho.get('opcoes'), velho.get('obs')
+            elif it.get('item_id') == of['item_id']:
                 it['opcoes'], it['obs'] = esc['opcoes'], esc.get('obs')
-        u['carrinho'] = car
+        u['carrinho'] = novo
         u['escolha'] = None
         nome = esc['item'].get('nome') or of['nome']
         if esc['opcoes']:
@@ -834,11 +918,16 @@ class Bot:
             self.dizer(f'🗑️ Tirei *{it["nome"]}*. Seu pedido ficou vazio.')
             self.perguntar_pedido()
             return
-        api.remover(car['id'], it['cart_item_id'])
-        novo = {**api.carrinho(car['id']), 'loja': car.get('loja')}
-        guardadas = {i['item_id']: (i.get('opcoes'), i.get('obs')) for i in car['itens']}
-        for i in novo.get('itens') or []:
-            i['opcoes'], i['obs'] = guardadas.get(i['item_id'], ([], None))
+        novo = api.remover(car['id'], it['cart_item_id'])
+        if not novo or not novo.get('itens'):
+            u['carrinho'] = None
+            self.dizer(f'🗑️ Tirei *{it["nome"]}*. Seu pedido ficou vazio.')
+            self.perguntar_pedido()
+            return
+        novo['loja'] = novo.get('loja') or car.get('loja')
+        guardadas = {i['cart_item_id']: (i.get('opcoes'), i.get('obs')) for i in car['itens']}
+        for i in novo['itens']:
+            i['opcoes'], i['obs'] = guardadas.get(i['cart_item_id'], ([], None))
         u['carrinho'] = novo
         self.dizer(f'🗑️ Tirei *{it["nome"]}*.')
         self._proximo_da_fila()
@@ -853,44 +942,38 @@ class Bot:
             return
         u['fila'] = []
         api = self.ctx.ifood(self.wa)
-        # 1. entrega (obrigatório antes do pagamento e do submitOrder)
+        if car.get('minimo') and (car.get('subtotal') or 0) < car['minimo']:
+            self.perguntar(f'O pedido mínimo do *{car.get("loja")}* é {T.reais(car["minimo"])}. 🙂\n'
+                           f'Seu pedido está em {T.reais(car.get("subtotal"))}. Quer colocar mais alguma coisa?',
+                           [T.B_MAIS_COISAS, T.B_CANCELAR], fase='mais')
+            return
+        # 1. entrega (a doc exige getCartDeliveryMethods -> setCartDelivery antes do pagamento).
+        # Escolhe sozinho a entrega padrão: uma pergunta a menos, e o resumo mostra prazo e taxa.
         if not car.get('entrega'):
             entregas = api.entregas(car['id'])
             if not entregas:
-                self.perguntar(T.LOJA_FECHADA, [T.B_OUTRA, T.B_INICIO], fase='pedido')
+                self.perguntar(T.LOJA_FECHADA + '\nVamos procurar em outra loja?', [T.B_OUTRA, T.B_INICIO], fase='pedido')
+                u['carrinho'] = None
                 return
-            agora = [e for e in entregas if not e.get('agendada')]
-            if agora and len(agora) == 1 or (agora and len(entregas) > 3):
-                self._definir_entrega(agora[0])
-            elif len(entregas) == 1:
-                self._definir_entrega(entregas[0])
-            else:
-                u['entregas'] = entregas[:9]
-                botoes = [(f'ent:{i}', e['nome'], ' · '.join(x for x in (e.get('tempo'), T.reais(e.get('preco'))) if x))
-                          for i, e in enumerate(entregas[:9])]
-                if len(botoes) <= 3:
-                    botoes = [(b[0], b[1]) for b in botoes]
-                self.perguntar(T.QUAL_ENTREGA, botoes, fase='entrega', rotulo='Ver horários')
-                return
+            self._definir_entrega(entregas[0])
         car = u['carrinho']
-        # 2. pagamento
+        # 2. pagamento: só o que um bot consegue pagar (PIX e vales); repete o da última vez
         if not car.get('pagamento'):
             formas = api.pagamentos(car['loja_id'])
             pref = u.get('pagamento_preferido') or {}
-            igual = next((f for f in formas if f['id'] == pref.get('id')), None)
+            igual = next((f for f in formas if f['tipo'] == pref.get('tipo')), None)
             if igual:
                 self._definir_pagamento(igual)
             elif len(formas) == 1:
                 self._definir_pagamento(formas[0])
             elif not formas:
-                self.perguntar('Essa loja não aceitou nenhuma forma de pagamento agora. 😕',
+                self.perguntar('Essa loja não aceita PIX nem vale por aqui. 😕\nVamos procurar em outra loja?',
                                [T.B_OUTRA, T.B_INICIO], fase='pedido')
+                u['carrinho'] = None
                 return
             else:
                 u['formas'] = formas[:9]
-                botoes = [(f'pag:{i}', f['nome'], f.get('detalhe') or '') for i, f in enumerate(formas[:9])]
-                if len(botoes) <= 3:
-                    botoes = [(b[0], b[1]) for b in botoes]
+                botoes = [(f'pag:{i}', f['nome']) for i, f in enumerate(formas[:9])]
                 self.perguntar(T.QUAL_PAGAMENTO, botoes, fase='pagamento', rotulo='Ver formas')
                 return
         car = u['carrinho']
@@ -898,27 +981,48 @@ class Bot:
         if 'cupom' not in car:
             car['cupom'] = None
             try:
-                cupons = api.cupons(car['id'])
+                cupons = api.cupons(car['id'], car.get('subtotal'))
                 if cupons:
                     melhor = max(cupons, key=lambda c: c.get('valor') or 0)
-                    api.aplicar_cupom(car['id'], melhor)
-                    car['cupom'] = melhor
+                    self._atualizar_carrinho(api.aplicar_cupom(car['id'], melhor))
+                    u['carrinho']['cupom'] = melhor
             except ErroMCP as e:
                 print(f'cupom ignorado: {e!r}')
-        # 4. CPF (uma vez; quem disse "sem CPF" não é perguntado de novo)
+        # 4. CPF: primeiro o da conta iFood (escopo advanced); só pergunta se não tiver, e uma vez só
         if u.get('cpf') is None:
-            self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF], fase='cpf')
-            return
+            try:
+                cpf = cpf_em(api.usuario().get('cpf') or '')
+            except ErroMCP:
+                cpf = None
+            if cpf:
+                u['cpf'] = cpf
+            else:
+                self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF], fase='cpf')
+                return
         self.mostrar_resumo()
+
+    def _atualizar_carrinho(self, novo):
+        """Troca os números do carrinho pelos que o iFood devolveu, sem perder o que é nosso
+        (loja, entrega, pagamento, cupom e as opções escolhidas de cada linha)."""
+        car = self.u['carrinho']
+        if not novo:
+            return car
+        guardadas = {i.get('cart_item_id'): (i.get('opcoes'), i.get('obs')) for i in car.get('itens') or []}
+        for i in novo.get('itens') or []:
+            i['opcoes'], i['obs'] = guardadas.get(i.get('cart_item_id'), ([], None))
+        for k in ('itens', 'subtotal', 'taxa_entrega', 'taxas', 'desconto', 'total', 'minimo'):
+            if novo.get(k) is not None:
+                car[k] = novo[k]
+        return car
 
     def _definir_entrega(self, ent):
         car = self.u['carrinho']
-        self.ctx.ifood(self.wa).definir_entrega(car['id'], ent['id'], ent.get('horario_id'))
+        self._atualizar_carrinho(self.ctx.ifood(self.wa).definir_entrega(car['id'], ent['id']))
         car['entrega'] = ent
 
     def _definir_pagamento(self, forma):
         car = self.u['carrinho']
-        self.ctx.ifood(self.wa).definir_pagamento(car['id'], forma)
+        self._atualizar_carrinho(self.ctx.ifood(self.wa).definir_pagamento(car['id'], forma))
         car['pagamento'] = forma
         self.u['pagamento_preferido'] = forma
 
@@ -965,18 +1069,12 @@ class Bot:
     def mostrar_resumo(self):
         u = self.u
         car = u['carrinho']
-        try:
-            atual = self.ctx.ifood(self.wa).carrinho(car['id'])
-            for k in ('itens', 'subtotal', 'taxa_entrega', 'desconto', 'total'):
-                if atual.get(k) is not None:
-                    if k == 'itens':
-                        guardadas = {i['item_id']: (i.get('opcoes'), i.get('obs')) for i in car['itens']}
-                        for i in atual['itens']:
-                            i['opcoes'], i['obs'] = guardadas.get(i['item_id'], ([], None))
-                    car[k] = atual[k]
+        try:  # a doc pede getCart pra confirmar o estado final antes do submitOrder
+            self._atualizar_carrinho(self.ctx.ifood(self.wa).carrinho(car['id']))
         except ErroMCP as e:
+            if 'NOT_FOUND' in str(e.codigo):
+                raise
             print(f'getCart antes do resumo falhou: {e!r}')
-        u['carrinho'] = car
         texto = T.resumo(car, u.get('endereco'), car.get('entrega'), car.get('pagamento'), car.get('cupom'))
         self.perguntar(texto, [(f'ok:{car["id"][:12]}', T.B_CONFIRMAR), T.B_MUDAR, T.B_CANCELAR], fase='confirmar')
 
@@ -1010,10 +1108,18 @@ class Bot:
         u['carrinho'] = None
         u['fila'] = []
         u['escolha'] = None
-        self.dizer(T.pedido_feito(feito.get('numero') or feito['id'][:8], (car.get('entrega') or {}).get('tempo')))
-        if feito.get('pix'):
-            self.dizer(T.pix(feito['pix']))
-            self.dizer(feito['pix'])
+        detalhes = {}
+        for tentativa in range(2):  # getOrder logo depois do checkout pode dar NOT_FOUND (consistência eventual)
+            try:
+                detalhes = self.ctx.ifood(self.wa).pedido(feito['id'])
+                break
+            except ErroMCP as e:
+                print(f'getOrder depois do pedido: {e!r}')
+                if tentativa == 0:
+                    self.ctx.dormir(1.5)
+        u['pedidos'][0]['codigo'] = detalhes.get('codigo')
+        self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
+                                  detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')))
         self.ctx.iniciar_rastreio(self.wa, feito['id'])
         self.perguntar(T.OFERECER_REPETIR, [T.B_REC_SEMANA, T.B_REC_MES, T.B_REC_NAO], fase='recorrencia')
 
@@ -1038,9 +1144,15 @@ class Bot:
             car.pop('pagamento', None)
             self.pedir_endereco()
         elif arg == 'pagamento':
+            formas = self.ctx.ifood(self.wa).pagamentos(car['loja_id'])
+            if len(formas) <= 1:
+                nome = formas[0]['nome'] if formas else 'essa forma'
+                self.perguntar(f'Essa loja só aceita *{nome}* por aqui. 🙂', [T.B_FINALIZAR, T.B_CANCELAR])
+                return
             car.pop('pagamento', None)
-            self.u['pagamento_preferido'] = None
-            self.finalizar()
+            self.u['formas'] = formas[:9]
+            self.perguntar(T.QUAL_PAGAMENTO, [(f'pag:{i}', f['nome']) for i, f in enumerate(formas[:9])],
+                           fase='pagamento', rotulo='Ver formas')
         else:
             self.mudar()
 
@@ -1071,8 +1183,9 @@ class Bot:
         conhecidos = {p['id'] for p in self.u.get('pedidos') or []}
         opcoes = [{'id': p['id'], 'resumo': p.get('resumo', ''), 'loja': p.get('loja')}
                   for p in self.u.get('pedidos') or []]
-        try:
-            opcoes += [p for p in self.ctx.ifood(self.wa).pedidos_recentes() if p['id'] not in conhecidos]
+        try:  # pedidos feitos fora do bot também (app do iFood), via getRecommendations(RECENT_ORDERS)
+            opcoes += [p for p in self.ctx.ifood(self.wa).pedidos_recentes(self.u['endereco'])
+                       if p['id'] not in conhecidos]
         except ErroMCP as e:
             print(f'pedidos recentes falhou: {e!r}')
         if not opcoes:

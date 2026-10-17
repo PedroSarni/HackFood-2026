@@ -50,9 +50,10 @@ def acompanhar(ctx, wa_id, pedido_id, dormir=time.sleep, relogio=time.time):
             continue
         codigo = st.get('codigo')
         if codigo and codigo != ultimo:
-            if ultimo is not None or codigo not in ('CREATED', 'PLACED', 'PENDING'):
+            if codigo != 'ORDER_CREATED':  # "registrado" a pessoa já soube na confirmação
                 ctx.wpp.texto(wa_id, T.status_pedido(codigo, st.get('descricao')))
             ultimo = codigo
+        # a doc manda decidir o fim pelo pollingStop (a lista de códigos terminais não é fechada)
         if st.get('parar') or codigo in FINAIS:
             return codigo or 'parou'
         dormir(segundos_da_dica(st.get('proxima')))
