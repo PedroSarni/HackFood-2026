@@ -123,7 +123,7 @@ cujo link é `https://<nosso-backend>/login/<codigo>`.
   WhatsApp da pessoa e vale 30 minutos. **Não é do iFood** — é a nossa URL no Modal.
 - Ao abrir o link (`GET /login/<codigo>`), no **modo real** o backend gera o par PKCE, guarda o
   `code_verifier` no servidor e redireciona a pessoa para o **login de verdade do iFood**
-  (`https://app.ifood.com.br/F4X4/authorize` → cai em `id.ifood.com.br`), pedindo os escopos
+  pelo login web (`https://id.ifood.com.br/authorize`, sem OneLink do app), pedindo os escopos
   `mcp.*`. A pessoa entra na conta dela e autoriza.
 - O iFood então volta para `GET /ifood/callback?code=...&state=...`. O backend troca o `code`
   pelos tokens (`access_token` ~1 h, `refresh_token` ~30 dias), guarda-os e avisa a pessoa no

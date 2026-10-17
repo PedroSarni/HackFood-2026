@@ -154,7 +154,7 @@ def test_mcp_manda_sessao_e_versao_nas_chamadas():
 def test_url_de_login_tem_pkce_e_escopos():
     v, d = M.pkce()
     url = M.url_login('cid', 'https://x.test/cb', 'estado123', d)
-    assert url.startswith(M.AUTORIZAR_APP)
+    assert url.startswith(M.AUTORIZAR + '?')
     assert 'code_challenge_method=S256' in url and 'mcp.cart.checkout' in url and 'redirect_uri=https%3A' in url
 
 

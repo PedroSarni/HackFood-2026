@@ -236,7 +236,7 @@ def web():
         await estado.put.aio(f'oauth:{state}', {'wa_id': pedido['wa_id'], 'verificador': verificador,
                                                 'criado': time.time()})
         url = ifood_mcp.url_login(_cfg('IFOOD_CLIENT_ID'), CALLBACK, state, desafio,
-                                  _cfg('IFOOD_ESCOPOS') or None, app=_cfg('IFOOD_LOGIN_WEB') != '1')
+                                  _cfg('IFOOD_ESCOPOS') or None)
         return RedirectResponse(url, status_code=302)
 
     @api.get('/ifood/callback', response_class=HTMLResponse)

@@ -23,10 +23,8 @@ import httpx
 
 GATEWAY = 'https://consumer-mcp.ifood.com.br/marketplace'
 EMISSOR = 'https://id.ifood.com.br'
+# login web direto (o recomendado pra nós): o OneLink do app exige redirect via Universal/App Link
 AUTORIZAR = f'{EMISSOR}/authorize'
-# OneLink: no celular abre o app do iFood se estiver instalado (login em segundos); sem o app,
-# cai sozinho no login web com todos os parâmetros preservados (verificado: 301 pro AUTORIZAR)
-AUTORIZAR_APP = 'https://app.ifood.com.br/F4X4/authorize'
 TOKEN = f'{EMISSOR}/token'
 REVOGAR = f'{EMISSOR}/revoke'
 PROTOCOLO = '2025-06-18'
@@ -227,12 +225,12 @@ def pkce():
     return verificador, desafio
 
 
-def url_login(client_id, redirect_uri, state, desafio, escopos=None, extras=None, app=True):
+def url_login(client_id, redirect_uri, state, desafio, escopos=None, extras=None):
     q = {'response_type': 'code', 'client_id': client_id, 'redirect_uri': redirect_uri,
          'scope': escopos or ESCOPOS, 'state': state, 'code_challenge': desafio,
          'code_challenge_method': 'S256'}
     q.update(extras or {})
-    return f'{AUTORIZAR_APP if app else AUTORIZAR}?{urllib.parse.urlencode(q, quote_via=urllib.parse.quote)}'
+    return f'{AUTORIZAR}?{urllib.parse.urlencode(q, quote_via=urllib.parse.quote)}'
 
 
 def _pedir_token(http, client_id, client_secret, dados):
