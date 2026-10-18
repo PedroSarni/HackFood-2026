@@ -140,4 +140,5 @@ Reestruturação e verificação visual do PDF em andamento; envio dos commits p
 **Prompt:** continua o que você estava fazendo
 
 **Resposta:** Continuei a reestruturação do PDF: visão geral, conversão, follow-ups e clientes agregados, rankings de mercado e financeiro/IA, sem registros individuais.
-Preservei fonte, filtros, data e período anterior da tela; seis testes do PDF passaram, incluindo recorte vazio, valores filtrados e paginação de rankings. Revisão visual e verificação final em andamento.
+Preservei fonte, filtros, data e período anterior da tela; 24 testes e o build passaram, incluindo recorte vazio, valores filtrados, fonte e paginação de rankings.
+Conferi visualmente as seis páginas com 907 conversas simuladas do servidor local e o recorte vazio real. Implementação salva em commits locais; push pendente de autenticação no GitHub.

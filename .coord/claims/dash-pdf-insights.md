@@ -1,7 +1,7 @@
 ---
 slug: dash-pdf-insights
 owner: Pedro Sarni
-status: active
+status: done
 started: 2026-10-17 21:51
 ---
 
@@ -26,7 +26,10 @@ Reorganizar o PDF com gráficos e indicadores agregados das páginas do dashboar
 
 - Nenhuma nova peça genérica prevista. Reutilizar e, se necessário, estender `metrics`, `groupBy`, `filterSessions` e os formatos existentes em `Frontend/Rascunho_Dash/data.js`, já compartilhados pelo dashboard e pelo PDF.
 
-## Onde está (preencher ao terminar)
+## Onde está
 
-- Em implementação local após resposta do Pedro "já pode commitar" à solicitação de autenticar ou autorizar trabalho local. Interpretação comunicada antes das edições; push continua bloqueado por autenticação.
-- `Frontend/Rascunho_Dash/data.js` — `metrics` estendida para compartilhar os indicadores das páginas e a série diária de vendas.
+- Implementação concluída localmente após resposta do Pedro "já pode commitar" à solicitação de autenticar ou autorizar trabalho local. Interpretação comunicada antes das edições; envio sujeito à autenticação no GitHub.
+- `Frontend/Rascunho_Dash/data.js` — `metrics` compartilha os indicadores das páginas, distribuição de resultados, IA, clientes, financeiro e a série diária de vendas; `groupBy` mantém os mesmos rankings.
+- `Frontend/Rascunho_Dash/pdf-report.js` — `createAnalyticsPdf` gera visão geral, conversão, follow-ups/clientes agregados, cidades, restaurantes e financeiro/IA, sem registros individuais; rankings paginados. `reportContext` recebe a data da exportação.
+- `Frontend/Rascunho_Dash/app.jsx` e `report-download.js` — exportam o recorte atual e anterior, filtros, fonte e data no momento do clique; reutilizam os cálculos das telas.
+- `Frontend/Rascunho_Dash/tests/` — 24 testes aprovados; build aprovado. Seis páginas verificadas visualmente com 907 sessões da demonstração local, além do recorte vazio real.
