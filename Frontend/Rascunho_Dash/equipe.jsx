@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Clock3, Copy, FileCode2, KeyRound, LifeBuoy, Power, Search, ShieldCheck, Sparkles, X, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Activity, Clock3, Copy, FileCode2, KeyRound, LifeBuoy, Network, Power, Search, ShieldCheck, Sparkles, X, Zap } from 'lucide-react';
 import { clock, latency, pct, useLiveSteps, useSummary, useTeam } from './telemetria.js';
 import { ConversationPicker, Step } from './agentes.jsx';
 
@@ -47,49 +48,103 @@ function Avatar({ agent, size = 44 }) {
 }
 
 // O palco: cada passo do diário vira um "recado" correndo entre o cliente, o Maestro, o agente e o iFood.
-function Stage({ team, byId, step, offline }) {
+// Clicar num personagem abre um balãozinho com o que ele andou fazendo (e, no iFood, o resumo do MCP).
+function Stage({ team, byId, step, offline, history, usage, mcp, picked, onPick, onOpenSheet }) {
   const pos = useMemo(() => seats(team), [team]);
   const target = step?.tipo === 'ia' ? pos[step.agente] : step?.tipo === 'mcp' ? SPOT.ifood : step ? SPOT.cliente : null;
   const from = step?.tipo === 'entrada' ? SPOT.cliente : SPOT.maestro;
   const to = step?.tipo === 'entrada' ? SPOT.maestro : target;
   const color = step?.tipo === 'ia' ? byId[step.agente]?.cor : step?.tipo === 'mcp' ? IFOOD : WHATSAPP;
-  const bubble = step ? sayFor(step, byId) : null;
+  const bubble = step && !picked ? sayFor(step, byId) : null;
   const bubbleAt = step?.tipo === 'ia' ? pos[step.agente] : step?.tipo === 'entrada' ? SPOT.cliente : SPOT.maestro;
   const state = !step ? '' : step.erro === 'desligado' ? 'off' : step.ok === false ? 'fail' : 'ok';
-  return <div className="team-stage">
+  const conducting = step && step.tipo !== 'entrada';
+  const at = p => ({ left: `${p.x / W * 100}%`, top: `${p.y / H * 100}%` });
+  const pick = id => onPick(picked === id ? null : id);
+  const lastTool = history.ifood?.[0];
+  const mcpErrors = (mcp?.tools || []).reduce((n, t) => n + (t.erros || 0), 0);
+  return <div className="team-stage" onKeyDown={e => { if (e.key === 'Escape') onPick(null); }}>
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="O time trabalhando: cliente, Maestro, agentes e iFood">
       <defs><radialGradient id="stage-glow"><stop offset="0" stopColor="#ea1d2c" stopOpacity=".09" /><stop offset="1" stopColor="#ea1d2c" stopOpacity="0" /></radialGradient></defs>
       <circle cx={SPOT.maestro.x} cy={SPOT.maestro.y} r="190" fill="url(#stage-glow)" />
-      <path className="wire" d={curve(SPOT.cliente, SPOT.maestro)} />
-      <path className="wire" d={curve(SPOT.maestro, SPOT.ifood)} />
+      <path className={`wire ${step?.tipo === 'entrada' || step?.tipo === 'saida' ? 'hot' : ''}`} style={{ '--agent': WHATSAPP }} d={curve(SPOT.cliente, SPOT.maestro)} />
+      <path className={`wire ${step?.tipo === 'mcp' ? 'hot' : ''}`} style={{ '--agent': IFOOD }} d={curve(SPOT.maestro, SPOT.ifood)} />
       {team.map(a => <path key={a.id} className={`wire ${a.ligado ? '' : 'off'} ${step?.agente === a.id ? 'hot' : ''}`} style={{ '--agent': a.cor }} d={curve(SPOT.maestro, pos[a.id])} />)}
       {step && to && <g key={step.key}>
         <circle r="7" fill={color} className="packet"><animateMotion dur=".55s" fill="freeze" path={curve(from, to)} /></circle>
         {step.tipo !== 'entrada' && step.tipo !== 'saida' && <circle r="5" fill={color} opacity=".55" className="packet"><animateMotion begin=".6s" dur=".5s" fill="freeze" path={curve(to, SPOT.maestro)} /></circle>}
       </g>}
     </svg>
-    <div className={`stage-node client ${step?.tipo === 'entrada' || step?.tipo === 'saida' ? 'hot' : ''}`} style={{ left: `${SPOT.cliente.x / W * 100}%`, top: `${SPOT.cliente.y / H * 100}%` }}><span className="node-icon">💬</span><strong>Cliente</strong><small>WhatsApp</small></div>
-    <div className={`stage-node maestro ${step ? 'hot' : ''}`} style={{ left: `${SPOT.maestro.x / W * 100}%`, top: `${SPOT.maestro.y / H * 100}%` }}><span className="node-icon">🎼</span><strong>Maestro</strong><small>o código que orquestra</small></div>
-    <div className={`stage-node ifood ${step?.tipo === 'mcp' ? 'hot' : ''}`} style={{ left: `${SPOT.ifood.x / W * 100}%`, top: `${SPOT.ifood.y / H * 100}%` }}><span className="node-icon">🛵</span><strong>iFood</strong><small>MCP</small></div>
+    <button type="button" className={`stage-node client ${step?.tipo === 'entrada' || step?.tipo === 'saida' ? 'hot' : ''} ${picked === 'cliente' ? 'picked' : ''}`} style={at(SPOT.cliente)} onClick={() => pick('cliente')} aria-label="Ver o que chegou do cliente"><span className="node-icon">💬</span><strong>Cliente</strong><small>WhatsApp</small></button>
+    <button type="button" className={`stage-node maestro ${step ? 'hot' : ''} ${conducting ? 'conducting' : ''} ${picked === 'maestro' ? 'picked' : ''}`} style={at(SPOT.maestro)} onClick={() => pick('maestro')} aria-label="Ver o que o Maestro orquestrou">
+      <span className="node-icon">🎼<span className="batons" aria-hidden="true"><i className="baton left" /><i className="baton right" /></span></span><strong>Maestro</strong><small>o código que orquestra</small>
+    </button>
+    <button type="button" className={`stage-node ifood ${step?.tipo === 'mcp' ? 'hot' : ''} ${picked === 'ifood' ? 'picked' : ''}`} style={at(SPOT.ifood)} onClick={() => pick('ifood')} aria-label="Ver o uso do MCP do iFood">
+      <span className="node-icon">🛵</span><strong>iFood</strong><small>{mcp ? `${mcp.total} chamadas · ${pct(mcp.total ? mcpErrors / mcp.total * 100 : 0)} erro` : 'MCP'}</small>
+      {lastTool && <span className={`node-tag ${lastTool.ok === false ? 'fail' : ''}`}>{lastTool.tool}</span>}
+    </button>
     {team.map(a => {
       const busy = step?.tipo === 'ia' && step.agente === a.id;
-      return <div key={a.id} className={`stage-agent ${a.ligado ? '' : 'off'} ${busy ? `busy ${state}` : ''}`} style={{ left: `${pos[a.id].x / W * 100}%`, top: `${pos[a.id].y / H * 100}%`, '--agent': a.cor }}>
+      return <button type="button" key={a.id} className={`stage-agent ${a.ligado ? '' : 'off'} ${busy ? `busy ${state}` : ''} ${picked === a.id ? 'picked' : ''}`} style={{ ...at(pos[a.id]), '--agent': a.cor }} onClick={() => pick(a.id)} aria-label={`Ver as ações de ${a.nome}`}>
         <Avatar agent={a} size={52} />{!a.ligado && <span className="zz" aria-hidden="true">z<b>z</b></span>}
         <strong>{a.nome}</strong><small>{a.cargo}</small>
-      </div>;
+      </button>;
     })}
-    {bubble && bubbleAt && <div key={`b-${step.key}`} className={`stage-bubble ${state}`} style={{ left: `${bubbleAt.x / W * 100}%`, top: `${bubbleAt.y / H * 100}%` }} role="status"><b>{bubble.who}</b> {bubble.text}{step.ms > 0 && <small>{latency(step.ms)}</small>}</div>}
+    {bubble && bubbleAt && <div key={`b-${step.key}`} className={`stage-bubble ${state}`} style={at(bubbleAt)} role="status"><b>{bubble.who}</b> {bubble.text}{step.ms > 0 && <small>{latency(step.ms)}</small>}</div>}
+    {picked && <Peek id={picked} at={picked === 'cliente' ? SPOT.cliente : picked === 'maestro' ? SPOT.maestro : picked === 'ifood' ? SPOT.ifood : pos[picked]} agent={byId[picked]} usage={usage[picked]} history={history} byId={byId} mcp={mcp} onClose={() => onPick(null)} onOpenSheet={onOpenSheet} />}
     {!step && <div className="stage-idle">{offline ? 'Sem conexão com o servidor do painel.' : 'O time está esperando a próxima mensagem. Manda um “oi” pro bot no WhatsApp.'}</div>}
   </div>;
 }
 
+function PeekSteps({ steps, byId, empty }) {
+  if (!steps?.length) return <p className="muted">{empty}</p>;
+  return <ol className="ticker compact">{steps.slice(0, 5).map(s => { const say = sayFor(s, byId);
+    return <li key={s.key} className={s.erro === 'desligado' ? 'off' : s.ok === false ? 'fail' : ''}><span className="ticker-dot" style={{ background: byId[s.agente]?.cor || (s.tipo === 'mcp' ? IFOOD : WHATSAPP) }} /><span>{s.tipo === 'ia' ? say.text : `${say.who}: ${say.text}`}</span><small>{s.ms > 0 ? latency(s.ms) : clock(new Date(s.ts * 1000).toISOString())}</small></li>; })}</ol>;
+}
+
+// O balãozinho de um personagem do palco: as últimas ações dele e, no iFood, o resumo do MCP.
+function Peek({ id, at, agent, usage, history, byId, mcp, onClose, onOpenSheet }) {
+  const left = at.x / W * 100, below = at.y < H * 0.45;
+  const style = { left: `${Math.min(Math.max(left, 17), 83)}%`, top: `${at.y / H * 100}%` };
+  let title, body;
+  if (agent) {
+    title = <><Avatar agent={agent} size={30} /><span><b>{agent.nome}</b><small>{agent.cargo} · {agent.ligado ? 'no ar' : 'de folga'}</small></span></>;
+    body = <>
+      <div className="peek-stats"><span><b>{usage?.chamadas ?? 0}</b>chamadas</span><span><b>{usage?.chamadas ? pct(100 - usage.pctErro) : '—'}</b>sucesso</span><span><b>{latency(usage?.msMedio)}</b>médio</span></div>
+      <PeekSteps steps={history[id]} byId={byId} empty={`${agent.nome} ainda não trabalhou desde que você abriu a página.`} />
+      <button className="text-button" onClick={() => onOpenSheet(id)}>Abrir a ficha completa</button>
+    </>;
+  } else if (id === 'ifood') {
+    const top = (mcp?.tools || []).slice(0, 5), max = Math.max(1, ...top.map(t => t.chamadas));
+    title = <><span className="peek-icon">🛵</span><span><b>iFood · MCP</b><small>{mcp ? `${mcp.total} chamadas em ${mcp.conversas} conversas` : 'carregando'}</small></span></>;
+    body = <>
+      {top.length ? <div className="peek-tools">{top.map(t => <div key={t.tool}><span>{t.tool}</span><i style={{ width: `${t.chamadas / max * 100}%` }} /><b>{t.chamadas}</b><small className={t.erros ? 'bad' : ''}>{t.erros ? `${pct(t.pctErro)} erro` : latency(t.msMedio)}</small></div>)}</div> : <p className="muted">Nenhuma chamada ao MCP no período.</p>}
+      <h4>Agora há pouco</h4>
+      <PeekSteps steps={history.ifood} byId={byId} empty="Nenhuma chamada desde que você abriu a página." />
+      <Link className="text-button" to="/mcp">Ver o uso do MCP completo</Link>
+    </>;
+  } else if (id === 'maestro') {
+    title = <><span className="peek-icon">🎼</span><span><b>Maestro</b><small>src/bot/fluxo.py · decide cada passo</small></span></>;
+    body = <><p className="muted">Recebe a mensagem, chama cada agente e o iFood, e responde. Os agentes nunca se falam direto.</p><PeekSteps steps={history.todos} byId={byId} empty="Esperando a próxima mensagem." /></>;
+  } else {
+    title = <><span className="peek-icon">💬</span><span><b>Cliente</b><small>o que chega e o que sai no WhatsApp</small></span></>;
+    body = <PeekSteps steps={history.cliente} byId={byId} empty="Nenhuma mensagem desde que você abriu a página." />;
+  }
+  return <div className={`stage-peek ${below ? 'below' : 'above'}`} style={{ ...style, '--agent': agent?.cor || (id === 'ifood' ? IFOOD : '#ea1d2c') }} role="dialog" aria-label="Detalhes do personagem">
+    <div className="peek-head">{title}<button className="icon-button" onClick={onClose} aria-label="Fechar detalhes"><X size={15} /></button></div>
+    {body}
+  </div>;
+}
+
 // Toca os passos em fila, um de cada vez; se acumular, acelera pra não ficar pra trás do tempo real.
+// `history` guarda os últimos passos de cada personagem, pros balõezinhos do palco.
 function usePlayer(source) {
   const queue = useRef([]);
   const [step, setStep] = useState(null);
   const [recent, setRecent] = useState([]);
   const [lastSeen, setLastSeen] = useState({});
-  useEffect(() => { queue.current = []; setStep(null); setRecent([]); }, [source]);
+  const [history, setHistory] = useState({});
+  useEffect(() => { queue.current = []; setStep(null); setRecent([]); setHistory({}); }, [source]);
   const seq = useRef(0);
   const push = useCallback(steps => { queue.current.push(...steps.map(st => ({ ...st, key: `p${seq.current++}` }))); if (queue.current.length > 40) queue.current = queue.current.slice(-40); }, []);
   const status = useLiveSteps(source, push);
@@ -101,6 +156,8 @@ function usePlayer(source) {
         setStep(item);
         setRecent(r => [item, ...r].slice(0, 9));
         if (item.agente) setLastSeen(s => ({ ...s, [item.agente]: Date.now() }));
+        const who = item.tipo === 'ia' ? item.agente : item.tipo === 'mcp' ? 'ifood' : 'cliente';
+        setHistory(h => ({ ...h, [who]: [item, ...(h[who] || [])].slice(0, 6), todos: [item, ...(h.todos || [])].slice(0, 6) }));
       }
       const wait = !item ? 400 : queue.current.length > 12 ? 280 : queue.current.length > 4 ? 650 : 1250;
       if (alive) timer = setTimeout(next, wait);
@@ -108,7 +165,7 @@ function usePlayer(source) {
     next();
     return () => { alive = false; clearTimeout(timer); };
   }, []);
-  return { step, recent, lastSeen, status };
+  return { step, recent, lastSeen, history, status };
 }
 
 function Ticker({ recent, byId }) {
@@ -205,7 +262,10 @@ function AgentSheet({ agent, usage, steps, known, onClose, onUpdate, source }) {
 export function TeamPage({ source, period }) {
   const team = useTeam(source);
   const usageState = useSummary('agentes', { source, period });
-  const { step, recent, lastSeen, status } = usePlayer(source);
+  const { step, recent, lastSeen, history, status } = usePlayer(source);
+  const mcpState = useSummary('mcp', { source, period });
+  const mcp = mcpState.data;
+  const [picked, setPicked] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [filter, setFilter] = useState('todos');
   const [kind, setKind] = useState('');
@@ -215,7 +275,7 @@ export function TeamPage({ source, period }) {
   const timeline = useSummary('agentes', { source, period, conversation });
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  useEffect(() => { setOpenId(null); setConversation(''); }, [source]);
+  useEffect(() => { setOpenId(null); setConversation(''); setPicked(null); }, [source]);
   const agents = team.data?.agentes || [];
   const byId = useMemo(() => Object.fromEntries(agents.map(a => [a.id, a])), [agents]);
   const usage = useMemo(() => Object.fromEntries((usageState.data?.agentes || []).map(u => [u.agente, u])), [usageState.data]);
@@ -232,6 +292,8 @@ export function TeamPage({ source, period }) {
   const timed = Object.values(usage).filter(u => u.msMedio !== null);
   const avg = timed.length ? timed.reduce((n, u) => n + u.msMedio * u.chamadas, 0) / Math.max(1, timed.reduce((n, u) => n + u.chamadas, 0)) : null;
   const open = openId && byId[openId];
+  const mcpErrors = (mcp?.tools || []).reduce((n, t) => n + (t.erros || 0), 0);
+  const topTools = (mcp?.tools || []).slice(0, 6);
   const rules = usageState.data?.regras || [];
   return <>
     {source === 'demo' && <div className="telemetry-note"><span className="badge purple"><i />Demonstração</span>Clientes simulados conversando com o bot de verdade.</div>}
@@ -240,10 +302,12 @@ export function TeamPage({ source, period }) {
       <div><Activity size={16} /><span>Chamadas no período</span><b>{calls}</b></div>
       <div><ShieldCheck size={16} /><span>Sucesso</span><b>{calls ? pct(100 - errors / calls * 100) : '—'}</b></div>
       <div><Clock3 size={16} /><span>Tempo médio</span><b>{latency(avg)}</b></div>
+      <div><Network size={16} /><span>Pedidos ao iFood (MCP)</span><b>{mcp ? mcp.total : '—'}{mcp?.total > 0 && <small> · {pct(mcpErrors / mcp.total * 100)} erro</small>}</b></div>
     </div>
     <section className="panel team-live">
-      <div className="panel-heading"><div><h2>O time agora</h2><p>Cada recado é um passo de verdade do bot. Sem o texto de ninguém.</p></div><span className={`live-pill ${status === 'offline' ? 'offline' : ''}`}><i />{status === 'offline' ? 'Desconectado' : 'Ao vivo'}</span></div>
-      <div className="team-live-body"><Stage team={agents} byId={byId} step={step} offline={status === 'offline'} /><aside><h3>Agora há pouco</h3><Ticker recent={recent} byId={byId} /></aside></div>
+      <div className="panel-heading"><div><h2>O time agora</h2><p>Cada recado é um passo de verdade do bot. Toque em alguém pra ver o que ele andou fazendo.</p></div><span className={`live-pill ${status === 'offline' ? 'offline' : ''}`}><i />{status === 'offline' ? 'Desconectado' : 'Ao vivo'}</span></div>
+      <div className="team-live-body"><Stage team={agents} byId={byId} step={step} offline={status === 'offline'} history={history} usage={usage} mcp={mcp} picked={picked} onPick={setPicked} onOpenSheet={id => { setPicked(null); setOpenId(id); }} /><aside><h3>Agora há pouco</h3><Ticker recent={recent} byId={byId} /></aside></div>
+      {topTools.length > 0 && <div className="mcp-strip"><span className="mcp-strip-label"><Network size={13} />O que o Maestro mais pede ao iFood</span>{topTools.map(t => <span key={t.tool} className={`mcp-chip ${step?.tipo === 'mcp' && step.tool === t.tool ? 'hot' : ''}`} title={`${t.chamadas} chamadas · ${pct(t.pctErro)} de erro · média ${latency(t.msMedio)}`}>{t.tool}<b>{t.chamadas}</b>{t.erros > 0 && <i>{pct(t.pctErro)}</i>}</span>)}<Link to="/mcp" className="text-button">ver tudo</Link></div>}
     </section>
     <section className="panel">
       <div className="panel-heading"><div><h2>Quem está performando</h2><p>Toque num agente pra ver a ficha: modelo, prompt, key e o interruptor.</p></div></div>

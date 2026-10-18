@@ -125,6 +125,7 @@ function stubTeam({ conversa = false } = {}) {
       body = equipe(cfg);
     } else if (u.pathname === '/api/equipe') body = equipe(cfg);
     else if (u.pathname === '/api/ao-vivo') body = { agora: 200, passos: u.searchParams.get('desde') ? [] : passos };
+    else if (u.pathname === '/api/mcp') body = mcp();
     else body = agentes(conversa ? u.searchParams.get('conversa') : null);
     return { ok: true, json: async () => body };
   }));
@@ -205,4 +206,31 @@ describe('Agentes (a 1ª tela)', () => {
     const lanes = [...document.querySelectorAll('.agent-timeline li .lane')].map(l => l.textContent);
     expect(lanes).toEqual(['Pessoa', 'IA', 'Código → iFood', 'IA', 'Regra', 'Bot']);
   });
+
+  it('clicar num agente do palco mostra as ações dele, e a ficha fica a um toque', async () => {
+    const user = userEvent.setup();
+    stubTeam();
+    mount('/');
+    await screen.findAllByText('Fiquei com 3 ofertas', { exact: false }, { timeout: 4000 });
+    await user.click(screen.getByRole('button', { name: 'Ver as ações de Duda' }));
+    const peek = screen.getByRole('dialog', { name: 'Detalhes do personagem' });
+    expect(within(peek).getByText('Fiquei com 3 ofertas')).toBeTruthy();
+    expect(within(peek).getByText('2,6 s')).toBeTruthy();
+    await user.click(within(peek).getByRole('button', { name: 'Abrir a ficha completa' }));
+    expect(within(screen.getByRole('dialog', { name: /Duda/ })).getByRole('tab', { name: 'Configuração' })).toBeTruthy();
+  });
+
+  it('o iFood do palco resume o MCP, e a faixa mostra as tools mais pedidas', async () => {
+    const user = userEvent.setup();
+    stubTeam();
+    mount('/');
+    expect(await screen.findByText('Pedidos ao iFood (MCP)')).toBeTruthy();
+    const strip = await screen.findByText('O que o Maestro mais pede ao iFood');
+    expect(within(strip.closest('.mcp-strip')).getByText('searchOffers')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Ver o uso do MCP do iFood' }));
+    const peek = screen.getByRole('dialog', { name: 'Detalhes do personagem' });
+    expect(within(peek).getByText('33,3% erro')).toBeTruthy();
+    expect(within(peek).getByRole('link', { name: 'Ver o uso do MCP completo' })).toBeTruthy();
+  });
 });
+

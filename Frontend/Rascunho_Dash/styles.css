@@ -60,7 +60,7 @@
 .team-live-body aside{border-left:1px solid #f1f1f4;padding:14px 16px;min-width:0}
 .team-live-body aside h3,.sheet-body h3{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#a1a1ab;margin:0 0 8px;display:flex;align-items:center;gap:6px}
 .team-stage{position:relative;aspect-ratio:960/430;margin:6px 10px 10px;user-select:none}
-.team-stage svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.team-stage>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .wire{fill:none;stroke:#ececf1;stroke-width:2;stroke-dasharray:5 6;transition:stroke .3s}
 .wire.off{stroke:#f5f5f7}
 .wire.hot{stroke:var(--agent);stroke-dasharray:none;stroke-width:2.5;animation:wire-flow .9s linear}
@@ -157,3 +157,56 @@
 @media(max-width:1200px){.team-live-body{grid-template-columns:1fr}.team-live-body aside{border-left:0;border-top:1px solid #f1f1f4}}
 @media(max-width:950px){.team-summary{grid-template-columns:1fr 1fr}}
 @media(max-width:740px){.team-stage{aspect-ratio:auto;height:330px;margin:4px 0}.stage-agent small,.stage-node small{display:none}.stage-agent .agent-avatar{width:38px!important;height:38px!important;font-size:17px!important}.node-icon{width:40px;height:40px;font-size:18px}.stage-node.maestro .node-icon{width:50px;height:50px}.stage-bubble{max-width:200px}.sheet-stats{grid-template-columns:1fr 1fr}.model-bars div{grid-template-columns:100px minmax(0,1fr) 26px}.team-filters{padding:4px 16px 14px}.agent-grid{padding:0 16px 16px}}
+
+/* palco clicável, pauzinhos do Maestro e o MCP no time */
+.stage-node,.stage-agent{pointer-events:auto;background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit}
+.stage-node:focus-visible .node-icon,.stage-agent:focus-visible .agent-avatar{outline:2px solid var(--agent,var(--red));outline-offset:3px}
+.stage-agent:hover .agent-avatar,.stage-agent.picked .agent-avatar{transform:scale(1.08);border-color:var(--agent)}
+.stage-node:hover .node-icon,.stage-node.picked .node-icon{transform:scale(1.06)}
+.stage-agent.picked strong,.stage-node.picked strong{color:var(--agent,var(--red))}
+.node-icon{position:relative}
+.batons{position:absolute;inset:0;pointer-events:none}
+.baton{position:absolute;top:-13px;width:3px;height:24px;border-radius:2px;background:linear-gradient(#3b3b46,#3b3b46 72%,#f2d39a 72%);transform-origin:50% 100%;animation:baton-idle 2.6s ease-in-out infinite}
+.baton::before{content:"";position:absolute;bottom:-3px;left:-2px;width:7px;height:7px;border-radius:50%;background:#f6c9a0}
+.baton.left{left:4px;transform:rotate(-28deg)}
+.baton.right{right:4px;transform:rotate(28deg);animation-delay:-1.3s}
+.conducting .baton.left{animation:baton-left .42s ease-in-out infinite alternate}
+.conducting .baton.right{animation:baton-right .42s ease-in-out infinite alternate;animation-delay:-.21s}
+@keyframes baton-idle{0%,100%{rotate:-4deg}50%{rotate:4deg}}
+@keyframes baton-left{from{transform:rotate(-48deg) translateY(-2px)}to{transform:rotate(-8deg) translateY(2px)}}
+@keyframes baton-right{from{transform:rotate(8deg) translateY(2px)}to{transform:rotate(48deg) translateY(-2px)}}
+.node-tag{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-family:ui-monospace,Menlo,monospace;font-size:8.5px;background:#fff7e6;color:#9a6a12;border:1px solid #f6e2b8;border-radius:6px;padding:2px 6px;white-space:nowrap;animation:bubble-in-tag .3s ease-out}
+.node-tag.fail{background:#fff3f4;color:#a2414a;border-color:#f5d0d4}
+@keyframes bubble-in-tag{from{opacity:0;transform:translate(-50%,4px)}}
+.stage-peek{position:absolute;z-index:5;width:290px;transform:translate(-50%,calc(-100% - 40px));background:#fff;border:1px solid var(--line);border-top:3px solid var(--agent);border-radius:12px;padding:12px 14px;box-shadow:0 14px 40px #2222302a;font-size:10.5px;animation:peek-in .2s ease-out;text-align:left}
+.stage-peek.below{transform:translate(-50%,46px)}
+@keyframes peek-in{from{opacity:0;margin-top:6px}}
+.peek-head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.peek-head>span:not(.agent-avatar):not(.peek-icon){flex:1;display:flex;flex-direction:column;min-width:0}
+.peek-head b{font-size:12px;color:var(--ink)}.peek-head small{font-size:9px;color:#8a8a95}
+.peek-icon{font-size:20px}
+.peek-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.peek-stats span{display:flex;flex-direction:column;font-size:8.5px;color:#a1a1ab;background:#fafafb;border-radius:7px;padding:6px 8px}
+.peek-stats b{font-size:12px;color:var(--ink)}
+.stage-peek h4{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#a1a1ab;margin:10px 0 4px}
+.stage-peek p{margin:0 0 6px;line-height:1.45}
+.stage-peek .text-button{margin-top:8px;font-size:10px;color:var(--red);display:inline-flex}
+.ticker.compact li{padding:4px 0;font-size:9.5px}
+.peek-tools{display:grid;gap:5px}
+.peek-tools div{display:grid;grid-template-columns:100px minmax(0,1fr) 28px 52px;gap:6px;align-items:center;font-size:9.5px}
+.peek-tools span{font-family:ui-monospace,Menlo,monospace;font-size:8.5px;overflow:hidden;text-overflow:ellipsis}
+.peek-tools i{height:5px;border-radius:3px;background:#f59e0b;min-width:3px}
+.peek-tools b{text-align:right;color:var(--ink)}.peek-tools small{color:#a1a1ab;text-align:right}.peek-tools small.bad{color:#cc5962}
+.team-summary{grid-template-columns:repeat(5,minmax(0,1fr))}
+.team-summary b small{font-size:10px;font-weight:500;color:#a1a1ab}
+.mcp-strip{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:10px 16px 14px;border-top:1px solid #f1f1f4;font-size:10px}
+.mcp-strip-label{display:inline-flex;align-items:center;gap:6px;color:#a1a1ab;margin-right:4px}
+.mcp-chip{display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,Menlo,monospace;font-size:9px;color:#55555f;background:#fafafb;border:1px solid var(--line);border-radius:7px;padding:4px 8px;transition:background .25s,border-color .25s}
+.mcp-chip b{font-family:'DM Sans',sans-serif;color:var(--ink)}
+.mcp-chip i{font-style:normal;color:#cc5962}
+.mcp-chip.hot{background:#fff7e6;border-color:#f6c76b}
+.mcp-strip .text-button{font-size:10px;color:var(--red);margin-left:auto}
+@media(max-width:1200px){.team-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:740px){.team-summary{grid-template-columns:1fr 1fr}.stage-peek{width:min(280px,86vw)}.baton{height:18px;top:-10px}}
+.stage-node.ifood small{white-space:nowrap}
+.stage-peek .icon-button{width:26px;height:26px;margin-left:auto}
