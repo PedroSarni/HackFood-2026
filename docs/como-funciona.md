@@ -388,6 +388,9 @@ o bot cutuca uma vez ("Ainda está por aí?" + a pergunta da etapa); aos 5 min (
   pedido mínimo por loja (o mesmo na loja e no carrinho), lanchonete, pizzaria, cantina e mercados com
   o que acompanha (refri, suco, batata, sobremesa), e busca que ignora "de"/"com" e põe na frente quem
   tem todas as palavras.
+- **Lojas fechadas na busca** (pros testes de madrugada): `scripts/modo.py --fechadas on|off`, sem deploy.
+  A busca para de mandar `onlyOpen` e a loja fechada aparece depois das abertas, com "🔒 fechada agora"
+  no card. Fechar o pedido nela ainda depende do iFood: se ele recusar, o bot oferece outra loja.
 - **Modo demo**: ligar com `IFOOD_MOCK=1` no secret `hackathon-ifood`. O iFood vira o mock e o
   login é simulado. Útil pra demonstrar sem depender de uma conta iFood.
 

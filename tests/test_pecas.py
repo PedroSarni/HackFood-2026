@@ -535,3 +535,30 @@ def test_como_esta_entregue_nao_mostra_previsao_nem_codigo():
     assert '23h46' in andando and '1006' in andando and 'Padaria' in andando
     entregue = T.como_esta('DELIVERED', '', ped, 'entre 23h46 e 23h56')
     assert '23h46' not in entregue and 'Código de entrega' not in entregue and '3x Café' in entregue
+
+
+def _busca_com_fechada():
+    chamadas = []
+
+    def chamar(tool, **args):
+        chamadas.append(args)
+        loja = lambda mid, aberta: {'merchantId': mid, 'merchantName': mid, 'isOpen': aberta}  # noqa: E731
+        return {'results': [{'itemId': 'i1', 'itemName': 'Leite', 'unitPrice': 5.0, 'merchant': loja('fechado', False)},
+                            {'itemId': 'i2', 'itemName': 'Leite', 'unitPrice': 6.0, 'merchant': loja('aberto', True)}]}
+    return chamar, chamadas
+
+
+def test_busca_normal_pede_so_loja_aberta():
+    chamar, chamadas = _busca_com_fechada()
+    Ifood(chamar).buscar('leite', {'lat': 1, 'lng': 2}, 'MERCADO')
+    assert chamadas[0]['refinements']['onlyOpen'] is True
+
+
+def test_interruptor_de_fechadas_mostra_loja_fechada_depois_das_abertas():
+    from src.bot import textos as T
+    chamar, chamadas = _busca_com_fechada()
+    ofertas, _ = Ifood(chamar, mostrar_fechadas=True).buscar('leite', {'lat': 1, 'lng': 2}, 'MERCADO')
+    assert chamadas[0]['refinements']['onlyOpen'] is False
+    assert [o['loja_id'] for o in ofertas] == ['aberto', 'fechado']
+    assert all(o['disponivel'] for o in ofertas)  # o ranking não joga fora
+    assert '🔒 fechada agora' in T.card_curto(ofertas[1]) and '🔒' not in T.card_curto(ofertas[0])

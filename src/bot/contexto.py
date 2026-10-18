@@ -51,7 +51,11 @@ class Contexto:
         self._locutor = locutor  # texto -> (mime, bytes) da nota de voz (ElevenLabs); None = sem modo áudio
 
     def ifood(self, wa_id):
-        return Ifood(self._chamador(wa_id))
+        try:  # interruptor dos testes de madrugada (scripts/modo.py --fechadas on), sem deploy
+            fechadas = bool(self.armazem.get('cfg:fechadas'))
+        except Exception:  # noqa: BLE001 - armazém fora do ar: busca normal, só lojas abertas
+            fechadas = False
+        return Ifood(self._chamador(wa_id), mostrar_fechadas=fechadas)
 
     def normalizar_endereco(self, texto):
         return self._geocoder(texto) if self._geocoder else None

@@ -434,3 +434,12 @@ mensagem. Tempo rápido segue ligado.
 
 **Resposta:** O tutor (antes Tito) virou Tungs em `src/agentes/tutor.py` (commit 15386c5). Só muda o crachá no dash; o
 comportamento e o prompt do tutor seguem iguais, então não precisou de deploy.
+
+## 2026-10-18 ~02h15 — leite com mercado fechado
+
+**Prompt:** "quando pesquiso tipo, leite (que so vende em mercados) e todos os mercados estao fechados ele diz que nao achou, o mcp nao consegue retornar de mercado fechado é isso? nao da pra agendar? o mcp nao tem essa funcao? acho que pros nossos testes era legal vc ignorar se o mercado ou estabelecimento esta fechado e exibir o item mesmo assim, se possivel, sabe?"
+
+**Resposta:** Quem escondia era o bot: a busca mandava `onlyOpen: true`. Criei o interruptor
+`scripts/modo.py --fechadas on|off` (`cfg:fechadas`, sem deploy depois deste): loja fechada aparece depois das
+abertas, com "🔒 fechada agora" no card. O MCP tem entrega agendada (timeslots em mercado), mas o bot só usa a
+imediata e ninguém testou agendar em loja fechada. Deploy feito e interruptor ligado.

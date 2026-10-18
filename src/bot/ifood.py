@@ -112,8 +112,10 @@ def _sem_envelope(d):
 
 
 class Ifood:
-    def __init__(self, chamar):
+    def __init__(self, chamar, mostrar_fechadas=False):
         self._chamar_cru = chamar   # função chamar(tool, **args) -> dict (ClienteMCP ou McpFake)
+        # pros testes de madrugada (scripts/modo.py --fechadas on): a busca traz loja fechada também
+        self.mostrar_fechadas = mostrar_fechadas
 
     def _chamar(self, ferramenta, **args):
         return _sem_envelope(self._chamar_cru(ferramenta, **args))
@@ -199,7 +201,7 @@ class Ifood:
         """searchOffers só com o termo descritivo; vertical no merchantType e o resto em
         refinements (regra da doc: "barato" nunca vai na query, vai no maxItemPrice).
         Devolve (ofertas, token_da_proxima_pagina)."""
-        refin = {'onlyOpen': True, 'requiredDeliveryMethod': 'DELIVERY'}
+        refin = {'onlyOpen': not self.mostrar_fechadas, 'requiredDeliveryMethod': 'DELIVERY'}
         if loja_id:
             refin['merchantId'] = loja_id
         if preco_max:
@@ -209,6 +211,11 @@ class Ifood:
                          pageSize=TAMANHO_PAGINA, nextPageToken=pagina)
         ofertas = [self._oferta(r) for r in _lista(d, 'results')]
         ofertas = [o for o in ofertas if o['item_id'] and o['loja_id'] and o['preco'] is not None]
+        if self.mostrar_fechadas:  # fechada aparece (com aviso no card), mas depois das abertas
+            for o in ofertas:
+                o['fechada'] = not o['disponivel']
+                o['disponivel'] = True
+            ofertas.sort(key=lambda o: o['fechada'])
         prox = _campo(d, 'nextPageToken') if _campo(d, 'hasMore', padrao=False) else None
         return ofertas, prox
 
