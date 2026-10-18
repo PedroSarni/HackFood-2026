@@ -1,0 +1,54 @@
+/* Rotinas automáticas (rotinas.jsx): o que o Maestro faz sozinho, na tela Agentes */
+.routines-body{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px;padding:16px 21px 20px}
+.routine-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start}
+.routine-card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:11px;padding:13px 14px 12px 16px;background:#fff;display:flex;flex-direction:column;gap:8px;transition:box-shadow .35s,border-color .35s}
+.routine-card::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--routine)}
+.routine-card.hot{border-color:color-mix(in srgb,var(--routine) 45%,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--routine) 14%,transparent),0 10px 26px color-mix(in srgb,var(--routine) 16%,transparent);animation:routine-pop .6s cubic-bezier(.34,1.56,.64,1)}
+@keyframes routine-pop{40%{transform:scale(1.015)}}
+.routine-card header{display:flex;gap:10px;align-items:flex-start}
+.routine-icon{width:34px;height:34px;flex-shrink:0;border-radius:10px;display:grid;place-items:center;font-size:17px;background:color-mix(in srgb,var(--routine) 10%,#fff)}
+.routine-card.hot .routine-icon{animation:routine-ring .45s ease-in-out 3}
+@keyframes routine-ring{25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
+.routine-card header strong{display:block;font-size:12px;color:var(--ink);font-family:Manrope,sans-serif}
+.routine-card header small{display:block;font-size:9.5px;line-height:1.5;color:#93939d;margin-top:3px}
+.routine-main{display:flex;align-items:baseline;gap:7px}
+.routine-main b{font:750 24px Manrope,sans-serif;letter-spacing:-.6px;color:var(--ink);font-variant-numeric:tabular-nums}
+.routine-main span{font-size:10px;color:#8a8a95}
+.routine-spark{display:flex;align-items:flex-end;gap:2px;height:26px}
+.routine-spark i{flex:1;min-width:2px;border-radius:2px 2px 0 0;background:#efeff3;transition:height .4s}
+.routine-spark i.on{background:color-mix(in srgb,var(--routine) 70%,#fff)}
+.routine-last{display:flex;align-items:center;gap:6px;font-size:10px;color:#7c7c88}
+.routine-last i{width:6px;height:6px;border-radius:50%;background:#d4d4dc;flex-shrink:0}
+.routine-last i.live{background:var(--routine);animation:routine-live 1.6s ease-out infinite}
+@keyframes routine-live{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--routine) 55%,transparent)}70%,100%{box-shadow:0 0 0 7px transparent}}
+.routine-highlight{font-size:10.5px;color:#5c5c68}
+.routine-highlight b{color:var(--routine);font-size:12px}
+.routine-highlight small{color:#a1a1ab}
+.routine-chips{display:flex;flex-wrap:wrap;gap:5px}
+.routine-chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:3px 8px;font-size:9px;background:#f4f4f7;color:#71717c;white-space:nowrap}
+.routine-chip b{font-weight:700}
+.routine-chip.good{background:#edf8f2;color:#2c8d6d}
+.routine-chip.bad{background:#ffeff0;color:#cc5962}
+.routine-chip.wait{background:#fff6e6;color:#b08435}
+.routine-chips.channels .routine-chip{background:#fff;border:1px dashed #e3e3ea}
+.routine-cron{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:9.5px;color:#7c7c88;border-top:1px dashed #ececf1;padding-top:8px}
+.routine-cron span,p.routine-cron{display:inline-flex;align-items:center;gap:4px}
+.routine-cron .wait{color:#b08435}
+.routine-cron .bad,.routine-cron.late>span:first-child{color:#cc5962}
+.routine-side h3{font-size:11px;color:#5a5a66;margin-bottom:8px}
+.routine-feed{list-style:none;display:grid;gap:2px;max-height:440px;overflow:auto}
+.routine-feed li{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 6px;border-radius:7px;font-size:10px;color:#5c5c68;animation:routine-in .4s ease both}
+.routine-feed li:hover{background:#fafafb}
+@keyframes routine-in{from{opacity:0;transform:translateY(4px)}}
+.routine-dot{width:7px;height:7px;border-radius:50%}
+.routine-feed-what{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 7px;min-width:0}
+.routine-feed-what b{font-weight:650;color:#45454f}
+.routine-feed-what .text-button{padding:0;font-size:10px;color:#6d4fe0}
+.routine-feed-what small{flex-basis:100%;font-size:9px;color:#a1a1ab}
+.routine-empty{font-size:10px;padding:8px 0}
+.routine-pill{color:var(--routine);background:color-mix(in srgb,var(--routine) 9%,#fff)}
+.routine-pill i{background:var(--routine)}
+.routines-foot{padding:0 21px 16px;font-size:9.5px;color:#a1a1ab}
+@media(max-width:1100px){.routines-body{grid-template-columns:1fr}.routine-feed{max-height:none}}
+@media(max-width:620px){.routines-body{padding:14px 16px 16px}.routine-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.routine-card.hot,.routine-card.hot .routine-icon,.routine-last i.live,.routine-feed li{animation:none}}

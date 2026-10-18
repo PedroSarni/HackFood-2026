@@ -47,6 +47,7 @@ class Agente:
     servico_modelo: object = None  # () -> nome do modelo, pros serviços
     extra: dict = field(default_factory=dict)
     foto: str | None = None       # arquivo em Frontend/Rascunho_Dash/images/agentes/ (sem foto = emoji)
+    onde: str = 'conversa'        # 'conversa' (o Maestro chama no WhatsApp, sobe no palco) | 'painel' (só no dash)
 
     def prompts(self):
         try:
@@ -214,6 +215,7 @@ def fichas(cfg=None, ar=None):
         saida.append({
             'id': a.id, 'nome': a.nome, 'cargo': a.cargo, 'emoji': a.emoji, 'foto': a.foto, 'cor': a.cor, 'bordao': a.bordao,
             'faz': a.faz, 'planoB': a.plano_b, 'arquivos': list(a.arquivos), 'tipo': a.tipo, 'essencial': a.essencial,
+            'onde': a.onde,
             'ligado': ligado(cfg, a.id), 'modeloEscolhido': (cfg.get(a.id) or {}).get('modelo'),
             'modelos': local, 'modelosNoAr': do_ar.get('modelos'),
             'keys': do_ar.get('keys') or [chave_mascarada(k) for k in a.keys], 'keysDoAr': bool(do_ar.get('keys')),

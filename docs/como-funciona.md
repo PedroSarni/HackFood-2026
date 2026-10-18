@@ -481,6 +481,34 @@ Caminho: o dash monta só agregados da página (`pageSummary` em `insights.jsx`,
 `analisar_pagina` (as keys de IA só existem lá) → `src/painel/analista.py` (prompt, esquema, validação), com a
 fila e o interruptor da ficha da Sofia.
 
+A Sofia tem `onde='painel'` na ficha: ela fica fora do palco do Maestro, num cartão "Fora da conversa, no painel"
+na tela Agentes, porque trabalha no dash e não na conversa. Agente novo que só serve ao dash ganha o mesmo campo.
+
+### 13.4 O que o Maestro faz sozinho (rotinas automáticas)
+
+Na tela Agentes, abaixo do time, uma seção mostra as rotinas que disparam sem a pessoa pedir. Cada uma traz os
+disparos do período, o gráfico por dia (ou por hora no "Último dia"), o último disparo e o que a pessoa fez depois:
+
+| Rotina | Onde está | Quando dispara | Desfecho que o dash conta |
+|---|---|---|---|
+| Cutucada | `pessoa_calada` em `src/app.py` | 3 min de silêncio no meio de uma pergunta | voltou a falar em até 10 min |
+| Carrinho esquecido | `pessoa_calada` em `src/app.py` | 5 min de silêncio com itens no carrinho | comprou ou voltou em até 24h |
+| Lembrete de recompra | `lembretes` em `src/app.py`, regras em `src/bot/recorrencia.py` | cron a cada 15 min acha lembrete vencido | virou pedido, "hoje não" ou desligou |
+| Rastreio do pedido | `src/bot/rastreio.py` | cada mudança de status do pedido | o status avisado |
+
+- **Como o dash reconhece:** pela `origem` da mensagem no diário (`followup`, `abandono`, `lembrete`, `rastreio`),
+  em `painel.rotina_da_saida`. O lembrete vencido com a janela de 24h fechada aparece quando a pessoa volta e é
+  reconhecido pelo texto ("🔔 Chegou o dia!").
+- **Cron vivo:** cada passada do cron dos lembretes grava um evento `rotina` (sem conversa) com avisados, adiados,
+  erros e a agenda (lembretes ligados, quantos esperam a pessoa voltar, quando vence o próximo). Se a última passada
+  tiver mais de ~25 min, o dash avisa que o cron atrasou.
+- **Resumo:** `painel.resumo_rotinas`, na rota `GET /api/rotinas?fonte=&dias=`. Só contagens, sem texto de ninguém.
+  Cada disparo da lista abre a conversa.
+- **Ao vivo:** o `/api/ao-vivo` marca o passo com a rotina. O recado do Maestro no palco ganha a cor dela e o
+  cartão da rotina acende.
+- **Demo:** o simulador roda as mesmas funções do bot (`calar` e `varrer` em `src/painel/simulador.py`): quem cala
+  leva a cutucada e pode perder o carrinho, quem repete a compra liga o lembrete, e o cron passa a cada 15 min.
+
 
 ---
 

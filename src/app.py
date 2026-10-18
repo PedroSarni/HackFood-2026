@@ -25,6 +25,7 @@ ROTULO = 'hackfood-bot'
 BASE = os.environ.get('HACKFOOD_BASE') or f'https://fabio-araujo-silva--{ROTULO}.us-east.modal.run'
 CALLBACK = f'{BASE}/ifood/callback'
 LOGIN_VALIDADE = 30 * 60      # link "Entrar no iFood" vale 30 min (cada toque gera PKCE novo)
+LEMBRETES_MIN = 15            # o cron dos lembretes de recompra passa a cada 15 min (o dash mostra a última passada)
 
 app = modal.App(APP)
 imagem = (modal.Image.debian_slim(python_version='3.12')
@@ -110,7 +111,8 @@ def pessoa_calada(wa_id: str, marca: float):
         # mesma trava das rodadas: com uma resposta em andamento a pessoa falou, e não falamos por cima
         if not estado.put(trava, {'seq': -2, 'ts': time.time()}, skip_if_exists=True):
             return 'rodada em andamento'
-        ctx = contexto_producao(estado, WhatsApp(), wa_id, origem='followup')  # EspiaoWhatsApp + diário
+        # EspiaoWhatsApp + diário: o dash separa a cutucada do carrinho esquecido pela origem
+        ctx = contexto_producao(estado, WhatsApp(), wa_id, origem='followup' if passo == 'followup' else 'abandono')
         try:
             getattr(Bot(ctx), passo)(wa_id, marca)
         finally:
@@ -184,15 +186,19 @@ def ferramentas_reais(wa_id: str):
     return [{'name': t.get('name'), 'inputSchema': t.get('inputSchema')} for t in tools]
 
 
-@app.function(image=imagem, secrets=segredos, timeout=600, schedule=modal.Period(minutes=15))
+@app.function(image=imagem, secrets=segredos, timeout=600, schedule=modal.Period(minutes=LEMBRETES_MIN))
 def lembretes():
-    """Recorrência: avisa quem tem compra repetida vencendo (botão "Pedir de novo")."""
-    from src.bot.recorrencia import disparar_vencidos
+    """Recorrência: avisa quem tem compra repetida vencendo (botão "Pedir de novo"). Cada passada fica no
+    diário (quantos avisou, adiou ou falharam e a agenda), pro dash mostrar que o cron está vivo."""
+    from src.bot.recorrencia import agenda, disparar_vencidos
     from src.shared import painel
     from src.shared.whatsapp import WhatsApp
     diario = painel.diario_producao()
+    dic_rec = modal.Dict.from_name('hackfood-recorrencias', create_if_missing=True)
     try:
-        return disparar_vencidos(estado, painel.EspiaoWhatsApp(WhatsApp(), diario, 'lembrete'))
+        cont = disparar_vencidos(estado, painel.EspiaoWhatsApp(WhatsApp(), diario, 'lembrete'), dic_rec=dic_rec)
+        painel.anotar_varredura(diario, cont, LEMBRETES_MIN * 60, agenda(dic_rec))
+        return cont
     finally:
         diario.descarregar()
 

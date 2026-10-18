@@ -170,3 +170,25 @@ def disparar_vencidos(estado, wpp, dic_rec=None, agora=None, so=None):
             print(f'lembrete {wa_id} falhou: {e!r}')
             cont['erro'] += 1
     return cont
+
+
+def agenda(dic_rec, agora=None):
+    """Pro painel (src/shared/painel.anotar_varredura): quantos lembretes estão ligados, de quantas pessoas, quando
+    vence o próximo e quantos venceram sem aviso (janela fechada: esperam a pessoa voltar). Só conta; nunca falha."""
+    agora = agora or time.time()
+    try:
+        ativos = pessoas = vencidos = 0
+        proximo = None
+        for wa_id in list(dic_rec.keys()):
+            recs = list(dic_rec.get(wa_id) or [])
+            pessoas += bool(recs)
+            for r in recs:
+                ativos += 1
+                if float(r.get('proximo') or 0) <= agora:
+                    vencidos += not r.get('avisado')
+                elif proximo is None or r['proximo'] < proximo:
+                    proximo = r['proximo']
+        return {'ativos': ativos, 'pessoas': pessoas, 'vencidos': vencidos, 'proximo': proximo}
+    except Exception as e:  # noqa: BLE001 - a varredura segue sem a agenda
+        print(f'agenda dos lembretes falhou: {e!r}')
+        return {}

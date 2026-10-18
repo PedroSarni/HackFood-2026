@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../app.jsx';
 import { summaryUrl } from '../telemetria.js';
+import { rotinas } from './rotinas-fixture.js';
 
 // Resposta de /api/mcp do jeito que src/painel/servidor.py manda (painel.resumo_mcp + índice).
 const conversas = [{ id: 'WA-AAA111-001', nome: 'Dona Cida', inicio: '2026-10-17T20:00:00.000Z', fim: '2026-10-17T20:05:00.000Z', mcp: 3, ia: 2 }];
@@ -108,7 +109,8 @@ const ficha = (id, nome, cargo, extra = {}) => ({
 const equipe = (cfg = {}) => ({
   fonte: 'real', agora: 1, conhecidos: ['gemini-3.5-flash-lite', 'gemini-3.8-flash'], arQuando: 1,
   agentes: [ficha('entendimento', 'Lia', 'Intérprete', { essencial: true, ...cfg.entendimento }), ficha('relevancia', 'Duda', 'Curadora', cfg.relevancia),
-    ficha('foto', 'Íris', 'Leitora de fotos', cfg.foto), ficha('ouvido', 'Otto', 'Ouvinte', { tipo: 'servico', prompts: [], ...cfg.ouvido })],
+    ficha('foto', 'Íris', 'Leitora de fotos', cfg.foto), ficha('ouvido', 'Otto', 'Ouvinte', { tipo: 'servico', prompts: [], ...cfg.ouvido }),
+    ficha('analista', 'Sofia', 'Analista', { onde: 'painel', ...cfg.analista })],
 });
 const passos = [{ ts: 100, tipo: 'entrada', conversa: 'aa', formato: 'Texto' }, { ts: 101, tipo: 'ia', conversa: 'aa', agente: 'relevancia', ok: true, ms: 900, mantidas: 3 }];
 
@@ -126,6 +128,7 @@ function stubTeam({ conversa = false } = {}) {
     } else if (u.pathname === '/api/equipe') body = equipe(cfg);
     else if (u.pathname === '/api/ao-vivo') body = { agora: 200, passos: u.searchParams.get('desde') ? [] : passos };
     else if (u.pathname === '/api/mcp') body = mcp();
+    else if (u.pathname === '/api/rotinas') body = rotinas();
     else body = agentes(conversa ? u.searchParams.get('conversa') : null);
     return { ok: true, json: async () => body };
   }));
@@ -139,9 +142,19 @@ describe('Agentes (a 1ª tela)', () => {
     const duda = await screen.findByRole('button', { name: /Abrir a ficha de Duda/ });
     expect(await within(duda).findByText('50,0%')).toBeTruthy();   // 1 erro em 2 chamadas
     expect(within(duda).getByText('2,6 s')).toBeTruthy();
-    expect(screen.getByText('Follow-up · 2 disparos')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'O que o Maestro faz sozinho' })).toBeTruthy();
+    expect(screen.getByRole('article', { name: /^Cutucada:/ })).toBeTruthy();
     expect(screen.queryByText('Exportar')).toBeNull();      // a tela do time não tem exportação de vendas
     expect([...document.querySelectorAll('nav .nav-link')].map(e => e.textContent).slice(0, 3)).toEqual(['Agentes', 'Uso do MCP', 'Dinheiro']);
+  });
+
+  it('a Sofia trabalha no painel: fica fora do palco do Maestro, mas a ficha dela continua a um toque', async () => {
+    stubTeam();
+    mount('/');
+    expect(await screen.findByRole('button', { name: 'Abrir a ficha de Sofia, Analista' })).toBeTruthy();
+    expect(screen.getByText('Fora da conversa, no painel')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Ver as ações de Duda' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Ver as ações de Sofia' })).toBeNull();
   });
 
   it('o palco conta o que o time fez, sem texto de ninguém', async () => {

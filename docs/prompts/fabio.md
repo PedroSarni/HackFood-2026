@@ -572,3 +572,28 @@ os eventos no override do próprio número, o `/whatsapp` do hackfood-bot no Mod
 Configuração) mostra só a URL do app, que é a do handwrite: ela é o fallback, usada só se o override do número sair.
 Não há override na WABA. Sem mudança de código.
 
+## 2026-10-18 ~05h05 — seção das rotinas (follow-up e afins) no dash
+
+**Prompt:** "vamos mexer um pouco no front do dashboard, ok? adicione uma sessaozinha sobre os algoritmos de
+recorrencia, como followup e afins, algum indicativo que foram disparados, sabe? sinto falta disso"
+
+**Resposta:** Claim `dash-rotinas`. Na tela Agentes entrou "O que o Maestro faz sozinho":
+- **Quatro cartões:** cutucada (3 min), carrinho esquecido (5 min), lembrete de recompra (cron de 15 min) e
+  rastreio. Cada um com disparos, gráfico, último disparo e o desfecho (voltou a falar, comprou, virou pedido...).
+- **Lista:** os últimos disparos, cada um abrindo a conversa. Quando uma rotina dispara ao vivo, o cartão acende e o
+  recado do Maestro no palco ganha a cor dela.
+- **Bot:** o abandono ganhou origem própria no diário. Cada passada do cron dos lembretes vira um evento com
+  avisados, adiados, erros e a agenda, então o dash diz se o cron está vivo e quantos lembretes esperam a pessoa
+  voltar (janela de 24h fechada). Precisa de deploy pra produção gravar isso.
+- **Demo:** cutuca, esquece carrinho, liga e responde lembrete com as mesmas funções do bot, e o cache guarda os
+  clientes simulados.
+- **Erro corrigido:** os horários que eu tinha escrito em UTC neste log voltaram pro horário de Brasília.
+
+## 2026-10-18 ~05h28 — a Sofia sai do palco do Maestro
+
+**Prompt:** "filho, a sofia nao devia estar junto com o maestro, tire ela dali por favor"
+
+**Resposta:** A ficha ganhou `onde` ('conversa' ou 'painel'), e a Sofia é 'painel'. Ela saiu do palco e das contas
+do time da conversa, e ficou num cartão "Fora da conversa, no painel" na tela Agentes, com a ficha (modelo e
+interruptor) a um toque, porque o botão de insights depende dela. Testes: 459 no back e 49 no front.
+

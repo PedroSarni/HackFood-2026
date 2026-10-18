@@ -78,6 +78,12 @@ def test_ficha_do_ar_nunca_leva_a_key_inteira():
     assert ficha['ligado'] is False and ficha['keysDoAr'] and ficha['prompts'] and ficha['versaoPrompt']
 
 
+def test_so_quem_trabalha_na_conversa_sobe_no_palco_do_maestro():
+    onde = {a['id']: a['onde'] for a in agentes.fichas()['agentes']}
+    assert onde.pop('analista') == 'painel'          # a Sofia escreve os insights do dash, longe da conversa
+    assert set(onde.values()) == {'conversa'}
+
+
 def test_bot_segue_com_o_entendimento_desligado():
     m = Mundo()
     endereco_pronto(m)

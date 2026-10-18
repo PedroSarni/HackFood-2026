@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Activity, Clock3, Copy, FileCode2, KeyRound, LifeBuoy, Network, Power, Search, ShieldCheck, Sparkles, X, Zap } from 'lucide-react';
 import { clock, latency, pct, useLiveSteps, useSummary, useTeam } from './telemetria.js';
 import { ConversationPicker, Step } from './agentes.jsx';
+import { ROUTINES, RoutinesPanel } from './rotinas.jsx';
 
 // O time de agentes, do jeito que o bot funciona: o Maestro (o código, src/bot/fluxo.py) recebe a
 // mensagem, chama cada especialista e o iFood, e responde. Os agentes não se falam entre si.
@@ -35,6 +36,7 @@ const SAYS = {
 export function sayFor(step, byId) {
   const who = byId[step.agente]?.nome || 'Alguém';
   if (step.tipo === 'entrada') return { who: 'Cliente', text: `Mandou ${String(step.formato || 'mensagem').toLowerCase()}` };
+  if (step.tipo === 'saida' && ROUTINES[step.rotina]) return { who: 'Maestro', text: `${ROUTINES[step.rotina].emoji} ${ROUTINES[step.rotina].say}` };
   if (step.tipo === 'saida') return { who: 'Maestro', text: `Respondeu${step.formato ? ` (${String(step.formato).toLowerCase()})` : ''}` };
   if (step.tipo === 'mcp') return { who: 'Maestro', text: `Pediu ao iFood: ${step.tool}${step.ok === false ? ' · falhou' : ''}` };
   if (step.erro === 'desligado') return { who, text: 'Estou de folga: foi o plano B' };
@@ -58,7 +60,7 @@ function Stage({ team, byId, step, offline, history, usage, mcp, picked, onPick,
   const target = step?.tipo === 'ia' ? pos[step.agente] : step?.tipo === 'mcp' ? SPOT.ifood : step ? SPOT.cliente : null;
   const from = step?.tipo === 'entrada' ? SPOT.cliente : SPOT.maestro;
   const to = step?.tipo === 'entrada' ? SPOT.maestro : target;
-  const color = step?.tipo === 'ia' ? byId[step.agente]?.cor : step?.tipo === 'mcp' ? IFOOD : WHATSAPP;
+  const color = step?.tipo === 'ia' ? byId[step.agente]?.cor : step?.tipo === 'mcp' ? IFOOD : ROUTINES[step?.rotina]?.color || WHATSAPP;
   const bubble = step && !picked ? sayFor(step, byId) : null;
   const bubbleAt = step?.tipo === 'ia' ? pos[step.agente] : step?.tipo === 'entrada' ? SPOT.cliente : SPOT.maestro;
   const state = !step ? '' : step.erro === 'desligado' ? 'off' : step.ok === false ? 'fail' : 'ok';
@@ -196,6 +198,16 @@ function AgentCard({ agent, usage, working, onOpen }) {
   </button>;
 }
 
+// Quem trabalha só no dash (ficha com onde='painel', a Sofia): fora do palco e das contas da conversa.
+function DeskCard({ agent, onOpen }) {
+  return <button type="button" className={`desk-card ${agent.ligado ? '' : 'off'}`} style={{ '--agent': agent.cor }} onClick={onOpen} aria-label={`Abrir a ficha de ${agent.nome}, ${agent.cargo}`}>
+    <Avatar agent={agent} size={36} />
+    <span className="desk-card-text"><strong>{agent.nome} <small>· {agent.cargo}</small></strong><small>{agent.faz}</small></span>
+    <span className="model-chip">{agent.modelos?.[0]?.modelo || '—'}</span>
+    <span className={`agent-status ${agent.ligado ? 'on' : 'off'}`}><i />{agent.ligado ? 'No ar' : 'De folga'}</span>
+  </button>;
+}
+
 function Switch({ checked, onChange, label, disabled }) {
   return <label className="mode-control agent-switch"><span>{label}</span><input role="switch" type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} /><span className="switch-track"><span /></span></label>;
 }
@@ -263,7 +275,7 @@ function AgentSheet({ agent, usage, steps, known, onClose, onUpdate, source }) {
   </dialog>;
 }
 
-export function TeamPage({ source, period }) {
+export function TeamPage({ source, period, onOpen }) {
   const team = useTeam(source);
   const usageState = useSummary('agentes', { source, period });
   const { step, recent, lastSeen, history, status } = usePlayer(source);
@@ -281,16 +293,18 @@ export function TeamPage({ source, period }) {
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   useEffect(() => { setOpenId(null); setConversation(''); setPicked(null); }, [source]);
   const agents = team.data?.agentes || [];
+  const crew = useMemo(() => agents.filter(a => a.onde !== 'painel'), [agents]);   // quem o Maestro rege na conversa
+  const desk = agents.filter(a => a.onde === 'painel');                             // quem só trabalha no dash
   const byId = useMemo(() => Object.fromEntries(agents.map(a => [a.id, a])), [agents]);
   const usage = useMemo(() => Object.fromEntries((usageState.data?.agentes || []).map(u => [u.agente, u])), [usageState.data]);
-  const models = useMemo(() => [...new Set(agents.map(a => a.modelos?.[0]?.modelo).filter(Boolean))], [agents]);
-  const shown = agents.filter(a => (filter === 'todos' || (filter === 'ligados' ? a.ligado : filter === 'desligados' ? !a.ligado : (usage[a.id]?.erros || 0) > 0))
+  const models = useMemo(() => [...new Set(crew.map(a => a.modelos?.[0]?.modelo).filter(Boolean))], [crew]);
+  const shown = crew.filter(a => (filter === 'todos' || (filter === 'ligados' ? a.ligado : filter === 'desligados' ? !a.ligado : (usage[a.id]?.erros || 0) > 0))
     && (!kind || a.tipo === kind) && (!model || a.modelos?.[0]?.modelo === model)
     && (!search || `${a.nome} ${a.cargo} ${a.faz}`.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))));
   if (!team.data) return team.status === 'offline'
     ? <div className="live-banner offline"><Zap size={18} /><div><strong>Sem resposta do servidor do painel.</strong><p>Na raiz do repo, rode <code>.venv/Scripts/python.exe -m src.painel.servidor</code>. Esta página tenta de novo sozinha.</p></div></div>
     : <div className="empty"><Search size={28} /><h3>Chamando o time</h3><p>Lendo a ficha de cada agente.</p></div>;
-  const on = agents.filter(a => a.ligado).length;
+  const on = crew.filter(a => a.ligado).length;
   const calls = Object.values(usage).reduce((n, u) => n + u.chamadas, 0);
   const errors = Object.values(usage).reduce((n, u) => n + u.erros, 0);
   const timed = Object.values(usage).filter(u => u.msMedio !== null);
@@ -298,11 +312,10 @@ export function TeamPage({ source, period }) {
   const open = openId && byId[openId];
   const mcpErrors = (mcp?.tools || []).reduce((n, t) => n + (t.erros || 0), 0);
   const topTools = (mcp?.tools || []).slice(0, 6);
-  const rules = usageState.data?.regras || [];
   return <>
     {source === 'demo' && <div className="telemetry-note"><span className="badge purple"><i />Demonstração</span>Clientes simulados conversando com o bot de verdade.</div>}
     <div className="team-summary">
-      <div><Power size={16} /><span>No ar</span><b>{on} de {agents.length}</b></div>
+      <div><Power size={16} /><span>No ar</span><b>{on} de {crew.length}</b></div>
       <div><Activity size={16} /><span>Chamadas no período</span><b>{calls}</b></div>
       <div><ShieldCheck size={16} /><span>Sucesso</span><b>{calls ? pct(100 - errors / calls * 100) : '—'}</b></div>
       <div><Clock3 size={16} /><span>Tempo médio</span><b>{latency(avg)}</b></div>
@@ -310,7 +323,7 @@ export function TeamPage({ source, period }) {
     </div>
     <section className="panel team-live">
       <div className="panel-heading"><div><h2>O time agora</h2><p>Cada recado é um passo de verdade do bot. Toque em alguém pra ver o que ele andou fazendo.</p></div><span className={`live-pill ${status === 'offline' ? 'offline' : ''}`}><i />{status === 'offline' ? 'Desconectado' : 'Ao vivo'}</span></div>
-      <div className="team-live-body"><Stage team={agents} byId={byId} step={step} offline={status === 'offline'} history={history} usage={usage} mcp={mcp} picked={picked} onPick={setPicked} onOpenSheet={id => { setPicked(null); setOpenId(id); }} /><aside><h3>Agora há pouco</h3><Ticker recent={recent} byId={byId} /></aside></div>
+      <div className="team-live-body"><Stage team={crew} byId={byId} step={step} offline={status === 'offline'} history={history} usage={usage} mcp={mcp} picked={picked} onPick={setPicked} onOpenSheet={id => { setPicked(null); setOpenId(id); }} /><aside><h3>Agora há pouco</h3><Ticker recent={recent} byId={byId} /></aside></div>
       {topTools.length > 0 && <div className="mcp-strip"><span className="mcp-strip-label"><Network size={13} />O que o Maestro mais pede ao iFood</span>{topTools.map(t => <span key={t.tool} className={`mcp-chip ${step?.tipo === 'mcp' && step.tool === t.tool ? 'hot' : ''}`} title={`${t.chamadas} chamadas · ${pct(t.pctErro)} de erro · média ${latency(t.msMedio)}`}>{t.tool}<b>{t.chamadas}</b>{t.erros > 0 && <i>{pct(t.pctErro)}</i>}</span>)}<Link to="/mcp" className="text-button">ver tudo</Link></div>}
     </section>
     <section className="panel">
@@ -323,8 +336,9 @@ export function TeamPage({ source, period }) {
       </div>
       {shown.length ? <div className="agent-grid">{shown.map(a => <AgentCard key={a.id} agent={a} usage={usage[a.id]} working={now - (lastSeen[a.id] || 0) < 4000} onOpen={() => setOpenId(a.id)} />)}</div>
         : <div className="empty"><Search size={28} /><h3>Nenhum agente com esses filtros</h3><p>Limpe a busca ou escolha outro filtro.</p></div>}
-      {rules.length > 0 && <div className="rules-row"><span className="muted">Rotinas do Maestro, sem IA:</span>{rules.map(r => <span key={r.agente} className="subtle-pill">{r.nome} · {r.disparos} disparos</span>)}</div>}
+      {desk.length > 0 && <div className="desk-row"><span className="desk-label">Fora da conversa, no painel</span>{desk.map(a => <DeskCard key={a.id} agent={a} onOpen={() => setOpenId(a.id)} />)}</div>}
     </section>
+    <RoutinesPanel source={source} period={period} step={step} now={now} onOpen={onOpen} />
     <section className="panel">
       <div className="panel-heading"><div><h2>Uma conversa, passo a passo</h2><p>Mensagem, quem pensou, o que o código pediu ao iFood e a resposta. Sem o texto da conversa.</p></div>{timeline.data && <ConversationPicker list={timeline.data.conversasLista} value={conversation} onChange={setConversation} />}</div>
       {conversation && timeline.data?.linha?.length ? <ol className="agent-timeline">{timeline.data.linha.map((s, i) => <Step key={`${s.at}-${i}`} step={s} />)}</ol>

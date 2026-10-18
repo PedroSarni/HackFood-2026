@@ -6,6 +6,9 @@ mesmos espiões da produção (src/shared/painel.py), então o caminho até o da
 
 Primeiro preenche os últimos 7 dias num relógio adiantado (o gráfico já nasce com histórico),
 depois segue ao vivo, um cliente novo a cada poucos segundos.
+As rotinas automáticas rodam também, com as mesmas funções que o src/app.py chama: quem cala leva a
+cutucada aos 3 min e perde o carrinho aos 5, quem repete a compra pode ligar o lembrete de recompra
+e o cron dos lembretes passa a cada 15 min (no histórico, no relógio adiantado).
 Nada disso vai pro modal.Dict do bot: o diário simulado fica num dict em memória.
 """
 import copy
@@ -23,6 +26,8 @@ SOBRENOMES = ['Costa', 'Almeida', 'Oliveira', 'Santos', 'Lima', 'Souza', 'Rocha'
 NOMES = [f'{p} {SOBRENOMES[i * 7 % len(SOBRENOMES)]}' if not p.startswith(('Dona', 'Seu')) else p
          for i, p in enumerate(PRIMEIROS)] + [f'{p} {s}' for p in PRIMEIROS[2:11] for s in SOBRENOMES[:4]]
 ITENS = ['quero pao', 'quero leite', 'preciso de carne', 'quero uma pizza', 'preciso de dipirona']
+CPF = '529.982.247-25'
+VARREDURA = 15 * 60   # s: o cron dos lembretes (src/app.py, LEMBRETES_MIN)
 
 
 class MundoAnotado(Mundo):
@@ -33,6 +38,7 @@ class MundoAnotado(Mundo):
         self._fixo = None
         super().__init__(**kw)
         self.nome = nome
+        self.calado = False   # esperando o protocolo de quem calou: não conta como conversa ativa
         self.painel = diario_dic if diario_dic is not None else Armazem()
         self.diario = painel.Diario(self.painel, agora=lambda: self.agora, intervalo=None)
         self.ctx.wpp = painel.EspiaoWhatsApp(self.wpp, self.diario)
@@ -100,6 +106,12 @@ class MundoAnotado(Mundo):
     def tem(self, prefixo):
         return any(i.startswith(prefixo) for i in self.wpp.todos_ids())
 
+    def rotina(self, origem):
+        """O Bot com as mensagens marcadas como rotina automática (o src/app.py faz o mesmo com contexto_producao)."""
+        ctx = copy.copy(self.ctx)
+        ctx.wpp = painel.EspiaoWhatsApp(self.wpp, self.diario, origem)
+        return self.Bot(ctx)
+
     def rastrear(self, pedido, ritmo):
         from src.bot.rastreio import acompanhar
         ctx = copy.copy(self.ctx)
@@ -125,6 +137,50 @@ def _escolher(m, ritmo):
         m.tocar(f'qtd:{random.choice([1, 1, 2, 3])}')
 
 
+def _rastrear(m, ritmo):
+    """O pedido saiu: acompanha o status (numa thread ao vivo; no relógio adiantado, no histórico)."""
+    if not m.rastreios:
+        return
+    pedido_id = m.rastreios.pop()
+    if m._fixo is None:
+        threading.Thread(target=m.rastrear, args=(pedido_id, ritmo), daemon=True).start()
+    else:
+        m.rastrear(pedido_id, ritmo)
+
+
+def _ligar_lembrete(m):
+    """Comprou de novo o mesmo item e o bot ofereceu o lembrete de recompra: mais da metade liga."""
+    ids = [i for i in m.wpp.todos_ids() if i.startswith('rec:')]
+    sim = [i for i in ids if i != 'rec:0']
+    if sim and random.random() < 0.6:
+        m.enviar(('botao', 'rec:7' if 'rec:7' in sim and random.random() < 0.75 else random.choice(sim)))
+    elif 'rec:0' in ids:
+        m.enviar(('botao', 'rec:0'))
+
+
+def _decidir_lembrete(m, ritmo):
+    """O lembrete chegou ("Podemos pedir?"): a pessoa pede, deixa pra outro dia ou desliga."""
+    if not m.tem('lem:'):
+        return None
+    r = random.random()
+    m.tocar('lem:pedir:' if r < 0.6 else 'lem:hoje:' if r < 0.85 else 'lem:parar:')
+    if r >= 0.6:
+        return 'respondeu o lembrete'
+    m.esperar(random.uniform(2, 6) * ritmo)
+    if m.estado().get('fase') == 'confirmar' and m.tem('ok:'):  # o preço mudou: o bot mostra o resumo antes
+        m.tocar('ok:')
+    _rastrear(m, ritmo)
+    return 'pediu pelo lembrete'
+
+
+def _responder_lembrete(m, ritmo):
+    """Lembrete que venceu com a janela de 24h fechada: o "oi" da pessoa traz o lembrete, e ela responde."""
+    if not m.ctx.recorrencias.vencido_sem_aviso(m.wa):
+        return None
+    _passo(m, ritmo, random.choice(['oi', 'bom dia', 'boa tarde']))
+    return _decidir_lembrete(m, ritmo) or 'só oi'
+
+
 def jornada(m, ritmo=1.0, sorte=None):
     """Uma conversa com final sorteado: compra, abandono, cancelamento, só um oi..."""
     r = sorte if sorte is not None else random.random()
@@ -134,6 +190,9 @@ def jornada(m, ritmo=1.0, sorte=None):
         # ("Não achei pizza no Drogaria Saúde"). Aqui ele expira em silêncio, como um cancelar.
         u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None, 'fase': 'inicio'})
         m.armazem[f'u:{m.wa}'] = u
+    lembrete = _responder_lembrete(m, ritmo)
+    if lembrete:
+        return lembrete
     if r < 0.06:
         _passo(m, ritmo, random.choice(['bom dia', 'oi', 'boa tarde']))
         return 'só oi'
@@ -175,20 +234,87 @@ def jornada(m, ritmo=1.0, sorte=None):
     if 0.32 <= r < 0.38:
         return 'parou no pagamento'
     if m.estado().get('fase') == 'cpf':
-        _passo(m, ritmo, '529.982.247-25')
+        _passo(m, ritmo, CPF)
     if 0.38 <= r < 0.42:
         m.tocar('cancelar')
         return 'cancelou'
     if not m.tem('ok:'):
         return 'sem resumo'
     m.tocar('ok:')
-    if m.rastreios:
-        pedido_id = m.rastreios.pop()
-        if m._fixo is None:
-            threading.Thread(target=m.rastrear, args=(pedido_id, ritmo), daemon=True).start()
-        else:
-            m.rastrear(pedido_id, ritmo)
+    if m.tem('rec:'):
+        m.esperar(random.uniform(2, 6) * ritmo)
+        _ligar_lembrete(m)
+    _rastrear(m, ritmo)
     return 'comprou'
+
+
+def _concluir(m, ritmo):
+    """Voltou depois da cutucada: segue de onde parou até o pedido sair (ou desiste de novo)."""
+    for passo in range(6):
+        fase = m.estado().get('fase')
+        if fase == 'confirmar' and m.tem('ok:'):
+            m.tocar('ok:')
+            _rastrear(m, ritmo)
+            return 'voltou e comprou'
+        if fase == 'cpf':
+            _passo(m, ritmo, CPF)
+        elif fase == 'pagamento' and m.tem('pag:'):
+            m.tocar('pag:0')
+        elif m.tem('fim'):
+            m.tocar('fim')
+        elif passo == 0:
+            _passo(m, ritmo, random.choice(['voltei', 'oi, tô aqui', 'pera, cheguei']))
+        else:
+            break
+        m.esperar(random.uniform(2, 6) * ritmo)
+    return 'voltou'
+
+
+def calar(m, ritmo=1.0, volta=0.35):
+    """O protocolo de quem calou (src/app.py, pessoa_calada), com as mesmas funções do Bot: aos FOLLOWUP_SEG a
+    cutucada, aos ABANDONO_SEG o carrinho esquecido. Parte de quem é cutucado volta e tenta fechar o pedido."""
+    from src.bot.fluxo import ABANDONO_SEG, FOLLOWUP_SEG
+    marca = m.estado().get('ultima_msg')
+    if not marca:
+        return None
+    m.calado = True
+    try:
+        m.esperar(max(0.0, marca + FOLLOWUP_SEG - m.agora))
+        if m.rotina('followup').followup(m.wa, marca) and random.random() < volta:
+            m.esperar(random.uniform(15, 100) * min(ritmo, 1.0))   # antes dos 5 min: o carrinho continua lá
+            return _concluir(m, ritmo)
+        m.esperar(max(0.0, marca + ABANDONO_SEG - m.agora))
+        return 'carrinho esquecido' if m.rotina('abandono').abandonar_carrinho(m.wa, marca) else None
+    finally:
+        m.calado = False
+
+
+def varrer(dic, clientes, quando=None, ocupados=(), anotar=True, antes=None):
+    """O cron dos lembretes (src/app.py, lembretes) na demo: avisa quem tem lembrete vencido (as mesmas funções de
+    src/bot/recorrencia.py) e anota a passada no diário. Quem está no meio de uma conversa fica pra próxima.
+    `anotar=False` só anota se a contagem mudou desde `antes` (o histórico não precisa de 2.880 passadas iguais)."""
+    from src.bot.recorrencia import agenda, disparar_vencidos
+    quando = quando or time.time()
+    total = {'janela': 0, 'template': 0, 'adiado': 0, 'erro': 0}
+    for m in list(clientes):
+        if m.wa in ocupados or not m.recs_dic.get(m.wa):
+            continue
+        if m._fixo is not None:   # histórico: o relógio de cada cliente só anda pra frente
+            if m._fixo > quando:
+                continue
+            m.agora = quando
+        cont = disparar_vencidos(m.armazem, painel.EspiaoWhatsApp(m.wpp, m.diario, 'lembrete'),
+                                 dic_rec=m.recs_dic, agora=quando, so=m.wa)
+        for k, v in cont.items():
+            total[k] = total.get(k, 0) + v
+        if cont.get('janela') and m._fixo is not None and random.random() < 0.6:
+            m.esperar(random.uniform(60, 900))   # avisada dentro da janela: às vezes já responde
+            _decidir_lembrete(m, 0.2)
+    if anotar or total != antes:
+        juntos = {m.wa: m.recs_dic.get(m.wa) for m in list(clientes) if m.recs_dic.get(m.wa)}
+        painel.anotar_varredura(painel.Diario(dic, agora=lambda: quando, intervalo=None), total, VARREDURA,
+                                agenda(juntos, quando))
+    return total
 
 
 def _cliente(dic, n):
@@ -197,39 +323,77 @@ def _cliente(dic, n):
     return m
 
 
+def guardar_clientes(clientes):
+    """O que cada cliente simulado já viveu (armazém do bot, iFood falso e lembretes), pro cache da demo: sem
+    isso, quem volta do cache não acha o pedido que o lembrete quer refazer."""
+    return [{'wa': m.wa, 'nome': m.nome, 'armazem': dict(m.armazem), 'recs': dict(m.recs_dic)} for m in clientes]
+
+
+def restaurar_clientes(dic, salvos, desvio):
+    """Os clientes do cache, com o relógio trazido pra hoje (última mensagem e vencimento dos lembretes)."""
+    clientes = []
+    for s in salvos or []:
+        m = MundoAnotado(diario_dic=dic, nome=s['nome'], wa=s['wa'])
+        m._fixo = None
+        m.armazem.update(s['armazem'])
+        u = m.armazem.get(f'u:{m.wa}')
+        if isinstance(u, dict) and u.get('ultima_msg'):
+            u['ultima_msg'] = float(u['ultima_msg']) + desvio
+        for wa, recs in (s.get('recs') or {}).items():
+            m.recs_dic[wa] = [{**r, 'proximo': float(r.get('proximo') or 0) + desvio} for r in recs]
+        clientes.append(m)
+    return clientes
+
+
 def preencher_historico(dic, dias=7, conversas=60, semente=17, clientes=None, progresso=None):
     """Conversas espalhadas nos últimos `dias`, no relógio adiantado (roda bem mais rápido que o real).
-    O relógio de cada cliente só anda pra frente: conversa nova começa depois que a anterior acabou."""
+    O relógio de cada cliente só anda pra frente: conversa nova começa depois que a anterior acabou.
+    O cron dos lembretes passa a cada 15 min no mesmo relógio, entre uma conversa e outra."""
     random.seed(semente)
     agora = time.time()
     clientes = clientes or [_cliente(dic, n) for n in range(len(NOMES))]
     inicios = sorted(agora - random.uniform(0.05, dias) * 86400 for _ in range(conversas))
+    cron, antes = agora - dias * 86400, None
     for n, inicio in enumerate(inicios):
+        while cron <= inicio:
+            antes = varrer(dic, clientes, cron, anotar=False, antes=antes)
+            cron += VARREDURA
         m = random.choice(clientes)
         if m._fixo is not None and inicio < m._fixo + painel.INATIVIDADE + 60:
             continue  # esse cliente ainda está "no meio" da conversa anterior
         m.agora = inicio
         try:
             jornada(m, ritmo=0.2)
+            calar(m, ritmo=0.2)
         except Exception as e:  # noqa: BLE001 - conversa simulada que tropeça não para as outras
             print(f'simulador: conversa do histórico tropeçou: {e!r}')
         if progresso:
             progresso(n + 1, len(inicios))
+    while cron <= agora:   # até agora; a última passada sempre fica no diário
+        antes = varrer(dic, clientes, cron, anotar=cron + VARREDURA > agora, antes=antes)
+        cron += VARREDURA
     return clientes
 
 
 def rodar_ao_vivo(dic, parar, clientes=None, intervalo=(6, 15), ritmo=1.0):
     """Até `parar` (threading.Event): a cada `intervalo` segundos alguém puxa conversa. Quem já
-    comprou no histórico volta (recompra); de vez em quando chega gente nova."""
+    comprou no histórico volta (recompra); de vez em quando chega gente nova. Quem cala depois
+    leva a cutucada e pode perder o carrinho, e o cron dos lembretes passa a cada 15 min."""
     random.seed()
     clientes = list(clientes or [])
     for m in clientes:
         m.ao_vivo()
-    ocupados = {}
+    ocupados, cron = {}, time.time()   # a 1ª passada do cron já na largada: o dash não espera 15 min
     while not parar.is_set():
-        ocupados = {wa: t for wa, t in ocupados.items() if t.is_alive()}
+        ocupados = {wa: (t, m) for wa, (t, m) in ocupados.items() if t.is_alive()}
+        if time.time() >= cron:
+            try:
+                varrer(dic, clientes, ocupados=set(ocupados))
+            except Exception as e:  # noqa: BLE001
+                print(f'simulador: o cron dos lembretes tropeçou: {e!r}')
+            cron += VARREDURA
         livres = [m for m in clientes if m.wa not in ocupados]
-        if len(ocupados) < 4:
+        if sum(1 for _, m in ocupados.values() if not m.calado) < 4:
             if not livres or random.random() < 0.2:
                 m = _cliente(dic, len(clientes))
                 m.ao_vivo()
@@ -240,9 +404,10 @@ def rodar_ao_vivo(dic, parar, clientes=None, intervalo=(6, 15), ritmo=1.0):
             def conversar(m=m):
                 try:
                     jornada(m, ritmo=ritmo)
+                    calar(m, ritmo=ritmo)
                 except Exception as e:  # noqa: BLE001
                     print(f'simulador: conversa ao vivo tropeçou: {e!r}')
             t = threading.Thread(target=conversar, daemon=True)
             t.start()
-            ocupados[m.wa] = t
+            ocupados[m.wa] = (t, m)
         parar.wait(random.uniform(*intervalo))

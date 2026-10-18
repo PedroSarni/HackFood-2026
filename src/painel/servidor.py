@@ -23,6 +23,7 @@ POST /api/equipe/<agente>?fonte=   {ligado?, modelo?, limparModelo?} -> liga/des
 GET /api/alertas?fonte=            -> o sino: {alertas[], naoLidas} (créditos do Claude etc.)
 POST /api/alertas/lidas?fonte=     -> marca todos como lidos
 GET /api/ao-vivo?fonte=&desde=     -> os últimos passos do time, pra animação (sem texto de ninguém)
+GET /api/rotinas?fonte=&dias=      -> o que o bot faz sozinho: cutucada, carrinho esquecido, lembrete, rastreio
 POST /api/insights?fonte=          {pagina, dados, novo?} -> insights da Analista (roda no Modal, cache de 10 min)
 GET /api/saude
 """
@@ -40,7 +41,7 @@ from src.shared import alertas, painel
 
 RECALCULO = 20       # s: status muda com o relógio (carrinho vira abandonado após 30 min) mesmo sem evento novo
 ENVIO_MIN = 1.5      # s entre fotos no SSE: a demo tem MBs e muda toda hora
-DEMO = {'dias': 30, 'conversas': 900, 'semente': 17, 'versao': 3}  # 3: a demo ganhou o rastro dos agentes
+DEMO = {'dias': 30, 'conversas': 900, 'semente': 17, 'versao': 4}  # 4: a demo cutuca, esquece carrinho e lembra
 CACHE_DEMO = os.path.join(tempfile.gettempdir(), 'hackfood-painel-demo-v{versao}-{dias}d-{conversas}-{semente}.json'.format(**DEMO))
 
 
@@ -144,6 +145,10 @@ class FonteDemo:
         clientes = None
         if not nova and self._carregar_cache():
             print(f'demo: histórico do cache ({len(self.dic) - 1} eventos), trazido pra hoje')
+            try:   # quem já comprou volta com o que viveu: o lembrete acha o pedido que vai refazer
+                clientes = simulador.restaurar_clientes(self.dic, self._salvos, self._desvio) or None
+            except Exception as e:  # noqa: BLE001 - cache de outra versão: começa com clientes novos
+                print(f'demo: clientes do cache ilegíveis: {e!r}')
         else:
             print(f'demo: gerando {DEMO["conversas"]} conversas em {DEMO["dias"]} dias (só na 1ª vez)...')
 
@@ -151,7 +156,7 @@ class FonteDemo:
                 self.progresso = n / total
             clientes = simulador.preencher_historico(self.dic, dias=DEMO['dias'], conversas=DEMO['conversas'],
                                                      semente=DEMO['semente'], progresso=avancar)
-            self._salvar_cache()
+            self._salvar_cache(clientes)
             print(f'demo: {len(self.dic.novos(set()))} eventos gerados')
         self.estado = 'pronto'
         if clientes is None:
@@ -167,13 +172,24 @@ class FonteDemo:
         desvio = time.time() - cache['gerado']
         for ev in cache['eventos'].values():
             ev['ts'] += desvio
+            if ev.get('proximo'):   # a agenda da varredura dos lembretes anda junto
+                ev['proximo'] += desvio
         self.dic.update(cache['eventos'])
+        self._salvos, self._desvio = cache.get('clientes') or [], desvio
         return True
 
-    def _salvar_cache(self):
+    def _salvar_cache(self, clientes=()):
+        from src.painel import simulador
+        eventos = self.dic.novos(set())
+        try:
+            texto = json.dumps({'gerado': time.time(), 'eventos': eventos, 'clientes': simulador.guardar_clientes(clientes)},
+                               ensure_ascii=False, default=list)
+        except (TypeError, ValueError) as e:   # estado de cliente que não vira JSON: guarda só o diário
+            print(f'demo: clientes fora do cache: {e!r}')
+            texto = json.dumps({'gerado': time.time(), 'eventos': eventos}, ensure_ascii=False)
         try:
             with open(CACHE_DEMO, 'w', encoding='utf-8') as f:
-                json.dump({'gerado': time.time(), 'eventos': self.dic.novos(set())}, f, ensure_ascii=False)
+                f.write(texto)
         except OSError as e:
             print(f'demo: não deu pra guardar o cache: {e!r}')
 
@@ -238,11 +254,16 @@ class Painel:
         if chave not in self._cache:
             if len(self._cache) > 64 or any(c[0] != carimbo for c in self._cache):
                 self._cache = {}
-            de = time.time() - float(dias) * 86400 if dias else None
-            dados = {'fonte': self.fonte.nome, 'estado': self.fonte.estado, 'agora': time.time(),
-                     'conversa': conversa, 'conversasLista': painel.indice_conversas(eventos, rotulos, sessoes, de)}
-            resumo = painel.resumo_agentes if nome == 'agentes' else painel.resumo_mcp
-            dados.update(resumo(eventos, rotulos, de, conversa))
+            agora = time.time()
+            de = agora - float(dias) * 86400 if dias else None
+            dados = {'fonte': self.fonte.nome, 'estado': self.fonte.estado, 'agora': agora, 'conversa': conversa}
+            if nome == 'rotinas':   # o que o bot faz sozinho: não filtra por conversa, só enfeita com o nome
+                nomes = {s['id']: s['name'] for s in sessoes}
+                dados.update(painel.resumo_rotinas(eventos, rotulos, de, agora=agora, nomes=nomes))
+            else:
+                dados['conversasLista'] = painel.indice_conversas(eventos, rotulos, sessoes, de)
+                resumo = painel.resumo_agentes if nome == 'agentes' else painel.resumo_mcp
+                dados.update(resumo(eventos, rotulos, de, conversa))
             self._cache[chave] = json.dumps(dados, ensure_ascii=False)
         return self._cache[chave]
 
@@ -285,6 +306,8 @@ class Painel:
             for k in ('agente', 'tool', 'ok', 'ms', 'erro', 'formato', 'reserva', 'modelo', *painel._RESUMO_IA):
                 if ev.get(k) is not None:
                     item[k] = ev[k]
+            if tipo == 'saida' and painel.rotina_da_saida(ev):   # cutucada, lembrete...: o palco e a seção acendem
+                item['rotina'] = painel.rotina_da_saida(ev)
             saida.append(item)
             if len(saida) >= limite:
                 break
@@ -365,6 +388,13 @@ def criar_api(paineis, analista=chamar_analista):
         if not p:
             return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
         return Response(p.consulta('agentes', dias, conversa or None), media_type='application/json')
+
+    @api.get('/api/rotinas')
+    async def rotinas(fonte: str = 'real', dias: float | None = None):
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+        return Response(p.consulta('rotinas', dias), media_type='application/json')
 
     @api.get('/api/equipe')
     async def equipe(fonte: str = 'real'):

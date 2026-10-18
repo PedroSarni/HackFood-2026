@@ -604,7 +604,7 @@ RAJADA = 30   # s: as mensagens de um mesmo disparo da regra contam uma vez só
 
 def regra_da_saida(ev):
     from src.bot.textos import VITRINE_TOPO
-    if ev.get('origem') == 'followup':
+    if ev.get('origem') in ('followup', 'abandono'):   # cutucada e carrinho esquecido (resumo_rotinas separa)
         return 'followup'
     if ev.get('origem') == 'lembrete':
         return 'recorrencia'
@@ -689,3 +689,173 @@ def resumo_agentes(eventos, rotulos, de=None, conversa=None):
     lista_regras = [{'agente': r, 'nome': nome, 'tipo': 'regra', 'disparos': regras.get(r, {}).get('n', 0),
                      'conversas': len(regras.get(r, {}).get('conv', ()))} for r, nome in REGRAS.items()]
     return {'total': total, 'agentes': agentes, 'regras': lista_regras, 'linha': linha}
+
+
+# --- rotinas automáticas: o que o bot faz sozinho, sem a pessoa pedir ---------------------------
+
+LEMBRETE_TOPO = '🔔 Chegou o dia!'   # começo de textos.lembrete(): o vencido com a janela fechada sai na volta da pessoa
+VOLTOU_CUTUCADA = 10 * 60   # s: falou até 10 min depois da cutucada = voltou por causa dela
+DEPOIS_ROTINA = 24 * 3600   # s: o que a pessoa fez até 24h depois do lembrete ou do carrinho esquecido
+STATUS_RECENTE = 10 * 60    # s: o aviso do rastreio fala do último trackOrder até 10 min antes dele
+MAX_DISPAROS = 12           # últimos disparos que o dash lista
+
+
+def rotina_da_saida(ev):
+    """Qual rotina automática mandou a mensagem: 'cutucada', 'abandono', 'lembrete', 'rastreio' ou None (resposta
+    normal). O abandono antigo saía com origem 'followup': esse é reconhecido pelo texto."""
+    origem, texto = ev.get('origem'), str(ev.get('texto') or '')
+    if origem == 'followup':
+        from src.bot.textos import CARRINHO_ABANDONADO
+        return 'abandono' if texto.startswith(CARRINHO_ABANDONADO[:30]) else 'cutucada'
+    if origem in ('abandono', 'lembrete', 'rastreio'):
+        return origem
+    if not origem and texto.startswith(LEMBRETE_TOPO):
+        return 'lembrete'
+    return None
+
+
+def anotar_varredura(diario, cont, a_cada=None, agenda=None):
+    """O cron dos lembretes (src/app.py) passou: quantos avisou, adiou ou falharam, e a agenda dos que faltam.
+    Vai sem conversa (wa vazio): não vira sessão nem passo do palco, só a última varredura do dash."""
+    try:
+        diario.anotar('', 'rotina', nome='lembretes', a_cada=a_cada,
+                      **{k: int(v) for k, v in (cont or {}).items()}, **(agenda or {}))
+    except Exception as e:  # noqa: BLE001 - diário nunca derruba o bot
+        print(f'painel: anotar varredura falhou: {e!r}')
+
+
+def _rotinas():
+    """id -> (nome, quando dispara), com os tempos de verdade do bot."""
+    from src.bot.fluxo import ABANDONO_SEG, FOLLOWUP_SEG
+    return {
+        'cutucada': ('Cutucada', f'Aos {FOLLOWUP_SEG // 60} min sem resposta no meio de uma pergunta, '
+                                 'repete a pergunta uma vez.'),
+        'abandono': ('Carrinho esquecido', f'Aos {ABANDONO_SEG // 60} min calada com itens no carrinho, '
+                                           'esvazia o carrinho e volta pro menu.'),
+        'lembrete': ('Lembrete de recompra', 'O cron procura lembrete vencido. Na janela de 24h manda os botões; '
+                                             'fora dela, mostra quando a pessoa voltar.'),
+        'rastreio': ('Rastreio do pedido', 'Depois do pedido, consulta o iFood no ritmo dele e avisa cada '
+                                           'mudança de status.'),
+    }
+
+
+def resumo_rotinas(eventos, rotulos, de=None, conversa=None, agora=None, nomes=None):
+    """As rotinas que disparam sozinhas (src/app.py, src/bot/rastreio.py): quantas vezes cada uma disparou no
+    recorte, em quantas conversas, o que a pessoa fez depois, a série pro gráfico, os últimos disparos e a última
+    varredura do cron dos lembretes. Sem texto de ninguém; `nomes` (sessão -> nome) só enfeita os disparos."""
+    agora = agora or time.time()
+    dias = (agora - de) / 86400 if de else 30
+    baldes, tamanho = (24, 3600) if dias <= 1.01 else (min(31, max(2, round(dias))), 86400)
+    rotinas = _rotinas()
+    por = {r: {'n': 0, 'conv': set(), 'ultimo': None, 'serie': [0] * baldes, 'res': {}, 'canais': {}} for r in rotinas}
+    abertos, ultimo, status, feed = {}, {}, {}, []
+    pedidos, entregues, ligados, vitrine, varredura, varreduras = set(), set(), 0, 0, None, 0
+
+    def fechar(d):
+        if d['no_recorte']:
+            res = por[d['rotina']]['res']
+            res[d['resultado']] = res.get(d['resultado'], 0) + 1
+
+    for ev in sorted(eventos, key=lambda e: e.get('ts', 0)):
+        ts, tipo, wa = ev.get('ts', 0), ev.get('tipo'), ev.get('wa')
+        no_recorte = not de or ts >= de
+        if tipo == 'rotina':
+            if ev.get('nome') == 'lembretes':
+                varredura, varreduras = ev, varreduras + no_recorte
+            continue
+        meus = abertos.get(wa, [])
+        for d in [d for d in meus if ts > d['prazo']]:   # passou da janela sem desfecho
+            d['resultado'] = d['resultado'] or 'sem resposta'
+            fechar(d)
+            meus.remove(d)
+        if tipo == 'entrada':
+            botao = str(ev.get('botao') or '')
+            ligados += no_recorte and botao.startswith('rec:') and botao != 'rec:0'
+            for d in list(meus):
+                if d['rotina'] == 'cutucada':
+                    d['resultado'] = 'voltou'
+                elif d['rotina'] == 'abandono' or not botao.startswith('lem:'):
+                    d['resultado'] = d['resultado'] or ('voltou' if d['rotina'] == 'abandono' else 'respondeu')
+                    continue   # segue aberto: ainda pode virar compra
+                else:
+                    acao = botao.split(':')[1]
+                    d['resultado'] = {'pedir': 'pediu', 'hoje': 'hoje não', 'parar': 'parou'}.get(acao, 'respondeu')
+                    if acao == 'pedir':
+                        continue   # segue aberto até o submitOrder
+                fechar(d)
+                meus.remove(d)
+        elif tipo == 'mcp':
+            if ev.get('tool') == 'trackOrder':
+                status[wa] = (ts, ev.get('status'))
+                if no_recorte and ev.get('pedido'):
+                    pedidos.add(ev['pedido'])
+                    if ev.get('status') in ENTREGUE:
+                        entregues.add(ev['pedido'])
+            elif ev.get('tool') == 'submitOrder' and ev.get('ok'):
+                for d in [d for d in meus if d['rotina'] in ('abandono', 'lembrete')]:
+                    d['resultado'] = 'comprou'
+                    fechar(d)
+                    meus.remove(d)
+        elif tipo == 'saida':
+            r = rotina_da_saida(ev)
+            if r is None:
+                if regra_da_saida(ev) == 'vitrine':
+                    vitrine += no_recorte and ts - ultimo.get((wa, 'vitrine'), float('-inf')) > RAJADA
+                    ultimo[(wa, 'vitrine')] = ts
+                continue
+            novo = ts - ultimo.get((wa, r), float('-inf')) > RAJADA
+            ultimo[(wa, r)] = ts
+            if not novo:
+                continue   # mais uma mensagem do mesmo disparo
+            d = {'rotina': r, 'ts': ts, 'resultado': None, 'no_recorte': no_recorte,
+                 'prazo': ts + (VOLTOU_CUTUCADA if r == 'cutucada' else DEPOIS_ROTINA)}
+            if r == 'rastreio':   # o desfecho do aviso é o status que ele deu
+                st = status.get(wa)
+                d['resultado'] = st[1] if st and st[1] and ts - st[0] <= STATUS_RECENTE else 'aviso'
+                fechar(d)
+            else:
+                abertos.setdefault(wa, meus).append(d)
+            if not no_recorte:
+                continue
+            p, conv = por[r], rotulos.get(id(ev))
+            p['n'] += 1
+            p['ultimo'] = ts
+            if conv:
+                p['conv'].add(conv)
+            i = baldes - 1 - int((agora - ts) // tamanho)
+            if 0 <= i < baldes:
+                p['serie'][i] += 1
+            if r == 'lembrete':
+                canal = 'template' if ev.get('formato') == 'Template' else 'na janela' if ev.get('origem') else 'na volta'
+                p['canais'][canal] = p['canais'].get(canal, 0) + 1
+            feed.append((d, conv))
+    for meus in abertos.values():   # ainda aberto: dentro da janela espera, fora dela ficou sem resposta
+        for d in meus:
+            d['resultado'] = d['resultado'] or ('esperando' if agora <= d['prazo'] else 'sem resposta')
+            fechar(d)
+
+    def destaque(r):
+        res = por[r]['res']
+        if r == 'rastreio':
+            n, total, rotulo = len(entregues), len(pedidos), 'pedidos entregues'
+        else:
+            n = res.get('voltou' if r == 'cutucada' else 'comprou', 0)
+            total = sum(v for k, v in res.items() if k != 'esperando')
+            rotulo = {'cutucada': 'voltaram a falar', 'abandono': 'compraram em 24h'}.get(r, 'viraram pedido')
+        return {'rotulo': rotulo, 'n': n, 'de': total, 'pct': _pct(n, total) if total else None}
+
+    v = varredura
+    return {
+        'rotinas': [{'id': r, 'nome': nome, 'quando': quando, 'disparos': por[r]['n'], 'conversas': len(por[r]['conv']),
+                     'ultimo': _iso(por[r]['ultimo']) if por[r]['ultimo'] else None, 'serie': por[r]['serie'],
+                     'resultados': por[r]['res'], 'canais': por[r]['canais'] or None, 'destaque': destaque(r)}
+                    for r, (nome, quando) in rotinas.items()],
+        'serie': {'baldes': baldes, 'tamanho': 'hora' if tamanho == 3600 else 'dia'},
+        'disparos': [{'at': _iso(d['ts']), 'rotina': d['rotina'], 'resultado': d['resultado'], 'conversa': conv,
+                      'nome': (nomes or {}).get(conv)} for d, conv in reversed(feed[-MAX_DISPAROS:])],
+        'varredura': v and {'ultima': _iso(v['ts']), 'aCada': v.get('a_cada'), 'execucoes': varreduras,
+                            'avisados': v.get('janela', 0) + v.get('template', 0), 'erros': v.get('erro', 0),
+                            'esperando': v.get('vencidos', v.get('adiado', 0)), 'ativos': v.get('ativos'),
+                            'pessoas': v.get('pessoas'), 'proximo': _iso(v['proximo']) if v.get('proximo') else None},
+        'pedidosAcompanhados': len(pedidos), 'lembretesLigados': ligados, 'vitrine': vitrine,
+    }
