@@ -38,6 +38,10 @@ CATEGORIAS = [
     ('sorvete', ('sorvete', 'milkshake', 'milk shake')),
     ('café', ('cafe', 'cappuccino', 'capuccino', 'latte')),
     ('pão', ('pao ', 'paes', 'baguete', 'bisnaga')),
+    # carne crua de qualquer marca (Friboi hoje, picanha Seara amanhã) é a 2ª vez da carne. Depois de pastel,
+    # esfiha e marmita: "pastel de carne" continua sendo pastel
+    ('carne', ('carne', 'picanha', 'alcatra', 'contrafile', 'maminha', 'fraldinha', 'patinho', 'acem', 'cupim',
+               'costela', 'file mignon', 'coxao', 'musculo', 'bife')),
 ]
 
 

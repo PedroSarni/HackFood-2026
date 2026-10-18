@@ -23,6 +23,8 @@ COMBINA = [
     (('arroz',), ['feijão', 'óleo']),
     (('feijao',), ['arroz', 'farofa']),
     (('macarrao', 'espaguete', 'lasanha', 'talharim'), ['molho de tomate', 'queijo']),
+    (('picanha', 'maminha', 'fraldinha', 'cupim', 'linguica', 'costela', 'coracao', 'churrasco'),
+     ['carvão', 'pão de alho', 'farofa']),
     (('carne', 'picanha', 'alcatra', 'contrafile', 'linguica', 'costela', 'acem', 'patinho', 'frango'),
      ['farofa', 'refrigerante']),
 ]

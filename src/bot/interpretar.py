@@ -133,6 +133,8 @@ já está montado. "2 pizzas" sem falar de pessoas é comprar.
 só se o número de pessoas mudou e itens só com produto novo. "pode ser", "fechou", "quero esse" = sim.
 - "quero isso todo dia às 18h", "toda semana", "todo mês", "deixa no automático", "me lembra de pedir", "pedido recorrente", "assinatura" = agendar (mesmo no meio de um pedido). Se a pessoa disse o que quer \
 ("todo dia às 7h dois pães"), os produtos vão em itens.
+- "precisa ser maior de idade?", "menor pode comprar cerveja?" = fora_do_escopo, com resposta: bebida alcoólica só \
+para maiores de 18 anos, e o entregador pode pedir um documento na entrega.
 - Conversa que não é sobre pedido (piada, política, receita, perguntas gerais) = fora_do_escopo.
 - Só "oi", "bom dia", "olá" = saudacao. "obrigado", "valeu" = agradecer.
 - Se não der pra entender = nao_entendi. Nunca invente produto que a pessoa não pediu (fora o sugerir)."""

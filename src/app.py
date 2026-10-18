@@ -13,6 +13,7 @@ import hmac
 import json
 import os
 import pathlib
+import re
 import secrets
 import time
 
@@ -47,6 +48,9 @@ segredos = [modal.Secret.from_name('hackathon-whatsapp'),
             modal.Secret.from_name('hackathon-anthropic')]
 
 estado = modal.Dict.from_name('hackfood-estado', create_if_missing=True)
+# catálogo de reserva do MCP (src/shared/mcp_fake.py lê /mock/catalogo.json; as fotos saem em /mock/img/). Mora só
+# no Volume, fora do git: sobe com `modal volume put hackfood-mock ...` e vale sem deploy (container novo lê de novo)
+VOLUMES = {'/mock': modal.Volume.from_name('hackfood-mock', create_if_missing=True)}
 entrada = modal.Queue.from_name('hackfood-entrada', create_if_missing=True)
 
 
@@ -57,7 +61,7 @@ def _cfg(nome):
 
 # --- conversa -------------------------------------------------------------------------
 
-@app.function(image=imagem, secrets=segredos, timeout=900, scaledown_window=600)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=900, scaledown_window=600)
 @modal.concurrent(max_inputs=40)
 def rodada(wa_id: str, seq: int, espera: float, mid: str = ''):
     """Uma por mensagem recebida; só a da mensagem mais nova da rajada processa."""
@@ -95,7 +99,7 @@ def rodada(wa_id: str, seq: int, espera: float, mid: str = ''):
         caixa.soltar_trava(wa_id, seq)
 
 
-@app.function(image=imagem, secrets=segredos, timeout=600)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=600)
 def pessoa_calada(wa_id: str, marca: float):
     """Protocolo de quem calou (decisão do Fabio): aos FOLLOWUP_SEG cutuca uma vez; aos ABANDONO_SEG,
     se ainda calada com itens no carrinho, esquece o carrinho. `marca` é o ultima_msg da rodada:
@@ -123,7 +127,7 @@ def pessoa_calada(wa_id: str, marca: float):
     return 'protocolo completo'
 
 
-@app.function(image=imagem, secrets=segredos, timeout=120)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=120)
 def analisar_pagina(pagina: str, dados: dict):
     """A Analista do dash (src/painel/analista.py): insights por time a partir dos números agregados de uma página.
     Chamada pelo servidor local do painel (POST /api/insights); usa a fila e o interruptor da ficha dela."""
@@ -143,7 +147,7 @@ def analisar_pagina(pagina: str, dados: dict):
         return {'erro': 'modelo', 'detalhe': str(e)[:300]}
 
 
-@app.function(image=imagem, secrets=segredos, timeout=120)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=120)
 def depois_do_login(wa_id: str):
     """O OAuth terminou no navegador: avisa no WhatsApp e retoma o que a pessoa tinha pedido."""
     from src.bot.contexto import contexto_producao
@@ -163,7 +167,7 @@ def depois_do_login(wa_id: str):
             estado.pop(caixa_trava, None)
 
 
-@app.function(image=imagem, secrets=segredos, timeout=4 * 3600)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=4 * 3600)
 def acompanhar_pedido(wa_id: str, pedido_id: str):
     """Consulta o status do pedido no ritmo que o iFood pede e avisa cada mudança."""
     from src.bot.contexto import contexto_producao
@@ -172,7 +176,7 @@ def acompanhar_pedido(wa_id: str, pedido_id: str):
     acompanhar(contexto_producao(estado, WhatsApp(), wa_id, origem='rastreio'), wa_id, pedido_id)
 
 
-@app.function(image=imagem, secrets=segredos, timeout=120)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=120)
 def ferramentas_reais(wa_id: str):
     """Diagnóstico: tools/list do gateway real com o token de quem já entrou. A doc não traz
     os inputSchema; isto mostra os nomes e parâmetros de verdade.
@@ -186,7 +190,7 @@ def ferramentas_reais(wa_id: str):
     return [{'name': t.get('name'), 'inputSchema': t.get('inputSchema')} for t in tools]
 
 
-@app.function(image=imagem, secrets=segredos, timeout=600, schedule=modal.Period(minutes=LEMBRETES_MIN))
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=600, schedule=modal.Period(minutes=LEMBRETES_MIN))
 def lembretes():
     """Recorrência: avisa quem tem compra repetida vencendo (botão "Pedir de novo"). Cada passada fica no
     diário (quantos avisou, adiou ou falharam e a agenda), pro dash mostrar que o cron está vivo."""
@@ -203,7 +207,7 @@ def lembretes():
         diario.descarregar()
 
 
-@app.function(image=imagem, secrets=segredos, timeout=900)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=900)
 def lembrete_na_hora(wa_id: str, quando: float):
     """Modo demo: espera até `quando` e manda o lembrete só dessa pessoa (sem esperar o cron)."""
     from src.bot.recorrencia import disparar_vencidos
@@ -219,7 +223,7 @@ def lembrete_na_hora(wa_id: str, quando: float):
 
 # --- web ------------------------------------------------------------------------------
 
-@app.function(image=imagem, secrets=segredos, timeout=60, scaledown_window=600)
+@app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=60, scaledown_window=600)
 @modal.concurrent(max_inputs=50)
 @modal.asgi_app(label=ROTULO)
 def web():
@@ -261,6 +265,18 @@ def web():
         from fastapi.responses import Response
         dados = (pathlib.Path(paginas.__file__).parent / 'logo.png').read_bytes()  # no ar o app.py fica em /root
         return Response(dados, media_type='image/png', headers={'cache-control': 'public, max-age=86400'})
+
+    @api.get('/mock/img/{arquivo}')
+    async def foto_do_mock(arquivo: str):
+        """Foto do catálogo de reserva (Volume hackfood-mock): o WhatsApp baixa daqui o cabeçalho dos cards."""
+        from fastapi.responses import Response
+        if not re.fullmatch(r'[a-z0-9][a-z0-9._-]{0,80}\.(?:jpg|png|webp)', arquivo):
+            return Response(status_code=404)
+        caminho = pathlib.Path('/mock/img') / arquivo
+        if not caminho.is_file():
+            return Response(status_code=404)
+        tipo = {'jpg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp'}[arquivo.rsplit('.', 1)[1]]
+        return Response(caminho.read_bytes(), media_type=tipo, headers={'cache-control': 'public, max-age=86400'})
 
     # --- WhatsApp ---
 

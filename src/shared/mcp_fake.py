@@ -21,6 +21,8 @@ a busca ignora palavra vazia ("de", "com") e põe na frente quem tem todas as pa
 SEMPRE no fim do CATALOGO: o id do item é o índice, e carrinho guardado no armazém aponta pra ele.
 """
 import copy
+import json
+import os
 import re
 import unicodedata
 import uuid
@@ -254,15 +256,60 @@ def _uid(*partes):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, 'hackfood:' + ':'.join(map(str, partes))))
 
 
+# catálogo de fora (Volume `hackfood-mock`, montado em /mock no Modal; NÃO mora no git): lojas, itens, fotos e
+# sinônimos. Sem ele vale o catálogo daqui de cima (testes e dev). `VERSAO` separa os ids dos dois catálogos:
+# carrinho guardado de um nunca aponta pra item do outro.
+CATALOGO_EXTERNO = os.environ.get('HACKFOOD_MOCK_CATALOGO', '/mock/catalogo.json')
+VERSAO = ''
+_FOTOS = {'itens': [], 'lojas': {}}
+
+
+def _id_item(i):
+    return _uid('item', VERSAO, i) if VERSAO else _uid('item', i)
+
+
+def _id_loja(k):
+    return _uid('loja', VERSAO, k) if VERSAO else _uid('loja', k)
+
+
 def _img(nome):
     texto = _n(nome).replace(' ', '+')[:40]
     return f'https://placehold.co/800x500/1f8f4e/ffffff/png?text={texto}'
 
 
+def _img_item(i):
+    fotos = _FOTOS['itens']
+    return (fotos[i] if i < len(fotos) else None) or _img(CATALOGO[i][1])
+
+
+def _img_loja(k):
+    return _FOTOS['lojas'].get(k) or _img(LOJAS[k][0])
+
+
+def usar_catalogo(dados):
+    """Troca o catálogo inteiro pelo de fora. Formato: {versao, img_base, sinonimos, lojas: {chave: {nome, tipo,
+    eta: {min, max}, taxa, nota, km, minimo, logo}}, itens: [{loja, nome, desc, preco, promo, foto,
+    grupos: [[nome, min, max, [[opção, adicional]]]]}]}."""
+    global LOJAS, CATALOGO, SINONIMOS, VERSAO, _ITEM_POR_ID, _LOJA_POR_ID
+    base = dados.get('img_base') or ''
+    LOJAS = {k: (lj['nome'], lj['tipo'], lj['eta'], float(lj['taxa']), lj['nota'], lj['km'], float(lj['minimo']))
+             for k, lj in dados['lojas'].items()}
+    CATALOGO = [(it['loja'], it['nome'], it.get('desc') or '', float(it['preco']), it.get('promo'),
+                 [(g[0], g[1], g[2], [tuple(o) for o in g[3]]) for g in it['grupos']] if it.get('grupos') else None)
+                for it in dados['itens']]
+    SINONIMOS = {**SINONIMOS, **(dados.get('sinonimos') or {})}
+    VERSAO = str(dados.get('versao') or 'externo')
+    _FOTOS['itens'] = [base + it['foto'] if it.get('foto') else None for it in dados['itens']]
+    _FOTOS['lojas'] = {k: base + lj['logo'] for k, lj in dados['lojas'].items() if lj.get('logo')}
+    _ITEM_POR_ID = {_id_item(i): i for i in range(len(CATALOGO))}
+    _LOJA_POR_ID = {_id_loja(k): k for k in LOJAS}
+    return len(LOJAS), len(CATALOGO)
+
+
 def _loja(chave):
     nome, _tipo, eta, taxa, nota, dist, _minimo = LOJAS[chave]
-    return {'merchantId': _uid('loja', chave), 'merchantName': nome,
-            'merchantLogoUrl': _img(nome), 'reviewRating': nota, 'isOpen': True,
+    return {'merchantId': _id_loja(chave), 'merchantName': nome,
+            'merchantLogoUrl': _img_loja(chave), 'reviewRating': nota, 'isOpen': True,
             'deliveryMethod': {'deliveryMethodMode': 'DELIVERY', 'fee': taxa, 'promotionalFee': None,
                                'estimatedMinutes': eta},
             'straightLineDistanceKm': dist, 'nextOpenAt': None}
@@ -270,15 +317,21 @@ def _loja(chave):
 
 def _resultado_item(i):
     lj, nome, _desc, preco, promo, _g = CATALOGO[i]
-    r = {'itemId': _uid('item', i), 'itemName': nome, 'itemImageUrl': _img(nome), 'unitPrice': preco,
+    r = {'itemId': _id_item(i), 'itemName': nome, 'itemImageUrl': _img_item(i), 'unitPrice': preco,
          'merchant': _loja(lj), 'matchScore': 0.9}
     if promo:
         r['promotionalUnitPrice'] = promo
     return r
 
 
-_ITEM_POR_ID = {_uid('item', i): i for i in range(len(CATALOGO))}
-_LOJA_POR_ID = {_uid('loja', k): k for k in LOJAS}
+_ITEM_POR_ID = {_id_item(i): i for i in range(len(CATALOGO))}
+_LOJA_POR_ID = {_id_loja(k): k for k in LOJAS}
+if os.path.isfile(CATALOGO_EXTERNO):
+    try:
+        with open(CATALOGO_EXTERNO, encoding='utf-8') as _f:
+            print('mock: catálogo de fora com %d lojas e %d itens' % usar_catalogo(json.load(_f)))
+    except Exception as _e:  # noqa: BLE001 - catálogo quebrado não derruba o bot: fica o daqui
+        print(f'mock: catálogo de fora ilegível, ficou o embutido: {_e!r}')
 
 
 def loja_do_mock(merchant_id):
@@ -405,7 +458,7 @@ class McpFake:
         for i, (lj, nome, _d, preco, promo, _g) in enumerate(CATALOGO):
             if merchantType and LOJAS[lj][1] != merchantType:
                 continue
-            if refin.get('merchantId') and _uid('loja', lj) != refin['merchantId']:
+            if refin.get('merchantId') and _id_loja(lj) != refin['merchantId']:
                 continue
             if refin.get('maxItemPrice') and (promo or preco) > float(refin['maxItemPrice']):
                 continue
@@ -457,10 +510,10 @@ class McpFake:
             raise _erro_discovery('ITEM_NOT_FOUND', 'item not found')
         i = _ITEM_POR_ID[itemId]
         lj, nome, desc, preco, promo, grupos = CATALOGO[i]
-        if merchantId and merchantId != _uid('loja', lj):
+        if merchantId and merchantId != _id_loja(lj):
             raise _erro_discovery('ITEM_MERCHANT_MISMATCH', 'item does not belong to merchant', True)
-        d = {'itemId': itemId, 'itemName': nome, 'merchantId': _uid('loja', lj), 'merchantName': LOJAS[lj][0],
-             'unitPrice': preco, 'itemDescription': desc, 'itemImageUrl': _img(nome),
+        d = {'itemId': itemId, 'itemName': nome, 'merchantId': _id_loja(lj), 'merchantName': LOJAS[lj][0],
+             'unitPrice': preco, 'itemDescription': desc, 'itemImageUrl': _img_item(i),
              'optionGroups': [{'optionGroupId': _uid('grupo', i, gi), 'name': gn, 'minSelections': mn,
                                'maxSelections': mx,
                                'options': [{'optionId': _uid('op', i, gi, oi), 'name': on, 'description': on,
@@ -585,7 +638,7 @@ class McpFake:
         car = self._carrinho(st, cartId)
         if options is None:
             raise _erro_cart('INVALID_REQUEST', 'options é obrigatório (pode ser [])', 'Erro no pedido.')
-        if itemId in _ITEM_POR_ID and _uid('loja', CATALOGO[_ITEM_POR_ID[itemId]][0]) != car['merchant']['merchantId']:
+        if itemId in _ITEM_POR_ID and _id_loja(CATALOGO[_ITEM_POR_ID[itemId]][0]) != car['merchant']['merchantId']:
             raise _erro_cart('ITEM_NOT_AVAILABLE', 'item de outra loja', 'Esse item não é desta loja.')
         car['items'].append(self._linha(st, {'itemId': itemId, 'quantity': quantity, 'options': options,
                                              'customerNote': customerNote}))

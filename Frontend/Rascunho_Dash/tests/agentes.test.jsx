@@ -42,7 +42,7 @@ describe('Uso do MCP', () => {
     const calls = stubFetch(() => mcp());
     mount('/mcp');
     expect(await screen.findByRole('heading', { name: 'Uso por tool' })).toBeTruthy();
-    expect(calls[0]).toBe('/api/mcp?fonte=real&dias=30');
+    expect(calls.filter(u => u.startsWith('/api/mcp?'))[0]).toBe('/api/mcp?fonte=real&dias=30');  // o sino e a reserva também buscam
     const row = screen.getByRole('cell', { name: 'searchOffers' }).closest('tr');
     expect(within(row).getByText('Ofertas')).toBeTruthy();
     expect(within(row).getByText('33,3%')).toBeTruthy();
@@ -59,7 +59,7 @@ describe('Uso do MCP', () => {
     mount('/mcp');
     await user.selectOptions(await screen.findByLabelText('Conversa'), 'WA-AAA111-001');
     expect(await screen.findByRole('heading', { name: 'Sequência das chamadas' })).toBeTruthy();
-    expect(calls.at(-1)).toBe('/api/mcp?fonte=real&dias=30&conversa=WA-AAA111-001');
+    expect(calls.filter(u => u.startsWith('/api/mcp?')).at(-1)).toBe('/api/mcp?fonte=real&dias=30&conversa=WA-AAA111-001');
     const steps = [...document.querySelectorAll('.call-sequence li')].map(li => li.querySelector('strong').textContent);
     expect(steps).toEqual(['searchOffers', 'searchOffers', 'createCart']);
     expect(document.querySelector('.call-sequence li.failed').textContent).toContain('TIMEOUT');

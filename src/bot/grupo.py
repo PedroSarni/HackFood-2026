@@ -21,6 +21,7 @@ em diante é o pedido de sempre, com o "por pessoa" no total e no resumo.
 """
 import math
 import re
+import unicodedata
 
 from src.bot import melhor_loja, ranking, relevancia
 from src.bot.combina import complementos
@@ -103,6 +104,51 @@ def tema_em(texto):
             return {'termo': termo, 'busca': termo, 'quantidade': None, 'observacao': None,
                     'tipo_loja': 'MERCADO' if chave == 'churrasco' else 'RESTAURANTE'}
     return None
+
+
+def _minusculo(texto):
+    t = unicodedata.normalize('NFKD', str(texto or '').lower())
+    return ''.join(c for c in t if not unicodedata.combining(c))
+
+
+_VALOR = r'(\d{1,5}(?:[.,]\d{1,2})?)'
+_POR_PESSOA = re.compile(rf'(?:r\$\s*)?{_VALOR}\s*(?:reais|conto|pila)?\s*(?:por pessoa|pra cada|para cada|cada um|por cabeca)')
+_TETO = re.compile(rf'\b(?:ate|no maximo|maximo de|max\.?|limite de|orcamento de|gastar|teto de)\s*(?:uns\s*)?'
+                   rf'(?:r\$\s*)?{_VALOR}|(?:r\$\s*){_VALOR}|{_VALOR}\s*(?:reais|conto|pila)\b')
+
+
+def teto_em(texto, pessoas=None):
+    """Quanto a pessoa topa gastar no kit inteiro: "por até 300 reais" -> 300; "uns 25 por pessoa" com 13
+    pessoas -> 325. None se não disse valor. Quem garante o teto é o código (`caber`), não o modelo."""
+    t = _minusculo(texto)
+    m = _POR_PESSOA.search(t)
+    if m and pessoas:
+        return round(float(m.group(1).replace(',', '.')) * pessoas, 2)
+    m = _TETO.search(t)
+    if not m:
+        return None
+    v = float(next(g for g in m.groups() if g).replace(',', '.'))
+    return v if v >= 10 else None  # "até 2 litros" não é dinheiro
+
+
+def caber(linhas, teto, taxa=0.0):
+    """Corta o kit até o total (com a entrega) caber no teto: primeiro tira 1 da linha mais cara que tem
+    mais de 1, depois some com acompanhamento que ninguém pediu. O que foi pedido ("com cerveja") e o
+    principal nunca somem de todo. Devolve as linhas (as que ficaram, com total refeito)."""
+    linhas = [dict(lin) for lin in linhas]
+    soma = lambda: sum(lin['unit'] * lin['qtd'] for lin in linhas) + (taxa or 0)  # noqa: E731
+    while teto and soma() > teto + 0.005:
+        varias = [lin for lin in linhas if lin['qtd'] > 1]
+        if varias:
+            max(varias, key=lambda lin: lin['unit'])['qtd'] -= 1
+            continue
+        sobra = [lin for lin in linhas if lin['papel'] in ('acompanhamento', 'bebida')]
+        if not sobra:
+            break
+        linhas.remove(max(sobra, key=lambda lin: lin['unit']))
+    for lin in linhas:
+        lin['total'] = round(lin['unit'] * lin['qtd'], 2)
+    return linhas
 
 
 def por_pessoa(total, pessoas):
@@ -257,10 +303,13 @@ kibe e salgado = ~3 por pessoa. Se tiver mais de uma opção, varie os sabores (
 X-Bacon), a não ser que peçam um só.
 - bebida: refrigerante de 2 litros serve ~4 pessoas (prefira pra grupo); lata ou 600 ml = 1 por pessoa. \
 Bebida alcoólica só se pedirem.
+- churrasco: carne ~400 g por pessoa sem orçamento apertado (peça de picanha de ~1 kg serve 2 a 3); \
+cerveja: pack de 12 latas serve ~4 pessoas; queijo coalho: 1 espeto por pessoa; carvão: saco de 3 kg pra cada \
+~3 kg de carne. Com orçamento curto, fique dentro dele e explique que priorizou a carne.
 - acompanhamento: porção de batata serve ~3 pessoas. Sobremesa só se pedirem ou se o grupo for grande.
 - produtos marcados [pedido] a pessoa pediu: entram SEMPRE.
 - respeite o ajuste ('sem refri', 'mais barato', '2 são vegetarianos', 'troca coca por guaraná', \
-'mais batata') e o orçamento por pessoa, se houver.
+'mais batata') e o orçamento, se houver (o total do kit, com a entrega, não pode passar dele).
 - se vier o kit atual, parta dele: mude SÓ o que o ajuste pede e mantenha o resto igual, mesmos produtos \
 e mesmas quantidades ('sem batata e sem refri' tira a batata e o refri; os lanches ficam os mesmos).
 - use SÓ os números da lista e no máximo 8 produtos diferentes. NÃO calcule preços: o sistema calcula.
@@ -346,13 +395,14 @@ def _citado(nome, ajuste):
     return any(f' {p} ' in t for p in normalizar(nome).split() if len(p) >= 4)
 
 
-def compor(llm, pessoas, tema, cands, ajuste=None, atual=None):
+def compor(llm, pessoas, tema, cands, ajuste=None, atual=None, teto=None, taxa=None):
     """O Gemini escolhe o que entra e quantos; o código confere. Devolve ([(índice, qtd)], explicação).
     atual: o kit da tela [(índice, qtd)]; com ajuste, ele parte dali em vez de recompor do zero
     (18/10: "sem a batata e sem o refri" trocou o X-Bacon por X-Salada)."""
     kit_atual = ('\nKit atual: ' + ', '.join(f'{q}x n{n}' for n, q in atual)) if atual and ajuste else ''
     texto = (f'Pessoas: {pessoas}\nQuerem comer: {tema["termo"]}'
              + (f'\nAjuste pedido: {ajuste}' if ajuste else '') + kit_atual
+             + (f'\nOrçamento: até R$ {teto:.2f} no total, com a entrega de R$ {taxa or 0:.2f}' if teto else '')
              + f'\n\nProdutos da loja:\n{_lista_pro_modelo(cands)}')
     try:
         dados, _modelo, _seg = llm(SISTEMA, [('texto', texto)], ESQUEMA)
@@ -422,7 +472,7 @@ def _termos(itens):
     return [normalizar(i['termo']) for i in itens or []]
 
 
-def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=None, outra_loja=False):
+def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=None, outra_loja=False, teto=None):
     """Monta (ou remonta) o kit. anterior: o kit que estava na tela; com outra_loja, pula as lojas
     já vistas sem buscar o principal de novo; com ajuste, refaz na mesma loja.
     Devolve (kit, motivo): motivo 'sem_principal' (nada perto) ou 'sem_loja' (acabaram as lojas)."""
@@ -462,11 +512,13 @@ def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=N
     if reaproveita and anterior.get('linhas'):  # mesma loja e mesmos candidatos: os números batem
         pos = {c['item_id']: i for i, c in enumerate(cands)}
         atual = [(pos[lin['item_id']], lin['qtd']) for lin in anterior['linhas'] if lin['item_id'] in pos]
-    escolha, explicacao = compor(llm, pessoas, tema, cands, ajuste, atual)
+    escolha, explicacao = compor(llm, pessoas, tema, cands, ajuste, atual, teto, fonte.get('taxa'))
     linhas, faltou_abrir = _linhas(api, endereco, cands, escolha, pessoas)
+    if teto:  # "por até 300 reais": o código garante, o modelo só tenta
+        linhas = caber(linhas, teto, fonte.get('taxa'))
     if not any(lin['papel'] == 'principal' for lin in linhas):
         return None, 'sem_principal'
-    kit = {'pessoas': pessoas, 'tema': tema, 'extras': list(extras), 'ajuste': ajuste,
+    kit = {'pessoas': pessoas, 'tema': tema, 'extras': list(extras), 'ajuste': ajuste, 'teto': teto,
            'loja_id': fonte['loja_id'], 'loja': fonte['loja'], 'taxa': fonte.get('taxa'),
            'linhas': linhas, 'explicacao': explicacao, 'faltou': list(dict.fromkeys(faltou + faltou_abrir)),
            'fontes': lista, 'vistas': vistas, 'candidatos': cands,

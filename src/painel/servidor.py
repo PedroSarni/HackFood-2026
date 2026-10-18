@@ -22,6 +22,8 @@ GET /api/equipe?fonte=             -> a ficha de cada agente (src/agentes/): per
 POST /api/equipe/<agente>?fonte=   {ligado?, modelo?, limparModelo?} -> liga/desliga ou troca o modelo principal
 GET /api/alertas?fonte=            -> o sino: {alertas[], naoLidas} (créditos do Claude etc.)
 POST /api/alertas/lidas?fonte=     -> marca todos como lidos
+GET /api/mock?fonte=               -> catálogo de reserva do MCP: {ligado, auto, desde, motivo, reservaAuto}
+POST /api/mock?fonte=              {ligado?, reservaAuto?} -> liga/desliga o mock e o modo palco (troca automática)
 GET /api/ao-vivo?fonte=&desde=     -> os últimos passos do time, pra animação (sem texto de ninguém)
 GET /api/rotinas?fonte=&dias=      -> o que o bot faz sozinho: cutucada, carrinho esquecido, lembrete, rastreio
 POST /api/insights?fonte=          {pagina, dados, novo?} -> insights da Analista (roda no Modal, cache de 10 min)
@@ -436,6 +438,48 @@ def criar_api(paineis, analista=chamar_analista):
             return JSONResponse(await asyncio.to_thread(alertas.listar, p.fonte.armazem()))
         except Exception as e:  # noqa: BLE001 - Modal fora: o sino só não acende
             return JSONResponse({'erro': str(e)[:200]}, status_code=503)
+
+    def _ver_mock(arm):
+        motivo = arm.get('cfg:mock_motivo') or {}
+        return {'ligado': bool(arm.get('cfg:mock')), 'auto': bool(motivo.get('auto')), 'desde': motivo.get('quando'),
+                'motivo': motivo.get('motivo'), 'reservaAuto': arm.get('cfg:reserva_auto') is True}
+
+    @api.get('/api/mock')
+    async def ver_mock(fonte: str = 'real'):
+        """Catálogo de reserva do MCP (src/bot/contexto.py): ligado na mão aqui ou sozinho quando o iFood cai."""
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+        try:
+            return JSONResponse(await asyncio.to_thread(_ver_mock, p.fonte.armazem()))
+        except Exception as e:  # noqa: BLE001 - Modal fora: o interruptor só não aparece
+            return JSONResponse({'erro': str(e)[:200]}, status_code=503)
+
+    @api.post('/api/mock')
+    async def definir_mock(request: Request, fonte: str = 'real'):
+        if not _origem_local(request):
+            return JSONResponse({'erro': 'origem não permitida'}, status_code=403)
+        if 'application/json' not in request.headers.get('content-type', ''):
+            return JSONResponse({'erro': 'mande JSON'}, status_code=415)
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+        corpo = await request.json()
+
+        def mudar():
+            arm = p.fonte.armazem()
+            if 'ligado' in corpo:
+                arm['cfg:mock'] = bool(corpo['ligado'])
+                if corpo['ligado']:
+                    arm['cfg:mock_motivo'] = {'quando': time.time(), 'motivo': 'ligado no dash', 'auto': False}
+                else:
+                    arm.pop('cfg:mock_motivo', None)
+            if 'reservaAuto' in corpo:
+                arm['cfg:reserva_auto'] = bool(corpo['reservaAuto'])
+            return _ver_mock(arm)
+        dados = await asyncio.to_thread(mudar)
+        print(f'painel {fonte}: mock -> {corpo}')
+        return JSONResponse(dados)
 
     @api.post('/api/alertas/lidas')
     async def ler_alertas(request: Request, fonte: str = 'real'):

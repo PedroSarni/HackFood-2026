@@ -2630,7 +2630,10 @@ class Bot:
             else:
                 extras += [i for i in itens if not _mesmo_termo(i, tema)
                            and not any(_mesmo_termo(i, e) for e in extras)]
-            self._montar_kit(pessoas or kit['pessoas'], tema, extras, ajuste or kit.get('ajuste'), anterior=anterior)
+            dito = ' '.join(x for x in (ajuste, self._disse) if x)  # "por até 200": o valor pode não vir no ajuste
+            teto = kit_grupo.teto_em(dito, pessoas or kit['pessoas']) or kit.get('teto')
+            self._montar_kit(pessoas or kit['pessoas'], tema, extras, ajuste or kit.get('ajuste'), anterior=anterior,
+                             teto=teto)
             return
         car = u.get('carrinho') or {}
         if not itens and not car.get('itens'):
@@ -2648,23 +2651,25 @@ class Bot:
         extras = itens[1:] if itens else list(pend.get('extras') or [])
         pessoas = pessoas or pend.get('pessoas')
         ajuste = ajuste or pend.get('ajuste')
+        # "por até 300 reais": o teto vem da frase inteira (o modelo nem sempre põe no texto do ajuste)
+        teto = kit_grupo.teto_em(' '.join(x for x in (ajuste, self._disse) if x), pessoas) or pend.get('teto')
         if tema:
             conhecido = kit_grupo.tema_em(tema['termo'])
             if conhecido and tema.get('tipo_loja') != conhecido['tipo_loja']:
                 tema = {**tema, 'tipo_loja': conhecido['tipo_loja']}  # pizza pra galera é de restaurante
         if not tema:
-            u['grupo_pendente'] = {'pessoas': pessoas, 'ajuste': ajuste}
+            u['grupo_pendente'] = {'pessoas': pessoas, 'ajuste': ajuste, 'teto': teto}
             self.perguntar(T.grupo_o_que(pessoas), [T.B_INICIO], fase='grupo_tema')
             return
         if not pessoas or pessoas > kit_grupo.MAX_PESSOAS:
-            u['grupo_pendente'] = {'tema': tema, 'extras': extras, 'ajuste': ajuste}
+            u['grupo_pendente'] = {'tema': tema, 'extras': extras, 'ajuste': ajuste, 'teto': teto}
             self.perguntar(T.GRUPO_DEMAIS if pessoas else T.GRUPO_QUANTAS, T.B_PESSOAS, fase='grupo_pessoas')
             return
         u['grupo_pendente'] = None
         if pessoas == 1:  # "pra mim só": pedido normal
             self.iniciar_compra([tema] + extras)
             return
-        self._montar_kit(pessoas, tema, extras, ajuste)
+        self._montar_kit(pessoas, tema, extras, ajuste, teto=teto)
 
     def grupo_pessoas(self, arg):
         n = arg if isinstance(arg, int) else (int(arg) if str(arg).isdigit() else numero_em(str(arg)))
@@ -2689,7 +2694,7 @@ class Bot:
         u['grupo'] = {'pessoas': pessoas, 'loja_id': car.get('loja_id')} if pessoas > 1 else None
         self.mostrar_carrinho()
 
-    def _montar_kit(self, pessoas, tema, extras=(), ajuste=None, anterior=None, outra_loja=False):
+    def _montar_kit(self, pessoas, tema, extras=(), ajuste=None, anterior=None, outra_loja=False, teto=None):
         u = self.u
         it = {'acao': 'grupo', 'numero': pessoas, 'itens': [tema] + list(extras), 'texto': ajuste}
         if not self.exigir_login(it):
@@ -2699,7 +2704,7 @@ class Bot:
         if not anterior:  # remontar é rápido; o 1º kit busca loja, cardápio e acompanhamentos
             self.dizer(T.montando_kit(pessoas, tema['termo']))
         kit, motivo = kit_grupo.montar(self.ctx.ifood(self.wa), self.ctx.llm, u['endereco'], pessoas, tema,
-                                       extras, ajuste, anterior=anterior, outra_loja=outra_loja)
+                                       extras, ajuste, anterior=anterior, outra_loja=outra_loja, teto=teto)
         if not kit:
             if motivo == 'sem_loja' and anterior:
                 u['kit'] = {**anterior, 'tem_outra': False}
@@ -2736,7 +2741,8 @@ class Bot:
         elif not k or not k.get('linhas'):
             self.repetir_pergunta(T.BOTAO_VELHO) if self.u.get('fase') != 'kit' else self.perguntar_pedido()
         elif arg == 'outra':
-            self._montar_kit(k['pessoas'], k['tema'], k.get('extras'), k.get('ajuste'), anterior=k, outra_loja=True)
+            self._montar_kit(k['pessoas'], k['tema'], k.get('extras'), k.get('ajuste'), anterior=k, outra_loja=True,
+                             teto=k.get('teto'))
         else:
             self.kit_ok()
 

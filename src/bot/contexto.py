@@ -129,7 +129,55 @@ class Contexto:
         self.recorrencias.remover_todas(wa_id)
 
 
-def chamador_real(armazem, wa_id):
+# --- catálogo de reserva: o iFood caiu, o bot não ------------------------------------------------
+# 18/10: o MCP do iFood tem ficado mudo (nem erro devolve) e a apresentação é ao vivo. Só com o "modo palco"
+# armado no dash (cfg:reserva_auto; DESLIGADO por padrão: fora do palco, pedido real que cai tem que dar erro,
+# nunca um "pedido feito" no mock) a chamada real tem prazo curto e uma tentativa só; no 1º sinal de queda o
+# interruptor do mock liga sozinho pra todo mundo, a MESMA chamada é refeita no mock e o dash ganha um aviso
+# discreto no sino. Volta pro iFood de verdade só quem desligar o mock: nada de alternar no meio do fluxo.
+PRAZO_COM_RESERVA = 10.0
+QUEDA = ('TIMEOUT', 'REDE', 'SESSAO', 'RESPOSTA_VAZIA')
+
+
+def reserva_armada(estado):
+    try:
+        return estado.get('cfg:reserva_auto') is True
+    except Exception:  # noqa: BLE001 - armazém fora: sem modo palco
+        return False
+
+
+def mcp_caiu(e):
+    """Queda do iFood (vale trocar pro mock) x erro de negócio ou de login (o fluxo trata como sempre)."""
+    if isinstance(e, (PrecisaLogin, ifood_mcp.SemAutorizacao)):
+        return False
+    if isinstance(e, ifood_mcp.ErroMCP):
+        cod = str(e.codigo or '').upper()
+        return cod in QUEDA or cod.startswith('HTTP_') or cod.startswith('RPC_-32')
+    return isinstance(e, (OSError, ValueError)) or type(e).__module__.startswith('httpx')
+
+
+def ligar_reserva(estado, motivo):
+    from src.shared import alertas
+    estado['cfg:mock'] = True
+    estado['cfg:mock_motivo'] = {'quando': time.time(), 'motivo': motivo[:300], 'auto': True}
+    print(f'iFood caiu, catálogo de reserva ligado: {motivo[:200]}')
+    alertas.registrar(estado, 'mcp_reserva', 'O iFood não respondeu: o bot passou pro catálogo de reserva', motivo[:300])
+
+
+def com_reserva(estado, real, reserva):
+    """chamar(tool, **args) que tenta o iFood real e, se ele cair, liga o mock e refaz a chamada nele."""
+    def chamar(ferramenta, **args):
+        try:
+            return real(ferramenta, **args)
+        except Exception as e:  # noqa: BLE001 - o filtro é o mcp_caiu
+            if not mcp_caiu(e):
+                raise
+            ligar_reserva(estado, f'{ferramenta}: {e!r}')
+            return reserva(ferramenta, **args)
+    return chamar
+
+
+def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2):
     """Função chamar(tool, **args) com o token da pessoa, renovando quando precisa.
     Token recusado no meio do caminho: renova uma vez e tenta de novo."""
     cid, segredo = _cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET')
@@ -164,10 +212,12 @@ def chamador_real(armazem, wa_id):
         tok = tokens_validos()
         try:
             try:
-                return ifood_mcp.ClienteMCP(tok['access_token']).chamar(ferramenta, **args)
+                return ifood_mcp.ClienteMCP(tok['access_token'], prazo=prazo, tentativas=tentativas).chamar(
+                    ferramenta, **args)
             except ifood_mcp.SemAutorizacao:
                 tok = tokens_validos(forcar=True)
-                return ifood_mcp.ClienteMCP(tok['access_token']).chamar(ferramenta, **args)
+                return ifood_mcp.ClienteMCP(tok['access_token'], prazo=prazo, tentativas=tentativas).chamar(
+                    ferramenta, **args)
         except ifood_mcp.ErroMCP:
             local = ifood_mcp._freio['bloqueado_ate']
             if local > barrado_ate:
@@ -202,9 +252,13 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
     wpp = painel.EspiaoWhatsApp(wpp, diario, origem)
     rec = Recorrencias(modal.Dict.from_name('hackfood-recorrencias', create_if_missing=True))
     def chamador(wid):  # decide a cada uso: o interruptor do modo demo vale sem deploy
+        mock = McpFake(armazem=estado, chave=f'mock:{wid}').chamar
         if modo_mock(estado):
-            return painel.espiar_mcp(McpFake(armazem=estado, chave=f'mock:{wid}').chamar, diario, wid)
-        return painel.espiar_mcp(chamador_real(estado, wid), diario, wid)
+            return painel.espiar_mcp(mock, diario, wid)
+        if not reserva_armada(estado):
+            return painel.espiar_mcp(chamador_real(estado, wid), diario, wid)
+        real = chamador_real(estado, wid, prazo=PRAZO_COM_RESERVA, tentativas=1)
+        return painel.espiar_mcp(com_reserva(estado, real, mock), diario, wid)
 
     def rastrear(wid, pedido_id):
         # pelo nome no app publicado: no container o app roda como `app` e este `src.app` é uma 2ª cópia

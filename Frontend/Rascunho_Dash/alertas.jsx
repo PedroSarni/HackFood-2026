@@ -43,9 +43,10 @@ export function AlertBell({ alerts }) {
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
   }, [open]);
   const { alertas, naoLidas, readAll } = alerts;
+  const grave = alertas.some(a => !a.lida && a.nivel === 'erro');  // aviso (ex.: iFood caiu, reserva entrou) fica discreto
   return <div className="alert-bell" ref={box}>
-    <button className={`icon-button bell-button ${naoLidas ? 'has-unread' : ''}`} aria-label={naoLidas ? `${naoLidas} notificações não lidas` : 'Notificações'} aria-expanded={open} onClick={() => setOpen(v => !v)}>
-      <Bell size={16} />{naoLidas > 0 && <span className="bell-count">{naoLidas > 9 ? '9+' : naoLidas}</span>}
+    <button className={`icon-button bell-button ${grave ? 'has-unread' : ''}`} aria-label={naoLidas ? `${naoLidas} notificações não lidas` : 'Notificações'} aria-expanded={open} onClick={() => setOpen(v => !v)}>
+      <Bell size={16} />{naoLidas > 0 && <span className={`bell-count ${grave ? '' : 'quiet'}`}>{naoLidas > 9 ? '9+' : naoLidas}</span>}
     </button>
     {open && <div className="alert-panel" role="dialog" aria-label="Notificações">
       <div className="alert-panel-head"><strong>Notificações</strong>{naoLidas > 0 && <button className="alert-read" onClick={readAll}><CheckCheck size={14} />Marcar como lidas</button>}<button className="icon-button" aria-label="Fechar notificações" onClick={() => setOpen(false)}><X size={14} /></button></div>

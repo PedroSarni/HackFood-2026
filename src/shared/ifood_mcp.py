@@ -157,10 +157,13 @@ SESSAO_VALIDADE = 600
 
 
 class ClienteMCP:
-    def __init__(self, token, url=GATEWAY, http=None):
+    def __init__(self, token, url=GATEWAY, http=None, prazo=PRAZO, tentativas=2):
+        """prazo/tentativas: com o catálogo de reserva armado (src/bot/contexto.py), o iFood mudo não segura
+        ninguém 25 s x 2: no 1º erro a chamada já vai pro mock."""
         self.token = token
         self.url = url
-        self.http = http or httpx.Client(timeout=PRAZO)
+        self.http = http or httpx.Client(timeout=prazo)
+        self.tentativas = tentativas
         self._chave = hashlib.sha256(token.encode()).hexdigest()[:16]
         self._id = 0
         self.versao = PROTOCOLO
@@ -235,13 +238,13 @@ class ClienteMCP:
     def chamar(self, ferramenta, **argumentos):
         """tools/call -> dict do domínio. Erro de negócio vira ErroMCP; passageiro tenta 2x."""
         args = {k: v for k, v in argumentos.items() if v is not None}
-        for tentativa in range(2):
+        for tentativa in range(self.tentativas):
             try:
                 return _resultado(self.rpc('tools/call', {'name': ferramenta, 'arguments': args}))
             except SemAutorizacao:
                 raise
             except ErroMCP as e:
-                if not e.tentar_de_novo or tentativa == 1:
+                if not e.tentar_de_novo or tentativa == self.tentativas - 1:
                     raise
                 time.sleep(1.5)
 

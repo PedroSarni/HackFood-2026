@@ -376,6 +376,17 @@ QUAL_ENTREGA = 'Quando você quer receber? 🛵'
 LOJA_FECHADA = 'Essa loja não está entregando agora. 😕'
 
 
+# bebida alcoólica no pedido: o iFood só vende pra maior de 18 e o entregador pode pedir documento
+_ALCOOL = re.compile(r'\b(cerveja|chopp?|vinho|espumante|vodka|whisky|cachaca|gin|licor|drink|caipirinha)\b')
+MAIORIDADE = '🔞 Tem bebida alcoólica: venda só para maiores de 18 anos. O entregador pode pedir um documento na entrega.'
+
+
+def _sem_acento(texto):
+    import unicodedata
+    t = unicodedata.normalize('NFKD', str(texto or '').lower())
+    return ''.join(c for c in t if not unicodedata.combining(c))
+
+
 def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None, sugestao=None):
     linhas = ['🧾 *Confira seu pedido:*', '']
     for it in somar_iguais(carrinho['itens']):
@@ -397,6 +408,8 @@ def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None, sug
     if pagamento:
         linhas.append(f'💳 {pagamento["nome"]}')
     linhas += ['', f'*Total: {reais(carrinho.get("total"))}*' + dividido(carrinho.get('total'), pessoas, linha=True)]
+    if any(_ALCOOL.search(_sem_acento(it.get('nome'))) for it in carrinho['itens']):
+        linhas += ['', MAIORIDADE]
     if sugestao:  # uma sugestão do que acompanha, sem passo a mais: é só falar
         linhas += ['', f'💡 Quer *{sugestao}* pra acompanhar? É só falar que eu coloco.']
     linhas += ['', 'Posso fazer o pedido?']
@@ -675,6 +688,9 @@ def kit(k, troca=None, _nome=60, _fala=True):
         linhas.append(f'🛵 Entrega: {reais(k["taxa"]) if k["taxa"] else "grátis"}')
     linhas.append(f'💰 *Total: {reais(k["total"])}*' + ('' if k.get('taxa') is not None else ' + entrega'))
     linhas.append(dividido(k['total'], k['pessoas']))
+    if k.get('teto'):
+        linhas.append(f'✅ Dentro do seu limite de {reais(k["teto"])}' if k['total'] <= k['teto'] + 0.005
+                      else f'⚠️ Passou do seu limite de {reais(k["teto"])}: o mínimo do kit já custa isso.')
     if k.get('faltou'):
         linhas.append(f'⚠️ Não achei {", ".join(k["faltou"])} nessa loja.')
     if troca:

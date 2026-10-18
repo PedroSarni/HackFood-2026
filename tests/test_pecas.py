@@ -327,8 +327,8 @@ def test_disjuntor_e_compartilhado_entre_containers(monkeypatch):
     postou = []
     real = M.ClienteMCP.__init__
 
-    def init(self, token, url=M.GATEWAY, http=None):
-        real(self, token, url, httpx.Client(transport=httpx.MockTransport(
+    def init(self, token, url=M.GATEWAY, http=None, **kw):
+        real(self, token, url, **kw, http=httpx.Client(transport=httpx.MockTransport(
             lambda req: postou.append(1) or httpx.Response(200, json={}))))
     monkeypatch.setattr(M.ClienteMCP, '__init__', init)
     with pytest.raises(M.ErroMCP) as e:
@@ -345,8 +345,8 @@ def test_bloqueio_visto_aqui_vai_pro_armazem(monkeypatch):
     armazem = {'tok:1': {'access_token': 'a', 'refresh_token': 'r', 'expira_em': time.time() + 3600}}
     real = M.ClienteMCP.__init__
 
-    def init(self, token, url=M.GATEWAY, http=None):
-        real(self, token, url, httpx.Client(transport=httpx.MockTransport(
+    def init(self, token, url=M.GATEWAY, http=None, **kw):
+        real(self, token, url, **kw, http=httpx.Client(transport=httpx.MockTransport(
             lambda req: httpx.Response(403, text='Access Denied'))))
     monkeypatch.setattr(M.ClienteMCP, '__init__', init)
     with pytest.raises(M.ErroMCP):
