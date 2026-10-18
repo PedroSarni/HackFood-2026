@@ -225,3 +225,9 @@ modo demo trouxe em 1 minuto o lembrete de um automático criado pelo bug antigo
 puxava o assunto: nenhuma dessas mensagens veio dele. Agora a oferta sai só na 2ª compra, "Não precisa"
 segura a oferta por uma semana e o texto ficou curto. De carona, com o Gemini fora: "cancelar o pedido"
 cancela (antes virava busca) e "quero jantar pizza hj" busca pizza no restaurante.
+
+## 2026-10-18 00:10 — fotos das opções no modo áudio; foto que "não deu pra ouvir"; key do OpenRouter
+
+**Prompt:** como pego a chave do openrouter qual o site certinho? preciso que quando eu peça pra ela entrar no modo só audio ela mande foto da comida, as opcoes como unica exceção, ok? o resto segue tudo audio mesmo / sem contar que agora pouco mandei uma foto e ela disse que nao consegue ouvir meu audio?? o que é isso / aqui a key do openrouter: [key do OpenRouter]
+
+**Resposta:** Chave em openrouter.ai/settings/keys (crédito em /settings/credits). Cadastrada no secret `hackathon-openrouter` e testada: os dois modelos entendem o pedido (~4-5 s). Modo áudio: opções de produto chegam como fotos numeradas (1️⃣ 2️⃣ 3️⃣, sem nome nem preço) e o áudio diz o que é cada número; o resto segue só áudio. Foto + Gemini fora caía no aviso de áudio; agora o aviso depende do que chegou (e o OpenRouter também lê foto). O trecho é do claim bot-photo-group-kit: mudança mínima, commit isolado.
