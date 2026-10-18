@@ -39,7 +39,9 @@ segredos = [modal.Secret.from_name('hackathon-whatsapp'),
             # ELEVENLABS_API_KEY do Scribe (áudio vira texto); PREENCHER = desligado e o Gemini ouve
             modal.Secret.from_name('hackathon-elevenlabs'),
             # palavra secreta de debug (DEBUG_RESET), fora do git; vazia = desligado
-            modal.Secret.from_name('hackathon-debug')]
+            modal.Secret.from_name('hackathon-debug'),
+            # OPENROUTER_API_KEY: quebra-galho quando o Gemini estoura (src/shared/llm.py); PREENCHER = desligado
+            modal.Secret.from_name('hackathon-openrouter')]
 
 estado = modal.Dict.from_name('hackfood-estado', create_if_missing=True)
 entrada = modal.Queue.from_name('hackfood-entrada', create_if_missing=True)

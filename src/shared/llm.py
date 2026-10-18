@@ -87,25 +87,109 @@ def _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento):
         raise ErroLLM(f'{modelo} devolveu JSON inválido: {txt[:120]!r}') from e
 
 
+# --- quebra-galho: OpenRouter --------------------------------------------------------------
+# 17/10 23h45: o Gemini estourando (timeout/503) deixava o bot mudo. Secret `hackathon-openrouter`
+# (OPENROUTER_API_KEY; vazia ou PREENCHER = desligado). Entra DEPOIS que a fila do Gemini falha.
+# BOT_LLM=openrouter pula o Gemini (debug). OPENROUTER_MODELOS="a,b" troca a fila.
+# Fila padrão: o mesmo 3.5-flash-lite por outra infraestrutura/cota, e o Haiku, de outro fornecedor.
+OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions'
+OPENROUTER_MODELOS = ['google/gemini-3.5-flash-lite', 'anthropic/claude-haiku-5.5']
+OPENROUTER_PRAZO = 8.0
+
+
+def _esquema_json(e):
+    """Esquema OpenAPI do Gemini (type OBJECT, nullable) -> JSON Schema (type object, [t, null])."""
+    if not isinstance(e, dict):
+        return e
+    s = {}
+    for k, v in e.items():
+        if k == 'type':
+            s['type'] = str(v).lower()
+        elif k == 'properties':
+            s['properties'] = {n: _esquema_json(p) for n, p in v.items()}
+        elif k == 'items':
+            s['items'] = _esquema_json(v)
+        elif k in ('required', 'enum', 'description'):
+            s[k] = v
+    if e.get('nullable') and 'type' in s:
+        s['type'] = [s['type'], 'null']
+        if 'enum' in s:
+            s['enum'] = list(s['enum']) + [None]
+    return s
+
+
+def _conteudo_openrouter(partes):
+    """Texto e foto vão; áudio não (o Scribe já transcreve antes; aqui só sobra o caso raro)."""
+    saida = []
+    for p in partes:
+        if p[0] == 'texto':
+            saida.append({'type': 'text', 'text': p[1]})
+        elif str(p[1]).startswith('image/'):
+            saida.append({'type': 'image_url',
+                          'image_url': {'url': f'data:{p[1]};base64,{base64.b64encode(p[2]).decode()}'}})
+        else:
+            saida.append({'type': 'text', 'text': '(a pessoa mandou um áudio que não deu pra ouvir)'})
+    return saida
+
+
+def _chamar_openrouter(http, modelo, sistema, partes, esquema, prazo):
+    corpo = {'model': modelo, 'temperature': 0.1, 'max_tokens': 2048,
+             'messages': [{'role': 'system', 'content': sistema + '\nResponda SÓ o JSON, sem texto em volta.'},
+                          {'role': 'user', 'content': _conteudo_openrouter(partes)}],
+             'response_format': {'type': 'json_schema',
+                                 'json_schema': {'name': 'resposta', 'strict': False, 'schema': _esquema_json(esquema)}}}
+    r = http.post(OPENROUTER, json=corpo, timeout=prazo,
+                  headers={'Authorization': f'Bearer {_cfg("OPENROUTER_API_KEY")}', 'X-Title': 'HackFood bot'})
+    if r.status_code >= 400:
+        raise ErroLLM(f'openrouter {modelo} HTTP {r.status_code}: {" ".join(r.text.split())[:200]}')
+    try:
+        txt = r.json()['choices'][0]['message']['content'] or ''
+    except (ValueError, KeyError, IndexError, TypeError) as e:
+        raise ErroLLM(f'openrouter {modelo} resposta estranha: {r.text[:120]!r}') from e
+    txt = txt.strip().removeprefix('```json').removeprefix('```').removesuffix('```').strip()
+    try:
+        return json.loads(txt)
+    except ValueError as e:
+        raise ErroLLM(f'openrouter {modelo} devolveu JSON inválido: {txt[:120]!r}') from e
+
+
+def _fila_openrouter():
+    if not _cfg('OPENROUTER_API_KEY'):
+        return []
+    return [m.strip() for m in (_cfg('OPENROUTER_MODELOS') or ','.join(OPENROUTER_MODELOS)).split(',') if m.strip()]
+
+
 def gerar_json(sistema, partes, esquema, http=None, modelos=None):
     """Uma resposta JSON no formato `esquema` (OpenAPI do Gemini: type OBJECT, STRING...).
     Tenta os modelos em ordem; devolve (dados, modelo_usado, segundos).
-    modelos: fila própria [(modelo, prazo, pensamento)] pra quem tem pressa (roteiro do áudio)."""
-    if not _cfg('GEMINI_API_KEY'):
+    modelos: fila própria [(modelo, prazo, pensamento)] pra quem tem pressa (roteiro do áudio).
+    Toda a fila do Gemini falhou: tenta o OpenRouter, se houver key (quebra-galho)."""
+    fila_or = _fila_openrouter()
+    so_openrouter = _cfg('BOT_LLM') == 'openrouter' and fila_or
+    if not _cfg('GEMINI_API_KEY') and not fila_or:
         raise ErroLLM('GEMINI_API_KEY não configurada')
     http = http or httpx.Client()
-    parts = _partes(partes)
     erros = []
     t0 = time.monotonic()
-    for modelo, prazo, pensamento in modelos or _modelos():
+    if _cfg('GEMINI_API_KEY') and not so_openrouter:
+        parts = _partes(partes)
+        for modelo, prazo, pensamento in modelos or _modelos():
+            try:
+                return _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento), modelo, time.monotonic() - t0
+            except (ErroLLM, httpx.HTTPError) as e:
+                if pensamento and 'thinking' in str(e).lower():  # nível não suportado: tenta sem
+                    try:
+                        return (_chamar(http, modelo, sistema, parts, esquema, prazo, ''), modelo,
+                                time.monotonic() - t0)
+                    except (ErroLLM, httpx.HTTPError) as e2:
+                        e = e2
+                erros.append(f'{modelo}: {e!r}'[:300])
+    for modelo in fila_or:
         try:
-            return _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento), modelo, time.monotonic() - t0
+            dados = _chamar_openrouter(http, modelo, sistema, partes, esquema, OPENROUTER_PRAZO)
+            if erros:
+                print(f'gemini falhou, openrouter {modelo} salvou: {erros[-1][:150]}')
+            return dados, f'openrouter:{modelo}', time.monotonic() - t0
         except (ErroLLM, httpx.HTTPError) as e:
-            if pensamento and 'thinking' in str(e).lower():  # nível não suportado: tenta sem
-                try:
-                    return (_chamar(http, modelo, sistema, parts, esquema, prazo, ''), modelo,
-                            time.monotonic() - t0)
-                except (ErroLLM, httpx.HTTPError) as e2:
-                    e = e2
-            erros.append(f'{modelo}: {e!r}'[:300])
+            erros.append(f'openrouter {modelo}: {e!r}'[:300])
     raise ErroLLM(' | '.join(erros))
