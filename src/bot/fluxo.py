@@ -35,6 +35,11 @@ TRIVIAIS = {'saudacao', 'agradecer', 'sim'}
 # etapas em que um "oi" no meio não deve jogar o pedido fora: reapresenta a pergunta
 NO_MEIO_DO_PEDIDO = {'escolhendo', 'quantidade', 'opcao', 'mais', 'tirar', 'pagamento', 'cpf', 'confirmar',
                      'mudar', 'endereco', 'endereco_escolha', 'endereco_lista', 'complemento', 'bairro'}
+# sumiu mais que isso no meio de uma pergunta aberta: o "oi" da volta não é resposta daquela etapa
+IDLE_MAX = 1800
+FASES_QUE_EXPIRAM = {'endereco', 'complemento', 'bairro', 'cpf', 'endereco_escolha', 'quantidade', 'opcao',
+                     'tirar', 'mudar'}
+VOLTOU = 'Faz um tempinho que você sumiu, recomeçamos? 🙂'
 
 
 def estado_novo():
@@ -100,6 +105,7 @@ class Bot:
         self.u = u = self._carregar(wa_id)
         if msgs and msgs[-1].get('_nome'):
             u['nome'] = msgs[-1]['_nome']
+        anterior = u.get('ultima_msg') or 0  # lido antes de sobrescrever (recorrencia.py usa o novo)
         u['ultima_msg'] = self.ctx.agora()
         self._resposta = None   # fala do Gemini pra esta rodada (interpretar preenche)
         self._direto = None     # "Sim, pode pedir" do lembrete: {'teto': total} = fecha sem resumo
@@ -109,7 +115,9 @@ class Bot:
             self._disse = ' / '.join(e.texto for e in entradas if e.texto)[:300]
             if self._debug_reset(entradas):   # palavra secreta de debug: desloga e zera tudo
                 return
-            botoes = [e for e in entradas if e.tipo == 'botao']
+            if self._sessao_ociosa(anterior, entradas):
+                return
+            botoes =[e for e in entradas if e.tipo == 'botao']
             livres = [e for e in entradas if e.tipo != 'botao']
             if botoes:
                 # toque duplo no mesmo botão vale um; de vários cards, vale o último toque
@@ -206,6 +214,28 @@ class Bot:
             except Exception:  # noqa: BLE001 - nem o aviso com botão saiu: vai texto puro
                 traceback.print_exc()
                 self.dizer(T.ERRO_SEM_BOTAO)
+
+    def _sessao_ociosa(self, anterior, entradas):
+        """Voltou depois de IDLE_MAX com uma pergunta aberta: recomeça do menu (ou reapresenta o
+        resumo, se o carrinho está montado). Login, endereços, histórico e carrinho ficam.
+        True = a rodada acabou aqui (só "oi"/"sim"/"valeu", ou o texto era da etapa do CPF)."""
+        u = self.u
+        if not anterior or self.ctx.agora() - float(anterior) <= IDLE_MAX:
+            return False  # 0/None = estado antigo sem a informação: não expira
+        if any(e.tipo == 'botao' for e in entradas):
+            return False  # tocou num botão: é resposta explícita, segue o caminho normal
+        fase = u.get('fase')
+        if fase == 'confirmar' and (u.get('carrinho') or {}).get('id'):
+            self._protegido(self.mostrar_resumo)
+        elif fase in FASES_QUE_EXPIRAM:
+            u.update({'fase': 'pedido', 'pergunta': {}, 'pendente': None, 'fila': [], 'atual': None,
+                      'escolha': None, 'novo_endereco': None})
+            self._protegido(lambda: self.menu(VOLTOU))
+            if fase == 'cpf':
+                return True  # CPF nunca vai pra IA: o que ela digitou não segue pro fluxo livre
+        else:
+            return False
+        return all(self._trivial(e) for e in entradas)
 
     def _ifood_instavel(self):
         try:

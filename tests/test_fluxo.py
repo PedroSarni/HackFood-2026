@@ -169,6 +169,69 @@ def test_duas_falhas_seguidas_no_endereco_mostram_botoes():
     assert m.estado()['fase'] == 'endereco'
 
 
+# --- sessão ociosa -----------------------------------------------------------------------
+
+def test_sumiu_31_min_no_endereco_e_disse_oi_volta_pro_menu():
+    m = Mundo()
+    m.enviar('quero pao')
+    assert m.estado()['fase'] == 'endereco'
+    antes = len(m.mcp.chamadas_de('createAddress'))
+    m.wpp.limpar()
+    m.agora += 31 * 60
+    m.enviar('oi')
+    assert len(m.mcp.chamadas_de('createAddress')) == antes
+    assert len(m.wpp.saida) == 1  # só o menu, sem resposta dobrada
+    assert 'sumiu' in m.wpp.textos()[-1]
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir', 'repetir', 'meu_pedido']
+    assert m.estado()['fase'] == 'pedido' and m.estado()['pendente'] is None
+
+
+def test_sumiu_5_min_no_endereco_continua_sendo_endereco():
+    m = Mundo()
+    m.enviar('quero pao')
+    antes = len(m.mcp.chamadas_de('createAddress'))
+    m.agora += 5 * 60
+    m.enviar('Rua das Flores, 120, São Carlos')
+    assert len(m.mcp.chamadas_de('createAddress')) > antes
+    assert 'sumiu' not in ' '.join(m.wpp.textos())
+
+
+def test_sumiu_2h_no_resumo_nao_apaga_o_carrinho():
+    m = pedido_ate_o_resumo(Mundo())
+    car_id = m.estado()['carrinho']['id']
+    m.wpp.limpar()
+    m.agora += 2 * 3600
+    m.enviar('oi')
+    e = m.estado()
+    assert e['fase'] == 'confirmar' and e['carrinho']['id'] == car_id
+    assert 'Confira seu pedido' in m.wpp.saida[-1][1]['texto']
+    assert not m.mcp.chamadas_de('submitOrder')
+
+
+def test_estado_antigo_sem_ultima_msg_nao_expira():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.estado()['ultima_msg'] = 0  # salvo antes de existir o campo
+    m.agora += 3 * 3600
+    antes = len(m.mcp.chamadas_de('createAddress'))
+    m.enviar('Rua das Flores, 120, São Carlos')
+    assert len(m.mcp.chamadas_de('createAddress')) > antes
+    assert 'sumiu' not in ' '.join(m.wpp.textos())
+
+
+def test_expirar_preserva_login_e_endereco_salvo():
+    m = Mundo()
+    endereco_pronto(m)
+    end = m.estado()['endereco']
+    m.enviar('2')  # escolheu o card: agora pergunta a quantidade
+    assert m.estado()['fase'] == 'quantidade'
+    m.agora += 31 * 60
+    m.enviar('oi')
+    e = m.estado()
+    assert e['fase'] == 'pedido' and e['escolha'] is None
+    assert e['endereco'] == end and m.armazem.get(f'tok:{m.wa}')
+
+
 # --- busca, cards e "mais opções" --------------------------------------------------------
 
 def test_mais_opcoes_reaproveita_a_lista_sem_buscar_de_novo(monkeypatch):
