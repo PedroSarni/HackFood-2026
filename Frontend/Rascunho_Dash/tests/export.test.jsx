@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../app.jsx';
 import { downloadAnalyticsPdf } from '../report-download.js';
+import { filterSessions } from '../data.js';
+import { createSeed, FIXTURE_DATE } from './fixtures.js';
 
 vi.mock('../report-download.js', () => ({ downloadAnalyticsPdf: vi.fn() }));
 const mount = (path = '/') => render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>);
@@ -23,6 +25,8 @@ describe('Exportação de relatórios na interface', () => {
     expect(request.filters.period).toBe('7');
     expect(request.advanced).toBe(false);
     expect(request.rows.length).toBe(39);
+    expect(request.previous).toEqual(filterSessions(createSeed(), request.filters, false, true));
+    expect(request.referenceDate).toBe(FIXTURE_DATE);
     expect(screen.getByRole('status').textContent).toContain('PDF gerado');
     expect(document.querySelector('.export-dropdown').open).toBe(false);
   });
@@ -38,7 +42,18 @@ describe('Exportação de relatórios na interface', () => {
     expect(request.advanced).toBe(true);
     expect(request.rows.length).toBeGreaterThan(0);
     expect(request.rows.every(s => s.restaurant === 'Sushi Nori')).toBe(true);
+    expect(request.previous.every(s => s.restaurant === 'Sushi Nori')).toBe(true);
     expect(screen.getByRole('button', { name: 'Exportar CSV' })).toBeTruthy();
+  });
+
+  it('envia a fonte selecionada para identificar corretamente o relatório', async () => {
+    downloadAnalyticsPdf.mockResolvedValue(undefined);
+    const user = userEvent.setup(); mount();
+    await user.selectOptions(screen.getByLabelText('Fonte dos dados'), 'demo');
+    await user.click(screen.getByText('Exportar', { selector: 'summary span' }));
+    await user.click(screen.getByRole('button', { name: /Relatório PDF/ }));
+    await waitFor(() => expect(downloadAnalyticsPdf).toHaveBeenCalledTimes(1));
+    expect(downloadAnalyticsPdf.mock.calls[0][0].source).toBe('demo');
   });
 
   it('trata falhas e permite uma nova tentativa sem perder os filtros', async () => {

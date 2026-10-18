@@ -41,7 +41,7 @@ cd Frontend/Rascunho_Dash && npm run dev            # o Vite repassa /api pra 12
 - Conversas com pesquisa, filtros, paginação e drawer que preserva a tabela. Mensagens e eventos em ordem cronológica; resumo comercial e análise em uma segunda aba.
 - Período e filtros globais aplicados sobre a mesma base usada nas métricas. Filtros avançados ficam suspensos no modo básico; voltam ao reativar o avançado.
 - Exportação CSV do recorte global com identificadores de cliente, sem conteúdo das mensagens. Filtros locais da tabela não alteram esta exportação.
-- Relatório PDF disponível no menu **Exportar → Relatório PDF**, nos dois modos, e em **Relatórios → Baixar relatório PDF**, no modo avançado. Inclui resumo executivo, vendas diárias, funil, restaurantes, distribuição de status, critérios das métricas e todas as conversas do recorte global, com paginação automática.
+- Relatório PDF disponível no menu **Exportar → Relatório PDF**, nos dois modos, e em **Relatórios → Baixar relatório PDF**, no modo avançado. Inclui visão geral, vendas diárias, funil e resultados, follow-ups, clientes agregados, rankings de cidades e restaurantes, financeiro e IA. Não exporta listas individuais de clientes ou conversas; rankings extensos têm paginação automática.
 - Identidade visual utiliza os PNGs fornecidos em `images/`, com a paleta vermelho `#EA1D2C`, branco e cinza. O WebP original tem um fundo quadriculado incorporado (não é transparente), por isso os PNGs foram priorizados para preservar o acabamento.
 
 ## Dados e métricas
@@ -71,7 +71,7 @@ Para publicar, trocar o servidor local por um serviço autenticado, com paginaç
 
 XLSX, coortes, mapas, custos, versões da IA e campanhas reais não foram implementados. Métricas indisponíveis estão identificadas na interface. CSV e PDF são exportações funcionais do protótipo. Fontes web usam Google Fonts com fallback local.
 
-O PDF é gerado no navegador, sem envio de dados a um serviço externo. `pdf-report.js` reutiliza os cálculos de `data.js`; `report-download.js` carrega o gerador e a imagem da marca somente ao solicitar o arquivo. Os relatórios não incluem nomes, telefones ou conteúdo de mensagens. Período, filtros globais efetivos, data de emissão, fuso horário e identificação de dados simulados constam no documento.
+O PDF é gerado no navegador, sem envio de dados a um serviço externo. `pdf-report.js` reutiliza `metrics` e `groupBy` de `data.js`, os mesmos cálculos usados nas páginas do dashboard; `report-download.js` carrega o gerador e a imagem da marca somente ao solicitar o arquivo. Os relatórios não incluem nomes, telefones ou conteúdo de mensagens. Período, filtros globais efetivos, data de emissão, fuso horário e fonte selecionada (dados reais ou demonstração, inclusive em recortes vazios) constam no documento. O PDF recebe as sessões atuais e anteriores e a data de referência no instante do clique. No modo avançado, inclui a comparação com o período anterior e as dez etapas do funil; no básico, usa três etapas e ignora os filtros avançados, como a tela. As seções agregadas de follow-ups, clientes, mercado e financeiro estão no PDF nos dois modos. Valores indisponíveis continuam identificados, sem estimativas inventadas.
 
 ## Verificação
 

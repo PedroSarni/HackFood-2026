@@ -52,6 +52,21 @@ describe('Métricas compartilhadas e integridade da base de teste', () => {
     expect(data.stages.every(s => s.count === 0)).toBe(true);
   });
 
+  it('compartilha finanças, recompra, IA e série diária com denominadores corretos', () => {
+    const base = { startedAt: '2026-10-17T12:00:00-03:00', firstAccepted: false, latency: 2 };
+    const rows = [
+      { ...base, clientId: 'a', status: 'completed', stage: 9, amountCents: 10000, firstAccepted: true },
+      { ...base, clientId: 'a', status: 'recovered', stage: 9, amountCents: 5000, firstAccepted: true, latency: 4 },
+      { ...base, clientId: 'b', status: 'abandoned', stage: 5, amountCents: 3000 },
+      { ...base, clientId: 'c', status: 'failed', stage: 2, amountCents: 0 },
+      { ...base, clientId: 'd', status: 'cancelled', stage: 8, amountCents: 9000 },
+    ];
+    const data = metrics(rows, { period: 2, referenceDate: '2026-10-17' });
+    expect(data).toMatchObject({ gmv: 15000, ticket: 7500, recoveredGmv: 5000, abandonedValue: 3000, clients: 4, recurring: 1, purchasing: 1, repurchase: 100, recommended: 4, accepted: 2, acceptedOrders: 2, acceptance: 50, firstListConversion: 50, failures: 1, failureRate: 20, averageLatency: 2.4 });
+    expect(data.dailySales).toEqual([{ day: '2026-10-16', amountCents: 0 }, { day: '2026-10-17', amountCents: 15000 }]);
+    expect(data.outcomes.map(s => s.count)).toEqual([2, 1, 1, 1]);
+  });
+
 
   it('identifica dados simulados no CSV, mascara cliente e neutraliza fórmulas', () => {
     const session = { ...createSeed().find(s => s.status === 'abandoned'), restaurant: '=SUM(A1:A2)' };
