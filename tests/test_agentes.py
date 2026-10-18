@@ -15,7 +15,7 @@ def test_cada_prompt_de_sistema_aponta_pro_seu_agente():
             assert p not in vistos, f'{a.id} e {vistos.get(p)} com o mesmo prompt'
             vistos[p] = a.id
     assert {a.id for a in agentes.TODOS if a.tipo == 'ia'} == {'entendimento', 'foto', 'relevancia', 'grupo',
-                                                                'tutor', 'voz'}
+                                                                'tutor', 'voz', 'analista'}
     assert agentes.do_sistema('prompt que ninguém tem') == 'outro'
 
 

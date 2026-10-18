@@ -21,6 +21,7 @@ GET /api/agentes?fonte=&dias=&conversa= -> uso dos agentes de IA e das regras, l
 GET /api/equipe?fonte=             -> a ficha de cada agente (src/agentes/): persona, prompt, fila, keys mascaradas
 POST /api/equipe/<agente>?fonte=   {ligado?, modelo?, limparModelo?} -> liga/desliga ou troca o modelo principal
 GET /api/ao-vivo?fonte=&desde=     -> os últimos passos do time, pra animação (sem texto de ninguém)
+POST /api/insights?fonte=          {pagina, dados, novo?} -> insights da Analista (roda no Modal, cache de 10 min)
 GET /api/saude
 """
 import argparse
@@ -294,11 +295,30 @@ class Painel:
             time.sleep(self.intervalo)
 
 
-def criar_api(paineis):
+INSIGHTS_CACHE = 600     # s: a mesma página com os mesmos números não gasta cota de novo
+
+
+def chamar_analista(pagina, dados):
+    """A Analista roda no Modal, onde estão as keys de IA (src/app.py, `analisar_pagina`)."""
+    import modal
+
+    from src.app import APP
+    return modal.Function.from_name(APP, 'analisar_pagina').remote(pagina, dados)
+
+
+def _origem_local(request):
+    origem = request.headers.get('origin', '')
+    return not origem or origem.startswith(('http://127.0.0.1', 'http://localhost'))
+
+
+def criar_api(paineis, analista=chamar_analista):
     from fastapi import FastAPI, Request
     from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+    from src.painel import analista as modulo_analista
+
     api = FastAPI(docs_url=None, redoc_url=None)
+    insights_cache = {}
 
     def escolher(fonte):
         return paineis.get(fonte or 'real')
@@ -357,8 +377,7 @@ def criar_api(paineis):
     @api.post('/api/equipe/{agente_id}')
     async def definir(agente_id: str, request: Request, fonte: str = 'real'):
         # só o dash local mexe: JSON (navegador manda preflight) e origem local, se vier
-        origem = request.headers.get('origin', '')
-        if origem and not origem.startswith(('http://127.0.0.1', 'http://localhost')):
+        if not _origem_local(request):
             return JSONResponse({'erro': 'origem não permitida'}, status_code=403)
         if 'application/json' not in request.headers.get('content-type', ''):
             return JSONResponse({'erro': 'mande JSON'}, status_code=415)
@@ -374,6 +393,36 @@ def criar_api(paineis):
                                         bool(corpo.get('limparModelo')))
         print(f'painel {fonte}: {agente_id} -> {corpo}')
         return Response(dados, media_type='application/json')
+
+    @api.post('/api/insights')
+    async def insights(request: Request, fonte: str = 'real'):
+        """{pagina, dados, novo?} -> {resumo, insights[], modelo, segundos} da Analista. Só agregados entram."""
+        if not _origem_local(request):
+            return JSONResponse({'erro': 'origem não permitida'}, status_code=403)
+        if 'application/json' not in request.headers.get('content-type', ''):
+            return JSONResponse({'erro': 'mande JSON'}, status_code=415)
+        corpo = await request.json()
+        pagina, dados = corpo.get('pagina'), corpo.get('dados')
+        if pagina not in modulo_analista.PAGINAS or not isinstance(dados, dict):
+            return JSONResponse({'erro': 'página sem insights'}, status_code=400)
+        dados = {**dados, 'demo': fonte == 'demo'}
+        texto = json.dumps(dados, ensure_ascii=False, sort_keys=True)
+        if len(texto) > modulo_analista.MAX_ENTRADA:
+            return JSONResponse({'erro': 'dados grandes demais'}, status_code=413)
+        chave = hashlib.sha1(f'{pagina}|{texto}'.encode()).hexdigest()
+        guardado = insights_cache.get(chave)
+        if guardado and not corpo.get('novo') and time.time() - guardado[0] < INSIGHTS_CACHE:
+            return JSONResponse({**guardado[1], 'cache': True})
+        try:
+            r = await asyncio.to_thread(analista, pagina, dados)
+        except Exception as e:  # noqa: BLE001 - Modal fora do ar ou sem login
+            return JSONResponse({'erro': 'modal', 'detalhe': str(e)[:200]}, status_code=502)
+        if r.get('erro'):
+            return JSONResponse(r, status_code=409 if r['erro'] == 'desligado' else 502)
+        if len(insights_cache) > 50:
+            insights_cache.clear()
+        insights_cache[chave] = (time.time(), r)
+        return JSONResponse(r)
 
     @api.get('/api/ao-vivo')
     async def ao_vivo(fonte: str = 'real', desde: float | None = None):

@@ -120,6 +120,25 @@ def pessoa_calada(wa_id: str, marca: float):
 
 
 @app.function(image=imagem, secrets=segredos, timeout=120)
+def analisar_pagina(pagina: str, dados: dict):
+    """A Analista do dash (src/painel/analista.py): insights por time a partir dos números agregados de uma página.
+    Chamada pelo servidor local do painel (POST /api/insights); usa a fila e o interruptor da ficha dela."""
+    from src import agentes
+    from src.painel import analista
+    from src.shared import llm
+    cfg = agentes.config(estado)
+    if not agentes.ligado(cfg, 'analista'):
+        return {'erro': 'desligado'}
+    try:
+        return analista.analisar(pagina, dados, agentes.roteador(llm.gerar_json, cfg))
+    except analista.EntradaRuim as e:
+        return {'erro': 'entrada', 'detalhe': str(e)}
+    except Exception as e:  # noqa: BLE001 - o dash mostra o aviso e deixa tentar de novo
+        print(f'analista falhou em {pagina}: {e!r}')
+        return {'erro': 'modelo', 'detalhe': str(e)[:300]}
+
+
+@app.function(image=imagem, secrets=segredos, timeout=120)
 def depois_do_login(wa_id: str):
     """O OAuth terminou no navegador: avisa no WhatsApp e retoma o que a pessoa tinha pedido."""
     from src.bot.contexto import contexto_producao

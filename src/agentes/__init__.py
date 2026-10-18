@@ -56,8 +56,8 @@ class Agente:
 
 
 def _carregar():
-    from src.agentes import entendimento, foto, grupo, ouvido, relevancia, tutor, voz
-    return [m.FICHA for m in (entendimento, foto, relevancia, grupo, tutor, voz, ouvido)]
+    from src.agentes import analista, entendimento, foto, grupo, ouvido, relevancia, tutor, voz
+    return [m.FICHA for m in (entendimento, foto, relevancia, grupo, tutor, voz, ouvido, analista)]
 
 
 TODOS = _carregar()
