@@ -20,13 +20,13 @@ Regras visuais que valem em todas as telas:
 > O que você quer pedir hoje? Pode escrever ou mandar áudio.
 
 Logo abaixo, a vitrine: "Separei umas ideias pra você 👇", com cards de sugestão.
-[PRINT A1]
+![Boas-vindas (captura de 18/10 em modo de teste, catálogo simulado)](prints/A1.png)
 
 ### A2. Login no iFood
 > 🔐 Primeiro, preciso que você entre na sua conta do iFood.
 
 Botão **Entrar no iFood**, que abre o login oficial. Na volta, o bot mostra de quem é a conta ("Não é a sua conta? Escreva *sair*").
-[PRINT A2]
+![Login no iFood (captura de 18/10 em modo de teste, catálogo simulado)](prints/A2.png)
 
 ### A3. Lista entendida (texto, áudio ou foto)
 > 📝 Anotei sua lista:
@@ -34,23 +34,23 @@ Botão **Entrar no iFood**, que abre o login oficial. Na volta, o bot mostra de 
 > 2. 1x pão
 > 3. 1x café
 
-[PRINT A3: de preferência a foto de uma lista de papel virando esta mensagem]
+![Lista entendida (captura de 18/10 em modo de teste, catálogo simulado)](prints/A3.png)
 
 ### A4. Opções com foto
 Carrossel de 3 cards, cada um com foto, nome, preço e loja, e botão **Quero esse**. Embaixo, **➕ Mais opções**.
 > Gostou de algum? Toque em *Quero esse* 👆
 
-[PRINT A4]
+![Opções com foto (captura de 18/10 em modo de teste, catálogo simulado)](prints/A4.png)
 
 ### A5. Resumo e confirmação
 Itens, entrega (prazo e taxa), pagamento, endereço e total, com **✅ Confirmar pedido**, **✏️ Mudar algo** e **❌ Cancelar**.
-[PRINT A5]
+![Resumo e confirmação (captura de 18/10 em modo de teste, catálogo simulado)](prints/A5.png)
 
 ### A6. Pedido feito e acompanhamento
 > 🎉 *Pedido feito!*
 
 Depois, uma mensagem por mudança de status, sempre dizendo qual pedido é (loja, itens e valor).
-[PRINT A6]
+![Pedido feito e acompanhamento (captura de 18/10 em modo de teste, catálogo simulado)](prints/A6.png)
 
 ### A7. Lembrete de compra recorrente
 > 🔔 Chegou o dia! …
@@ -58,6 +58,7 @@ Depois, uma mensagem por mudança de status, sempre dizendo qual pedido é (loja
 > *Podemos pedir aqui pra enviar na sua casa?*
 
 Botões: **Sim, pode pedir**, **Hoje não**, **Parar lembretes**.
+![Recorrência agendada (captura de 18/10, modo de teste)](prints/A11.png)
 [PRINT A7]
 
 ### A8. Kit em grupo

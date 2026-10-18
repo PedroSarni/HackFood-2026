@@ -168,24 +168,25 @@ O produto tem duas interfaces: **a conversa no WhatsApp**, para quem compra (nen
 Regras visuais: frases curtas, um emoji por ideia (🛒 pedido, 🏠 endereço, 💳 pagamento, 💰 valor), negrito no que importa, toda mensagem termina com o próximo passo e nada em inglês chega à tela.
 
 **A1. Boas-vindas.** "Oi, Maria! 😊 O que você quer pedir hoje? Pode escrever ou mandar áudio." Logo abaixo, a vitrine "Separei umas ideias pra você 👇".
-[PRINT A1]
+![Boas-vindas (captura de 18/10 em modo de teste, catálogo simulado)](prints/A1.png)
 
 **A2. Login no iFood.** "🔐 Primeiro, preciso que você entre na sua conta do iFood." Botão **Entrar no iFood**. Na volta, o bot diz de quem é a conta ("Não é a sua conta? Escreva *sair*").
-[PRINT A2]
+![Login no iFood (captura de 18/10 em modo de teste, catálogo simulado)](prints/A2.png)
 
 **A3. Lista entendida.** "📝 Anotei sua lista: 1. 2x leite · 2. 1x pão · 3. 1x café".
-[PRINT A3: de preferência a foto de uma lista de papel virando esta mensagem]
+![Lista entendida (captura de 18/10 em modo de teste, catálogo simulado)](prints/A3.png)
 
 **A4. Opções com foto.** Carrossel de cards (até 10 por vez), cada um com foto, nome, preço e loja e o botão **Quero esse**; embaixo, **➕ Mais opções**. "Gostou de algum? Toque em *Quero esse* 👆"
-[PRINT A4]
+![Opções com foto (captura de 18/10 em modo de teste, catálogo simulado)](prints/A4.png)
 
 **A5. Resumo e confirmação.** Itens, entrega (prazo e taxa), pagamento, endereço e total, com **✅ Confirmar pedido**, **✏️ Mudar algo** e **❌ Cancelar**.
-[PRINT A5]
+![Resumo e confirmação (captura de 18/10 em modo de teste, catálogo simulado)](prints/A5.png)
 
 **A6. Pedido feito e acompanhamento.** "🎉 *Pedido feito!*" e uma mensagem por mudança de status, sempre dizendo qual pedido é (loja, itens e valor).
-[PRINT A6]
+![Pedido feito e acompanhamento (captura de 18/10 em modo de teste, catálogo simulado)](prints/A6.png)
 
 **A7. Lembrete de compra recorrente.** "🔔 Chegou o dia!" com itens, loja, endereço, pagamento e o valor da última vez, e "*Podemos pedir aqui pra enviar na sua casa?*". Botões **Sim, pode pedir**, **Hoje não**, **Parar lembretes**.
+![Recorrência agendada (captura de 18/10, modo de teste)](prints/A11.png)
 [PRINT A7]
 
 **A8. Kit em grupo.** Kit numa loja só, com **👥 R$ X por pessoa (N pessoas)** e "Pode ser? Toque em *Quero esse kit* ou me diga o que mudar (ex.: _sem refri_, _mais barato_)". Botões **✅ Quero esse kit**, **🔄 Outra loja**, **❌ Não quero**.

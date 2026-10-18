@@ -392,3 +392,12 @@ que ainda citam informação desatualizada."
 
 **Resposta:** estado.md ganhou "Mudou desde as 05h10" (com commits), "Não confirmado", itens D7 a D10, E4 e H13; D1 a
 D6 marcados. Claim docs-vivos virou done. Lista de docs desatualizados no chat. Sem deploy.
+
+## 2026-10-18 11:50 — prints A1 a A6 e A11 do WhatsApp nos entregáveis
+
+**Prompt:** "Os prints A1 a A6 e A11 do WhatsApp estão em docs/entregaveis/prints/. Faltam A7, A8 e A9: NÃO mexa nesses
+três marcadores. [...] troque [PRINT A1] a [PRINT A6] por ![legenda](prints/Ax.png) [...] Coloque o A11 [...] dentro
+[da seção de compra recorrente] [...] Se existir A9_rever.png, NÃO o inclua no commit."
+
+**Resposta:** A1 a A6 substituídos no 04 e no entrega-unica.md (o marcador do A3 tinha texto de orientação, que saiu
+junto). A11 entrou na seção A7, acima do marcador [PRINT A7], que ficou intacto. Pendentes: A7, A8, A9.
