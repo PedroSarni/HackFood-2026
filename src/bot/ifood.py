@@ -41,6 +41,16 @@ class PrecisaLogin(Exception):
     """A pessoa não tem token (nunca entrou, saiu, ou o refresh venceu)."""
 
 
+class IfoodTrocou(ErroMCP):
+    """O iFood caiu numa chamada presa ao pedido da pessoa (carrinho, loja, item ou pedido) e o catálogo de reserva
+    ligou (modo palco, src/bot/contexto.py): refazer igual do outro lado só daria "carrinho não encontrado". O fluxo
+    leva o pedido junto e refaz a ação (src/bot/fluxo.py, _trocar_de_ifood). Fica com o código da queda (TIMEOUT,
+    HTTP_502...): quem não sabe da troca trata como iFood fora, que sobe pro fluxo (melhor_loja.infra)."""
+
+    def __init__(self, motivo='', codigo='REDE'):
+        super().__init__(codigo, motivo)
+
+
 def _campo(d, *nomes, padrao=None):
     """Primeiro campo existente (aceita caminho com ponto: 'merchant.merchantName')."""
     if not isinstance(d, dict):

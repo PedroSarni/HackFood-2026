@@ -953,7 +953,7 @@ def test_pedir_sugestao_de_novo_traz_outra_coisa():
     assert primeira and segunda and not primeira & segunda   # cada toque traz outra coisa
 
 
-def test_carrinho_do_ifood_real_e_largado_quando_o_mock_liga():
+def test_carrinho_do_ifood_real_vem_pro_mock_quando_o_mock_liga():
     m = Mundo()
     endereco_pronto(m)
     u = m.armazem[f'u:{m.wa}']
@@ -961,9 +961,10 @@ def test_carrinho_do_ifood_real_e_largado_quando_o_mock_liga():
                      'itens': [{'item_id': 'x', 'nome': 'Leite', 'qtd': 1}], 'subtotal': 5.0}
     m.armazem[f'u:{m.wa}'] = u
     m.enviar('quero leite')
+    car = m.estado()['carrinho']
     busca = m.mcp.chamadas_de('searchOffers')[-1]
-    assert 'merchantId' not in (busca.get('refinements') or {})   # não fica preso no Nissei
-    assert m.wpp.cards() and not m.estado()['carrinho']
+    assert (busca.get('refinements') or {}).get('merchantId') == car['loja_id']   # não fica preso no Nissei
+    assert m.ctx.carrinho_valido(car) and [i['qtd'] for i in car['itens']] == [1] and m.wpp.cards()
 
 
 def test_pedido_no_meio_do_endereco_muda_de_funcao_e_vira_o_pendente():

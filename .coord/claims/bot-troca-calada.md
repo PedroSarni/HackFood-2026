@@ -1,7 +1,7 @@
 ---
 slug: bot-troca-calada
 owner: araujo.fabio@usp.br
-status: active
+status: done
 started: 2026-10-18 08:15
 ---
 
@@ -24,4 +24,8 @@ como produto que acabou. NÃO cobre: endereço cadastrado só de um lado, pagame
 
 ## Onde está (preencher ao terminar)
 
-- (em andamento)
+- `src/bot/fluxo.py` — `_trocar_de_ifood()`, `_transplantar()`, `_traduzir_escolha()`, `_mesmo_produto()`,
+  `_do_outro_ifood()`; `_protegido()` refaz a ação depois da troca; `escolher_oferta()` traduz o card de antes
+- `src/bot/contexto.py` — `presa_ao_pedido()`; `src/bot/ifood.py` — `IfoodTrocou`
+- `src/bot/textos.py` — `PEDIDO_RECOMECADO` (novo texto), `PEDIDO_ATUALIZADO`, `indisponiveis()`, `no_lugar()`
+- `docs/como-funciona.md` §modos do iFood, "Troca com pedido montado"

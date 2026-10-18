@@ -8,7 +8,7 @@ import pytest
 
 from src.bot import grupo
 from src.bot.contexto import com_reserva, mcp_caiu
-from src.bot.ifood import PrecisaLogin
+from src.bot.ifood import IfoodTrocou, PrecisaLogin
 from src.bot.recorrencia import categoria
 from src.shared import alertas, mcp_fake
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
@@ -52,6 +52,26 @@ def test_erro_de_negocio_e_login_continuam_com_o_fluxo_de_sempre():
         with pytest.raises(type(erro)):
             com_reserva(estado, real, lambda *a, **k: pytest.fail('não era pra ir pro mock'))('getItem')
     assert not estado.get('cfg:mock') and not alertas.listar(estado)['alertas']
+
+
+def test_chamada_presa_ao_pedido_nao_vai_pro_mock_igual_sobe_pro_fluxo_levar_o_pedido():
+    estado, feitas = Armazem(), []
+
+    def real(ferramenta, **args):
+        raise ErroMCP('TIMEOUT', 'o iFood não respondeu em 10 s', tentar_de_novo=True)
+
+    def mock(ferramenta, **args):
+        feitas.append(ferramenta)
+        return {'results': []}
+    chamar = com_reserva(estado, real, mock)
+    for ferramenta, args in (('getCart', {'cartId': 'c-do-real'}), ('getItem', {'itemId': 'i', 'merchantId': 'l'}),
+                             ('searchOffers', {'query': 'pão', 'refinements': {'merchantId': 'l'}})):
+        with pytest.raises(IfoodTrocou) as e:               # o mock não conhece esses ids: "carrinho não encontrado"
+            chamar(ferramenta, **args)
+        assert e.value.codigo == 'TIMEOUT'                  # quem não sabe da troca vê iFood fora e sobe pro fluxo
+    assert estado['cfg:mock'] is True and not feitas       # o modo palco ligou mesmo assim
+    assert chamar('searchOffers', query='pão', refinements={'maxItemPrice': 10}) == {'results': []}   # busca solta vai
+    assert feitas == ['searchOffers']
 
 
 def test_teto_do_kit_em_reais():

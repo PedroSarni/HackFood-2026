@@ -1,9 +1,15 @@
 """Achados do QA da madrugada de 18/10: a quantidade dita fora da pergunta "quantas unidades?" (U20), o "até
 agora" que somava entrega e taxas sem avisar (M2), o pedido que só fechava com toque, nunca por áudio, e o
-"o pagamento não passou" que o rastreio mandou depois do "saiu pra entrega"."""
+"o pagamento não passou" que o rastreio mandou depois do "saiu pra entrega", e o pedido que atravessa a troca
+do iFood real pro de reserva (e a volta) sem a pessoa perceber."""
+import pytest
+
 from src.bot import interpretar
 from src.bot import textos as T
+from src.bot.contexto import presa_ao_pedido
+from src.bot.ifood import IfoodTrocou
 from src.bot.rastreio import acompanhar
+from src.shared import mcp_fake
 from tests.fakes import Mundo, WhatsAppFake
 from tests.test_fluxo import endereco_pronto, pedido_ate_o_resumo
 
@@ -102,25 +108,154 @@ def _lista_de_leite_na_tela():
     return m
 
 
-def test_carrinho_do_outro_ifood_some_com_aviso_e_o_toque_na_lista_dele_volta_pro_menu():
-    m = _lista_de_leite_na_tela()
-    m.armazem['cfg:mock'] = False             # 01h43: o mock desligou com o carrinho de mentira montado (B3)
-    pick = next(i for i in reversed(m.wpp.todos_ids()) if i.startswith('pick:'))
-    m.wpp.limpar()
-    m.enviar(('botao', pick))
-    texto = ' '.join(m.wpp.textos())
-    assert T.PEDIDO_RECOMECADO in texto and T.BOTAO_VELHO not in texto
-    assert m.estado()['fase'] == 'pedido' and not m.estado().get('carrinho')
-    m.enviar(('botao', pick))                 # insistir no card velho agora é só botão velho, uma vez
-    assert T.PEDIDO_RECOMECADO not in m.wpp.textos()[-1]
+@pytest.fixture
+def outro_ifood():
+    """Liga "o outro iFood": o mock desligou (ou ligou) com o pedido montado, 18/10 01h43 (QA B3/U4). É o catálogo
+    embutido com outros ids, menos os itens com `sem` no nome: as lojas de antes deixam de existir aqui e os
+    produtos de mesmo nome estão do lado de cá, como o iFood real e o de reserva."""
+    guardado = {k: getattr(mcp_fake, k) for k in ('LOJAS', 'CATALOGO', 'SINONIMOS', 'VERSAO', '_ITEM_POR_ID',
+                                                   '_LOJA_POR_ID')}
+    fotos = dict(mcp_fake._FOTOS)
+
+    def trocar(*sem, vazio=False):
+        lojas = {k: {'nome': n, 'tipo': t, 'eta': eta, 'taxa': taxa, 'nota': nota, 'km': km, 'minimo': minimo}
+                 for k, (n, t, eta, taxa, nota, km, minimo) in mcp_fake.LOJAS.items()}
+        itens = [{'loja': lj, 'nome': nome, 'desc': desc, 'preco': preco, 'promo': promo,
+                  'grupos': [[g[0], g[1], g[2], [list(o) for o in g[3]]] for g in grupos] if grupos else None}
+                 for lj, nome, desc, preco, promo, grupos in mcp_fake.CATALOGO
+                 if not vazio and not any(s in nome for s in sem)]
+        mcp_fake.usar_catalogo({'versao': f'outro:{sem}:{vazio}', 'lojas': lojas, 'itens': itens})
+    yield trocar
+    # volta o catálogo embutido sem recarregar o módulo: um reload cria outro McpFake, e o monkeypatch dos testes
+    # seguintes (test_fluxo, a loja que exige CPF) iria pra classe nova enquanto o Mundo usa a velha
+    for k, v in guardado.items():
+        setattr(mcp_fake, k, v)
+    mcp_fake._FOTOS.clear()
+    mcp_fake._FOTOS.update(fotos)
 
 
-def test_carrinho_do_outro_ifood_avisa_e_segue_com_o_que_a_pessoa_escreveu():
+def _nomes(car):
+    return [(i['nome'], i['qtd']) for i in (car or {}).get('itens') or []]
+
+
+def test_troca_de_ifood_leva_o_carrinho_junto_e_ninguem_percebe(outro_ifood):
     m = _com_dois_paes()
-    m.armazem['cfg:mock'] = False
+    antes = m.estado()['carrinho']
+    outro_ifood()
     m.wpp.limpar()
     m.enviar('quero leite')
-    assert T.PEDIDO_RECOMECADO in m.wpp.textos()[0] and m.wpp.cards()   # avisou e foi buscar o leite
+    car = m.estado()['carrinho']
+    assert m.ctx.carrinho_valido(car) and car['id'] != antes['id'] and car['loja'] == antes['loja']
+    assert _nomes(car) == _nomes(antes)                      # os 2 pães, na mesma loja, do lado de cá
+    texto = ' '.join(m.wpp.textos())
+    assert not any(t in texto for t in (T.PEDIDO_RECOMECADO, T.BOTAO_VELHO, 'disponíve', 'no lugar'))
+    assert m.wpp.cards()                                     # e foi buscar o leite, como se nada fosse
+
+
+def test_card_de_antes_da_troca_vale_o_mesmo_produto_do_lado_de_ca(outro_ifood):
+    m = _lista_de_leite_na_tela()
+    pick = next(i for i in reversed(m.wpp.todos_ids()) if i.startswith('pick:'))
+    _, lid, idx = pick.split(':')
+    leite = m.estado()['listas'][lid]['ofertas'][int(idx)]['nome']
+    outro_ifood()
+    m.wpp.limpar()
+    m.enviar(('botao', pick))
+    esc = m.estado()['escolha']
+    assert esc['oferta']['nome'] == leite and m.ctx.carrinho_valido({'loja_id': esc['oferta']['loja_id']})
+    assert f'*{leite}*' in m.wpp.textos()[-1] and T.BOTAO_VELHO not in ' '.join(m.wpp.textos())   # "Quantas...?"
+    m.tocar('qtd:1')
+    assert [n for n, _ in _nomes(m.estado()['carrinho'])][1:] == [leite]   # os pães vieram junto e o leite entrou
+
+
+def test_quantas_unidades_respondido_depois_da_troca_entra_o_produto_daqui(outro_ifood):
+    m = _lista_de_leite_na_tela()
+    m.tocar('pick:')                                         # "Quantas unidades de *Leite...*?"
+    leite = m.estado()['escolha']['oferta']['nome']
+    outro_ifood()
+    m.wpp.limpar()
+    m.enviar(('botao', 'qtd:2'))
+    car = m.estado()['carrinho']
+    assert m.ctx.carrinho_valido(car) and _nomes(car)[-1] == (leite, 2)
+
+
+def test_produto_da_vez_que_nao_tem_do_outro_lado_vira_as_opcoes_de_agora(outro_ifood):
+    m = _lista_de_leite_na_tela()
+    m.tocar('pick:')
+    leite = m.estado()['escolha']['oferta']['nome']
+    outro_ifood(leite)
+    m.wpp.limpar()
+    m.enviar(('botao', 'qtd:2'))
+    assert T.indisponiveis([leite], do_pedido=False) in m.wpp.textos() and m.wpp.cards()
+    assert not m.estado().get('escolha') and leite not in [n for n, _ in _nomes(m.estado()['carrinho'])]
+
+
+def test_resumo_de_antes_da_troca_nao_fecha_e_vem_o_resumo_novo(outro_ifood):
+    m = pedido_ate_o_resumo(Mundo())
+    ok = next(i for i in reversed(m.wpp.todos_ids()) if i.startswith('ok:'))
+    outro_ifood()
+    m.wpp.limpar()
+    m.enviar(('botao', ok))                                  # o "Confirmar" do resumo com o valor de antes
+    assert not m.rastreios and not m.mcp.chamadas_de('submitOrder')
+    assert T.PEDIDO_ATUALIZADO in m.wpp.textos() and m.estado()['fase'] == 'confirmar'
+    m.tocar('ok:')                                           # o do resumo novo fecha
+    assert m.rastreios
+
+
+def test_o_que_nao_tem_do_outro_lado_sai_como_produto_que_acabou(outro_ifood):
+    m = _lista_de_leite_na_tela()
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    (pao, _), (leite, _) = _nomes(m.estado()['carrinho'])
+    outro_ifood('Leite')                                     # do lado de cá não tem leite nenhum
+    m.wpp.limpar()
+    m.enviar(('botao', 'fim'))
+    assert T.indisponiveis([leite]) in m.wpp.textos()
+    car = m.estado()['carrinho']
+    assert m.ctx.carrinho_valido(car) and _nomes(car) == [(pao, 2)]
+
+
+def test_sem_o_mesmo_produto_vai_o_parecido_e_a_pessoa_fica_sabendo(outro_ifood):
+    m = _com_dois_paes()
+    (pao, qtd), = _nomes(m.estado()['carrinho'])
+    outro_ifood(pao)                                         # esse pão não tem do lado de cá; outros pães, sim
+    m.wpp.limpar()
+    m.enviar('quero leite')
+    (novo, qtd_nova), = _nomes(m.estado()['carrinho'])
+    assert novo != pao and qtd_nova == qtd
+    assert T.no_lugar([(pao, novo)]) in m.wpp.textos()
+
+
+def test_sem_nada_do_pedido_do_outro_lado_recomeca_falando_como_loja(outro_ifood):
+    escreveu, tocou = _com_dois_paes(), _com_dois_paes()
+    outro_ifood(vazio=True)
+    for m in (escreveu, tocou):
+        m.wpp.limpar()
+    escreveu.enviar('quero leite')
+    assert escreveu.wpp.textos()[0] == T.PEDIDO_RECOMECADO and not escreveu.estado().get('carrinho')
+    tocou.enviar(('botao', 'fim'))                           # o toque era no pedido que sumiu: volta pro menu
+    assert tocou.wpp.textos()[0].startswith(T.PEDIDO_RECOMECADO) and tocou.estado()['fase'] == 'pedido'
+    assert 'iFood' not in T.PEDIDO_RECOMECADO
+
+
+def test_ifood_cai_no_meio_da_rodada_e_o_pedido_vai_junto_sem_expirou(outro_ifood):
+    m = _com_dois_paes()
+    antes = m.estado()['carrinho']
+    caiu = []
+
+    def chamar(ferramenta, **args):  # o real caiu nesta chamada e o modo palco ligou o de reserva (contexto.py)
+        if not caiu and presa_ao_pedido(ferramenta, args):
+            caiu.append(ferramenta)
+            outro_ifood()
+            raise IfoodTrocou(f'{ferramenta}: TIMEOUT')
+        return m.mcp.chamar(ferramenta, **args)
+    m.ctx._chamador = lambda wid: chamar
+    m.wpp.limpar()
+    m.enviar('quero leite')                                  # a busca na loja do carrinho é a que cai
+    assert caiu == ['searchOffers']
+    texto = ' '.join(m.wpp.textos())
+    assert 'expirou' not in texto and T.ERRO not in texto and m.wpp.cards()
+    car = m.estado()['carrinho']
+    assert m.ctx.carrinho_valido(car) and _nomes(car) == _nomes(antes)
 
 
 def test_agendar_abaixo_do_minimo_agenda_e_no_dia_pede_pra_completar():

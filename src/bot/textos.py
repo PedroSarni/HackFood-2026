@@ -187,8 +187,22 @@ def sim_ou_acompanhamento(sugestao):
 
 NADA_PRA_MUDAR = 'Ainda não tem nada no carrinho pra mudar. 🙂'
 CARRINHO_ABANDONADO = 'Esvaziei seu carrinho pra não ficar parado. 🙂 Quando quiser, é só pedir de novo.'
-PEDIDO_RECOMECADO = ('😕 Precisei recomeçar seu pedido: a ligação com o iFood mudou aqui do nosso lado, e o '
-                     'carrinho de antes não vale mais. Desculpa!')
+# troca do iFood real pro catálogo de reserva (ou volta) com pedido montado (src/bot/fluxo.py, _trocar_de_ifood): o
+# pedido vem junto calado; estas só saem quando algo dele não existe do lado de cá, e falam como loja, não como sistema
+PEDIDO_RECOMECADO = '😕 O que estava no seu pedido não está mais disponível, então ele ficou vazio.'
+PEDIDO_ATUALIZADO = '🔄 Atualizei seu pedido com os preços de agora. Confere antes de eu fazer o pedido 👇'
+
+
+def indisponiveis(nomes, do_pedido=True):
+    lista = ', '.join(f'*{n}*' for n in nomes)
+    fim = ', tirei do seu pedido.' if do_pedido else '.'
+    return f'😕 {lista} ' + ('não está mais disponível' if len(nomes) == 1 else 'não estão mais disponíveis') + fim
+
+
+def no_lugar(trocas):
+    return '\n'.join(f'🔄 *{antes}* acabou, coloquei *{novo}* no lugar.' for antes, novo in trocas)
+
+
 ENDERECO_FALTA_POUCO = '😊 Falta só isso pra eu salvar o seu endereço:'
 ESCOLHA_ENDERECO = 'Qual destes é o seu endereço? Toque no certo 👇'
 PEDIR_COMPLEMENTO = ('Tem apartamento, bloco ou casa nos fundos?\n'

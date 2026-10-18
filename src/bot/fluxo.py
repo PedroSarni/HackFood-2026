@@ -20,7 +20,7 @@ from src.bot import grupo as kit_grupo
 from src.bot import melhor_loja, ranking, relevancia, tutor, vitrine, voz
 from src.bot import textos as T
 from src.bot.combina import complementos, ja_tem, so_o_produto
-from src.bot.ifood import PrecisaLogin
+from src.bot.ifood import IfoodTrocou, PrecisaLogin
 from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, opcao_dita, pede_sugestao, pergunta_minimo,
                                  so_complemento, so_endereco,
                                  regra_rapida)
@@ -123,18 +123,9 @@ class Bot:
     def processar(self, wa_id, msgs):
         self.wa = wa_id
         self.u = u = self._carregar(wa_id)
-        car = u.get('carrinho') or {}
-        recomecou = False
-        if car.get('loja_id') and not self.ctx.carrinho_valido(car):
-            # ligaram/desligaram o mock (ou o modo palco ligou sozinho): o carrinho é do outro iFood e prendia a
-            # busca numa loja que não existe aqui. 18/10 01h43 (QA B3/U4): sumia calado, e cada toque na lista dele
-            # (e o nome do produto digitado) virava "botão de uma conversa antiga"; agora a pessoa fica sabendo
-            print(f'carrinho de outro iFood largado {wa_id}: {car.get("loja")}')
-            u.update(carrinho=None, fila=[], listas={}, lista_atual=None, atual=None, visiveis=[], sugeridos=None,
-                     pergunta={})
-            if u.get('fase') in NO_MEIO_DO_PEDIDO:
-                u['fase'] = 'inicio'
-            recomecou = True
+        # ligaram/desligaram o mock (ou o modo palco ligou sozinho) com o pedido montado do outro lado: ele vem
+        # junto no começo da rodada, antes de qualquer chamada (_trocar_de_ifood)
+        outro_ifood = self._do_outro_ifood()
         if msgs and msgs[-1].get('_nome'):
             u['nome'] = msgs[-1]['_nome']
         anterior = u.get('ultima_msg') or 0  # lido antes de sobrescrever (recorrencia.py usa o novo)
@@ -155,11 +146,11 @@ class Bot:
             self._disse = _sem_cpf(' / '.join(e.texto for e in entradas if e.texto))[:300]
             if self._debug_reset(entradas):   # palavra secreta de debug: desloga e zera tudo
                 return
-            if recomecou and all(e.tipo == 'botao' for e in entradas):
-                self.menu(T.PEDIDO_RECOMECADO)    # o toque era na lista do carrinho que caiu
-                return
-            if recomecou:
-                self.dizer(T.PEDIDO_RECOMECADO)   # e segue com o que a pessoa escreveu ou falou
+            if outro_ifood:
+                fim = []  # True = a rodada acabou na troca (resumo novo ou menu); vazio = deu erro e já avisou
+                self._protegido(lambda: fim.append(self._trocar_de_ifood(all(e.tipo == 'botao' for e in entradas))))
+                if fim != [False]:
+                    return
             if self._sessao_ociosa(anterior, entradas):
                 return
             botoes =[e for e in entradas if e.tipo == 'botao']
@@ -319,13 +310,19 @@ class Bot:
         self.wpp.texto(self.wa, '🧹 [debug] Desconectei do iFood e zerei a conversa. Manda um "oi" pra recomeçar.')
         return True
 
-    def _protegido(self, fn):
+    def _protegido(self, fn, de_novo=True):
         """Nenhum erro chega mudo pra pessoa: login vencido pede login, o resto pede pra tentar."""
         try:
             fn()
         except (PrecisaLogin, SemAutorizacao):
             self.pedir_login(vencido=bool(self.ctx.armazem.get(f'tok:{self.wa}')))
         except ErroMCP as e:
+            if de_novo and (isinstance(e, IfoodTrocou) or self._do_outro_ifood()):
+                # o iFood trocou no meio da rodada (o real caiu e o modo palco ligou o de reserva, ou mexeram no
+                # interruptor): o pedido vai junto e a mesma ação roda de novo, já do lado de cá. Nada de "expirou"
+                print(f'iFood trocou no meio da rodada de {self.wa}: {e!r}')
+                self._protegido(lambda: self._trocar_de_ifood(so_toques=False) or fn(), de_novo=False)
+                return
             print(f'MCP {self.wa}: {e!r} {str(e.bruto)[:300] if e.bruto else ""}')
             self.erro_mcp(e)
         except Exception:
@@ -343,6 +340,133 @@ class Bot:
             return self.ctx.armazem.get('cfg:cutucar') is not False
         except Exception:  # noqa: BLE001 - armazém fora: fica como sempre foi
             return True
+
+    # ================================================================== troca de iFood (mock <-> real)
+
+    def _do_outro_ifood(self):
+        """O pedido em andamento (o carrinho ou o produto da vez) é do outro iFood: o mock ligou ou desligou no meio,
+        na mão ou sozinho (modo palco)."""
+        u = self.u or {}
+        lojas = [(u.get('carrinho') or {}).get('loja_id'), ((u.get('escolha') or {}).get('oferta') or {}).get('loja_id')]
+        return any(lj and not self.ctx.carrinho_valido({'loja_id': lj}) for lj in lojas)
+
+    def _trocar_de_ifood(self, so_toques=True):
+        """O pedido estava montado no outro iFood. 18/10 (QA B3/U4): avisava "a ligação com o iFood mudou" e jogava o
+        carrinho fora. Agora monta o mesmo do lado de cá sem a pessoa perceber: o carrinho (cada item pelo nome, mesma
+        quantidade, numa loja que tem tudo) e o produto da vez; o card de antes vale no toque (escolher_oferta). O que
+        não existe aqui sai como produto que acabou; no resumo, mostra o resumo novo antes de fechar (o valor muda).
+        True = a rodada acabou aqui; False = segue com o que a pessoa mandou."""
+        u = self.u
+        car, esc = u.get('carrinho') or {}, u.get('escolha')
+        velha = bool(esc) and not self.ctx.carrinho_valido({'loja_id': esc['oferta'].get('loja_id')})
+        u.update(plano=None, vitrine=None, sugeridos=None)  # lojas e produtos do outro lado
+        sairam, trocados = [], []
+        if car.get('loja_id') and not self.ctx.carrinho_valido(car):
+            try:
+                u['carrinho'], sairam, trocados = self._transplantar(car) if car.get('itens') else (None, [], [])
+            except SemAutorizacao:
+                raise  # login vencido: o _protegido pede o login
+            except ErroMCP as e:
+                if not self._do_outro_ifood():
+                    return False  # trocou de volta no meio (o iFood caiu de novo): o pedido de antes vale
+                print(f'troca de iFood {self.wa}: o carrinho não deu pra levar junto ({e!r})')
+                u['carrinho'], sairam = None, [i['nome'] for i in car.get('itens') or []]
+        if velha and not self._traduzir_escolha(esc):
+            u['escolha'] = None
+        novo = u.get('carrinho') or {}
+        print(f'troca de iFood {self.wa}: {len(novo.get("itens") or [])} itens vieram junto, {len(sairam)} saíram')
+        if sairam and not novo.get('itens') and not u.get('escolha'):
+            # nada veio junto: recomeça, com aviso de gente (nada de "ligação com o iFood")
+            u.update(fila=[], listas={}, lista_atual=None, atual=None, visiveis=[], pergunta={})
+            if u.get('fase') in NO_MEIO_DO_PEDIDO:
+                u['fase'] = 'inicio'
+            if so_toques:  # o toque era na lista do pedido que sumiu: volta pro menu
+                self.menu(T.PEDIDO_RECOMECADO)
+                return True
+            self.dizer(T.PEDIDO_RECOMECADO)  # e segue com o que a pessoa escreveu ou falou
+            return False
+        if sairam:
+            self.dizer(T.indisponiveis(sairam))
+        if trocados:  # o mesmo produto não tinha, foi o parecido: a pessoa fica sabendo, como na troca do mercado
+            self.dizer(T.no_lugar(trocados))
+        if novo.get('itens') and u.get('fase') in ('confirmar', 'pagamento'):
+            self.dizer(T.PEDIDO_ATUALIZADO)  # o valor mudou: nada fecha sem o resumo novo
+            self.finalizar()
+            return True
+        if velha and u.get('fase') in ('quantidade', 'opcao'):
+            if not u.get('escolha'):  # o produto da vez não tem aqui: as opções de agora pro mesmo pedido
+                self.dizer(T.indisponiveis([esc['oferta'].get('nome')], do_pedido=False))
+                if u.get('atual'):
+                    self.buscar(u['atual'])
+                else:
+                    self._proximo_da_fila()
+                return True
+            if u['fase'] == 'opcao':  # as opções agora são as do produto daqui: pergunta de novo, do começo
+                self._proximo_passo_da_escolha()
+                return True
+        return False
+
+    def _transplantar(self, car):
+        """O carrinho no iFood de agora: a loja que tem tudo (a de mesmo nome, se tiver; senão a melhor do
+        melhor_loja) e cada item pelo nome, com a mesma quantidade e opções (_equivalentes, o do "Trocar de loja");
+        sem o mesmo produto, vai o mais parecido do que a pessoa pediu.
+        Devolve (carrinho novo ou None, nomes do que não tem aqui, [(nome de antes, o parecido que foi no lugar)])."""
+        u = self.u
+        api = self.ctx.ifood(self.wa)
+        tipo = (u.get('atual') or {}).get('tipo_loja') or 'MERCADO'
+        itens = [{'termo': i.get('termo') or i['nome'], 'busca': None if i.get('termo') else i['nome'],
+                  'quantidade': i.get('qtd'), 'tipo_loja': i.get('tipo_loja') or tipo, 'observacao': None}
+                 for i in car['itens']]
+        lojas = melhor_loja.planejar(api, self.ctx.llm, u['endereco'], itens)['lojas']
+        if not lojas:
+            return None, [i['nome'] for i in car['itens']], []
+        # a que tem mais itens (tudo, quase sempre); no empate, a de mesmo nome da de antes, senão a melhor do plano
+        mais = max(len(lj['tem']) for lj in lojas)
+        empatadas = [lj for lj in lojas if len(lj['tem']) == mais]
+        loja = next((lj for lj in empatadas if normalizar(lj['loja']) == normalizar(car.get('loja'))), empatadas[0])
+        linhas, ficaram = self._equivalentes(api, car['itens'], loja['loja_id'])
+        trocados = []
+        for lin in list(linhas):
+            if _mesmo_nome(lin['antes'], lin['nome']):
+                continue
+            if _e_o_pedido(lin['termo'], lin['nome']):  # o parecido do que a pessoa pediu: vai, e ela fica sabendo
+                trocados.append((lin['antes'], lin['nome']))
+            else:  # "Leite em pó" não vira "Sabão em pó" por causa do "em pó"
+                linhas.remove(lin)
+                ficaram.append(lin['antes'])
+        novo = api.criar_carrinho(loja['loja_id'], u['endereco']['id'], linhas) if linhas else None
+        if novo:
+            novo['loja'] = novo.get('loja') or loja['loja']
+            _anotar_linhas(novo, linhas)
+        return novo, ficaram, trocados
+
+    def _traduzir_escolha(self, esc):
+        """O produto da vez ("Quantas unidades?") no iFood de agora, na loja do carrinho. False se não tem aqui (ou o
+        iFood não respondeu: o carrinho que já veio junto fica)."""
+        car = self.u.get('carrinho') or {}
+        try:
+            of = self._mesmo_produto(esc['oferta'].get('nome'), esc, car.get('loja_id') if car.get('itens') else None)
+            item = of and self.ctx.ifood(self.wa).item(of['item_id'], of['loja_id'], self.u['endereco'])
+        except SemAutorizacao:
+            raise
+        except ErroMCP as e:
+            print(f'troca de iFood {self.wa}: o produto da vez não veio junto ({e!r})')
+            return False
+        if not of:
+            return False
+        item['nome'] = item.get('nome') or of['nome']
+        esc.update(oferta=of, item=item, opcoes=[], grupo=0, feitas=0)
+        return True
+
+    def _mesmo_produto(self, nome, pedido=None, loja_id=None):
+        """O mesmo produto no iFood de agora (_mesmo_nome: "Leite integral 1L" vale "Leite integral"), só na loja
+        do carrinho, se ele já tem item. None se aqui não tem: aí a pessoa escolhe de novo, nada trocado escondido."""
+        pedido = pedido or {}
+        p = {'termo': pedido.get('termo') or nome, 'busca': nome, 'tipo_loja': pedido.get('tipo_loja') or 'MERCADO'}
+        ofertas = melhor_loja.ofertas_de_varios(self.ctx.ifood(self.wa), self.ctx.llm, self.u['endereco'], [p],
+                                                [loja_id])[0]
+        of = melhor_loja.mais_parecida(ofertas, nome) if ofertas else None
+        return of if of and _mesmo_nome(of.get('nome'), nome) else None
 
     def marca_followup(self):
         """Depois do processar(): a rodada terminou com pergunta aberta? Devolve a marca (o ultima_msg
@@ -1608,11 +1732,7 @@ class Bot:
             novo = api.criar_carrinho(nova['loja_id'], u['endereco']['id'], linhas) if linhas else None
             if novo:
                 novo['loja'] = novo.get('loja') or nova['loja']
-                pelo_item = {lin['item_id']: lin for lin in linhas}
-                for i in novo.get('itens') or []:  # as nossas anotações de cada linha vão junto
-                    lin = pelo_item.get(i.get('item_id')) or {}
-                    i['opcoes'], i['obs'] = lin.get('opcoes') or [], lin.get('obs')
-                    i['termo'], i['tipo_loja'] = lin.get('termo'), lin.get('tipo_loja')
+                _anotar_linhas(novo, linhas)
                 levados = novo.get('itens') or []
             u['carrinho'] = novo
         plano['escolhida'] = nova['loja_id']
@@ -1629,7 +1749,8 @@ class Bot:
         """As linhas do carrinho na loja nova: o mesmo produto pelo nome ("Arroz branco tipo 1"), senão o mais
         parecido do que a pessoa pediu ("arroz"); mesma quantidade, e as mesmas opções quando a loja tem
         (senão as padrão dela). Uma busca por linha e um filtro do Gemini pra todas.
-        Devolve (linhas pro carrinho novo, nomes do que a loja nova não tem)."""
+        Devolve (linhas pro carrinho novo, nomes do que a loja nova não tem); cada linha guarda o nome de antes e
+        o do produto achado."""
         tipo = (self.u.get('plano') or {}).get('tipo') or 'MERCADO'
         pedidos = [{'termo': it.get('termo') or it['nome'], 'busca': it['nome'],
                     'tipo_loja': it.get('tipo_loja') or tipo} for it in itens]
@@ -1651,7 +1772,8 @@ class Bot:
                 ficaram.append(it['nome'])
                 continue
             linhas.append({'item_id': of['item_id'], 'qtd': it['qtd'], 'opcoes': opcoes, 'obs': it.get('obs'),
-                           'termo': pedido['termo'], 'tipo_loja': pedido['tipo_loja']})
+                           'termo': pedido['termo'], 'tipo_loja': pedido['tipo_loja'], 'antes': it['nome'],
+                           'nome': of.get('nome'), 'descricao': item.get('descricao')})
         return linhas, ficaram
 
     def _replanejar(self):
@@ -1750,6 +1872,19 @@ class Bot:
             self.repetir_pergunta(T.BOTAO_VELHO)
             return
         car = u.get('carrinho') or {}
+        pedido = (u['listas'][lid].get('pedido') or u.get('atual') or {})
+        if not self.ctx.carrinho_valido({'loja_id': of.get('loja_id')}):
+            # card de antes da troca de iFood (o mock ligou ou desligou): vale o mesmo produto do lado de cá, calado;
+            # se aqui não tem, ele "acabou" e vêm as opções de agora pro mesmo pedido
+            velho = of
+            of = self._mesmo_produto(velho.get('nome'), pedido, car.get('loja_id') if car.get('itens') else None)
+            if not of:
+                self.dizer(T.indisponiveis([velho.get('nome')], do_pedido=False))
+                if pedido.get('termo'):
+                    self.buscar(pedido)
+                else:
+                    self.repetir_pergunta()
+                return
         if car.get('itens') and car.get('loja_id') != of['loja_id']:
             # carrinho é de uma loja só: o item de outra loja entra num pedido separado depois
             self.perguntar(f'Seu pedido já é do *{car.get("loja")}*. Esse item é de outra loja. 🙂\n'
@@ -1758,7 +1893,6 @@ class Bot:
             return
         item = self.ctx.ifood(self.wa).item(of['item_id'], of['loja_id'], u['endereco'])
         item['nome'] = item.get('nome') or of['nome']
-        pedido = (u['listas'][lid].get('pedido') or u.get('atual') or {})
         u['escolha'] = {'oferta': of, 'item': item, 'qtd': pedido.get('quantidade'),
                         'obs': pedido.get('observacao'), 'opcoes': [], 'grupo': 0, 'feitas': 0,
                         'termo': pedido.get('termo'), 'tipo_loja': pedido.get('tipo_loja')}
@@ -2897,6 +3031,31 @@ def _fechamento(acao):
 
 def _mesmo_termo(a, b):
     return normalizar((a or {}).get('termo')) == normalizar((b or {}).get('termo'))
+
+
+def _mesmo_nome(a, b):
+    """"Pão francês" e "Pão Francês 50g" são o mesmo produto em dois catálogos; "Pão de forma" já é outro, e só
+    "Pão" diz pouco pra valer por "Pão de queijo"."""
+    pa, pb = set(normalizar(a).split()), set(normalizar(b).split())
+    curto, longo = sorted((pa, pb), key=len)
+    return bool(pa and pb) and (pa == pb or (len(curto) >= 2 and curto <= longo))
+
+
+def _e_o_pedido(termo, nome):
+    """O produto ainda é o que a pessoa pediu: as palavras do pedido ("leite", "pão de queijo") estão no nome."""
+    pt = set(normalizar(termo).split())
+    return bool(pt) and pt <= set(normalizar(nome).split())
+
+
+def _anotar_linhas(car, linhas):
+    """Carrinho refeito em outra loja (ou no outro iFood): as nossas anotações de cada linha vão junto, e a unidade
+    de venda é a do produto de lá (o quilo daqui pode ser bandeja lá)."""
+    pelo_item = {lin['item_id']: lin for lin in linhas}
+    for i in car.get('itens') or []:
+        lin = pelo_item.get(i.get('item_id')) or {}
+        i['opcoes'], i['obs'] = lin.get('opcoes') or [], lin.get('obs')
+        i['termo'], i['tipo_loja'] = lin.get('termo'), lin.get('tipo_loja')
+        i['unidade'] = T.unidade(i.get('nome') or '', lin.get('descricao'), lin.get('tipo_loja'))
 
 
 def _falha_do_ifood(cod):

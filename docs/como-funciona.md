@@ -388,6 +388,15 @@ o bot cutuca uma vez ("Ainda está por aí?" + a pergunta da etapa); aos 5 min (
   pedido mínimo por loja (o mesmo na loja e no carrinho), lanchonete, pizzaria, cantina e mercados com
   o que acompanha (refri, suco, batata, sobremesa), e busca que ignora "de"/"com" e põe na frente quem
   tem todas as palavras.
+- **Troca com pedido montado** (o mock ligou ou desligou, na mão ou pelo modo palco): a pessoa não fica
+  sabendo. No começo da rodada o bot monta o mesmo carrinho do outro lado (`_trocar_de_ifood` em
+  `src/bot/fluxo.py`): a loja que tem tudo pelo `melhor_loja` (a de mesmo nome, se tiver), cada item pelo
+  nome e com a mesma quantidade, como no "Trocar de loja". O produto da vez e o card de antes valem pelo
+  mesmo nome. O que não existe lá sai como "não está mais disponível", o parecido do que a pessoa pediu
+  entra com "acabou, coloquei X no lugar", e o "Confirmar" do resumo de antes não fecha: vem o resumo novo,
+  com os preços de agora. Se o iFood cai numa chamada presa ao pedido (carrinho, loja, item, pedido), o
+  `com_reserva` não refaz igual no mock (daria "carrinho não encontrado"): sobe `IfoodTrocou`, e o
+  `_protegido` faz a mesma troca e roda a ação de novo.
 - **Lojas fechadas na busca** (pros testes de madrugada): `scripts/modo.py --fechadas on|off`, sem deploy.
   A busca para de mandar `onlyOpen` e a loja fechada aparece depois das abertas, como se estivesse
   aberta (sem aviso no card: é só teste). Fechar o pedido nela ainda depende do iFood: se ele recusar, o bot oferece outra loja.

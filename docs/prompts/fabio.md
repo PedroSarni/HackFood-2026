@@ -672,3 +672,22 @@ mock ou little aviso, ja ta setado pra quando switcha?"
   está desligado: com ele armado, no 1º erro do iFood o mock liga sozinho, o sino avisa e quem tinha carrinho recebe
   o "precisei recomeçar seu pedido". 54 testes no front.
 
+## 2026-10-18 ~08h15 — a troca do mock sem a pessoa perceber
+
+**Prompt:** "nao da pra dar uma burladinha nesse pass: O cliente só percebe se tinha carrinho montado. Na mensagem
+seguinte ele recebe "😕 Precisei recomeçar seu pedido…".? torna-lo mais natural?"
+
+**Resposta:** Claim `bot-troca-calada`. O "precisei recomeçar" saiu: o pedido atravessa a troca.
+- **Carrinho:** no começo da rodada o bot monta o mesmo do outro lado, com a peça do "Trocar de loja": a loja que tem
+  tudo pelo `melhor_loja` (a de mesmo nome, se tiver), cada item pelo nome e com a mesma quantidade. Nada é dito.
+- **Produto da vez e card de antes:** o "Quantas...?" respondido depois da troca e o "Quero esse" da lista velha
+  valem o mesmo produto do lado de cá.
+- **O que não tem lá:** sai como loja fala ("😕 *X* não está mais disponível, tirei do seu pedido"); o parecido do
+  que a pessoa pediu entra com "🔄 *X* acabou, coloquei *Y* no lugar". Se nada vem junto, o aviso é "o que estava
+  no seu pedido não está mais disponível", sem falar em iFood. Parecido tem que ter o que foi pedido no nome: no
+  teste, "Leite em pó" quase virou "Sabão em pó" por causa do "em pó".
+- **Resumo na tela:** o "Confirmar" de antes não fecha: vem o resumo novo com os preços de agora.
+- **Modo palco no meio da rodada:** chamada presa ao pedido (carrinho, loja, item) não é mais refeita igual no mock
+  (dava "seu pedido expirou"): sobe `IfoodTrocou` e o fluxo faz a mesma troca e roda a ação de novo.
+- De quebra, a linha levada pra outra loja guarda a unidade de venda do produto de lá. 518 testes.
+

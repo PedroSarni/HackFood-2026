@@ -10,7 +10,7 @@ import os
 import time
 
 from src import agentes
-from src.bot.ifood import Ifood, PrecisaLogin
+from src.bot.ifood import Ifood, IfoodTrocou, PrecisaLogin
 from src.bot.recorrencia import Recorrencias
 from src.shared import geocoder, ifood_mcp, llm, scribe, voz
 
@@ -164,8 +164,17 @@ def ligar_reserva(estado, motivo):
     alertas.registrar(estado, 'mcp_reserva', 'O iFood não respondeu: o bot passou pro catálogo de reserva', motivo[:300])
 
 
+def presa_ao_pedido(ferramenta, args):
+    """A chamada carrega id do iFood de antes (carrinho, loja, item, pedido)? Busca solta e conta valem nos dois lados."""
+    if ferramenta == 'searchOffers':
+        return bool((args.get('refinements') or {}).get('merchantId'))
+    return any(k in args for k in ('cartId', 'merchantId', 'itemId', 'orderId'))
+
+
 def com_reserva(estado, real, reserva):
-    """chamar(tool, **args) que tenta o iFood real e, se ele cair, liga o mock e refaz a chamada nele."""
+    """chamar(tool, **args) que tenta o iFood real e, se ele cair, liga o mock e refaz a chamada nele. A chamada
+    presa ao pedido da pessoa não dá pra refazer igual (o mock não conhece aqueles ids): sobe IfoodTrocou e o fluxo
+    leva o pedido junto, sem a pessoa ver erro."""
     def chamar(ferramenta, **args):
         try:
             return real(ferramenta, **args)
@@ -173,6 +182,8 @@ def com_reserva(estado, real, reserva):
             if not mcp_caiu(e):
                 raise
             ligar_reserva(estado, f'{ferramenta}: {e!r}')
+            if presa_ao_pedido(ferramenta, args):
+                raise IfoodTrocou(f'{ferramenta}: {e!r}'[:300], getattr(e, 'codigo', None) or 'REDE') from e
             return reserva(ferramenta, **args)
     return chamar
 
