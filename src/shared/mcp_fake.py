@@ -266,13 +266,13 @@ def _n(s):
 
 
 def _uid(*partes):
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, 'hackfood:' + ':'.join(map(str, partes))))
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, 'aifood:' + ':'.join(map(str, partes))))
 
 
 # catálogo de fora (Volume `hackfood-mock`, montado em /mock no Modal; NÃO mora no git): lojas, itens, fotos e
 # sinônimos. Sem ele vale o catálogo daqui de cima (testes e dev). `VERSAO` separa os ids dos dois catálogos:
 # carrinho guardado de um nunca aponta pra item do outro.
-CATALOGO_EXTERNO = os.environ.get('HACKFOOD_MOCK_CATALOGO', '/mock/catalogo.json')
+CATALOGO_EXTERNO = os.environ.get('AIFOOD_MOCK_CATALOGO', '/mock/catalogo.json')
 VERSAO = ''
 _FOTOS = {'itens': [], 'lojas': {}}
 

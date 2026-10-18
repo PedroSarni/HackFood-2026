@@ -23,7 +23,7 @@ import modal
 # e o portal não deixa mais editar (AGENTS.md §0.0). Mudou a URL, o login do iFood quebra.
 APP = 'hackfood-bot'
 ROTULO = 'hackfood-bot'
-BASE = os.environ.get('HACKFOOD_BASE') or f'https://fabio-araujo-silva--{ROTULO}.us-east.modal.run'
+BASE = os.environ.get('AIFOOD_BASE') or f'https://fabio-araujo-silva--{ROTULO}.us-east.modal.run'
 CALLBACK = f'{BASE}/ifood/callback'
 LOGIN_VALIDADE = 30 * 60      # link "Entrar no iFood" vale 30 min (cada toque gera PKCE novo)
 LEMBRETES_MIN = 15            # o cron dos lembretes de recompra passa a cada 15 min (o dash mostra a última passada)
@@ -35,7 +35,7 @@ imagem = (modal.Image.debian_slim(python_version='3.12')
           # add_local_python_source só leva .py: sem isso o /logo.png dava 500 no ar
           .add_local_file(pathlib.Path(__file__).parent / 'web' / 'logo.png', '/root/src/web/logo.png'))
 segredos = [modal.Secret.from_name('hackathon-whatsapp'),
-            # GEMINI_API_KEY própria do HackFood (o `llm-conversor` é do handwrite_bot e a cota estourou)
+            # GEMINI_API_KEY própria do AiFood (o `llm-conversor` é do handwrite_bot e a cota estourou)
             modal.Secret.from_name('hackathon-gemini'),
             modal.Secret.from_name('hackathon-ifood'),
             # ELEVENLABS_API_KEY do Scribe (áudio vira texto); PREENCHER = desligado e o Gemini ouve

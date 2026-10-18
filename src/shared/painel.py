@@ -336,7 +336,7 @@ def _iso(ts):
 
 
 def _cliente(wa):
-    return 'CLI-' + hashlib.sha1(f'hackfood:{wa}'.encode()).hexdigest()[:6].upper()
+    return 'CLI-' + hashlib.sha1(f'aifood:{wa}'.encode()).hexdigest()[:6].upper()
 
 
 def _telefone(wa):

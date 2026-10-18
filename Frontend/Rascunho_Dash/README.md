@@ -1,4 +1,4 @@
-# HackFood Analytics
+# AiFood Analytics
 
 Dash local em React, React Router e Vite, alimentado em tempo real pelo diário do bot (ou pela demonstração simulada). Identidade visual em vermelho, branco e cinza.
 

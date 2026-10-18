@@ -1,7 +1,7 @@
 # 05 — Documento Técnico Resumido
 
 Time: Davi, Fabio, Pedro e Breno (Hackathon iFood × SEMCOMP 29, 17–18/10/2026).
-Repositório: `PedroSarni/HackFood-2026`. Detalhe completo em `docs/como-funciona.md`.
+Repositório: `PedroSarni/AiFood-2026`. Detalhe completo em `docs/como-funciona.md`.
 
 ## 1. Tese técnica: "a IA entende, o código garante"
 

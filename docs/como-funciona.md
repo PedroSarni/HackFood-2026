@@ -395,7 +395,7 @@ o bot cutuca uma vez ("Ainda está por aí?" + a pergunta da etapa); aos 5 min (
 |---|---|
 | `hackathon-whatsapp` | Número, token e verify token da Cloud API da Meta (emprestados do handwrite_bot) |
 | `hackathon-ifood` | `IFOOD_CLIENT_ID`, `IFOOD_CLIENT_SECRET` (agente "Compras pelo WhatsApp", aprovado). Sem `IFOOD_MOCK` = modo real |
-| `hackathon-gemini` | `GEMINI_API_KEY` (key própria do HackFood; o `llm-conversor` do handwrite_bot não é mais usado aqui) |
+| `hackathon-gemini` | `GEMINI_API_KEY` (key própria do AiFood; o `llm-conversor` do handwrite_bot não é mais usado aqui) |
 | `hackathon-elevenlabs` | `ELEVENLABS_API_KEY` do Scribe (`PREENCHER` = desligado: o áudio vai pro Gemini, como antes) |
 
 - **Modo real** (atual): o bot fala com o iFood de verdade. A pessoa precisa fazer o login real

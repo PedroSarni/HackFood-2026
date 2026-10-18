@@ -4,7 +4,7 @@
 Gemini virou reserva. Áudio pula o Claude (a API não ouve). Sem crédito ou com a key recusada, o Claude
 sai da fila por CLAUDE_PAUSA e o dash recebe um alerta (`avisar`, ligado em src/shared/alertas.py).
 
-Secret Modal `hackathon-gemini`: só a GEMINI_API_KEY, key própria do HackFood (até 17/10 20h
+Secret Modal `hackathon-gemini`: só a GEMINI_API_KEY, key própria do AiFood (até 17/10 20h
 era o `llm-conversor` do handwrite_bot, e a cota dele estourou). Override dos modelos por
 BOT_GEMINI_MODELOS="modelo:prazo:pensamento,modelo:prazo:pensamento".
 
@@ -265,7 +265,7 @@ def _chamar_openrouter(http, modelo, sistema, partes, esquema, prazo):
              'response_format': {'type': 'json_schema',
                                  'json_schema': {'name': 'resposta', 'strict': False, 'schema': _esquema_json(esquema)}}}
     r = http.post(OPENROUTER, json=corpo, timeout=prazo,
-                  headers={'Authorization': f'Bearer {_cfg("OPENROUTER_API_KEY")}', 'X-Title': 'HackFood bot'})
+                  headers={'Authorization': f'Bearer {_cfg("OPENROUTER_API_KEY")}', 'X-Title': 'AiFood bot'})
     if r.status_code >= 400:
         raise ErroLLM(f'openrouter {modelo} HTTP {r.status_code}: {" ".join(r.text.split())[:200]}')
     try:

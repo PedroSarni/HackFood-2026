@@ -8,7 +8,7 @@ import json
 
 import modal
 
-app = modal.App('hackfood-validar-foto-grupo')
+app = modal.App('aifood-validar-foto-grupo')
 imagem = (modal.Image.debian_slim(python_version='3.12')
           .pip_install('httpx==0.28.1', 'pillow==11.3.0')
           .add_local_python_source('src'))
@@ -86,7 +86,7 @@ def validar():
     lida = foto.ler(gerar_json, {}, [('image/jpeg', _lista_escrita())])
     print('lista:', json.dumps(lida, ensure_ascii=False))
     ok &= lida['tipo'] == 'lista' and len(lida['itens']) >= 4
-    r = httpx.get(FOTO_COMIDA, headers={'User-Agent': 'HackFood-validacao/1.0'}, follow_redirects=True, timeout=30)
+    r = httpx.get(FOTO_COMIDA, headers={'User-Agent': 'AiFood-validacao/1.0'}, follow_redirects=True, timeout=30)
     if r.status_code == 200:
         lida = foto.ler(gerar_json, {}, [('image/jpeg', r.content)])
         print('comida:', json.dumps(lida, ensure_ascii=False))

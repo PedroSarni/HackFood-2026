@@ -9,7 +9,7 @@ Dados reais exigem autenticação e acesso ao workspace Modal do bot; a demonstr
 ## 2026-10-17 21:34 — preparar e rodar o dash no Linux
 
 **Prompt:** siga essas instruções, leve em consideração que eu tenho um linux:
-# Dash do HackFood: como rodar no seu PC
+# Dash do AiFood: como rodar no seu PC
 
 O dash roda local, em duas partes: um servidor Python (porta 8787) que gera ou lê os dados, e o site em React/Vite (porta 5173). São 2 terminais abertos ao mesmo tempo.
 
@@ -31,8 +31,8 @@ node --version
 O repositório é privado: peça pro Fabio ou pro Pedro te ad
 
 sh
-git clone https://github.com/PedroSarni/HackFood-2026.git
-cd HackFood-2026
+git clone https://github.com/PedroSarni/AiFood-2026.git
+cd AiFood-2026
 
 
 ## 3. Preparar o Python (uma vez só)
@@ -59,7 +59,7 @@ cd ../..
 
 ## 5. Rodar (toda vez)
 
-*Terminal 1*, na pasta HackFood-2026 (o servidor dos dados):
+*Terminal 1*, na pasta AiFood-2026 (o servidor dos dados):
 
 Windows:
 powershell
@@ -72,7 +72,7 @@ sh
 
 Pronto quando aparecer painel: http://127.0.0.1:8787/api/saude · fontes: demo.
 
-*Terminal 2*, na pasta HackFood-2026/Frontend/Rascunho_Dash (o site):
+*Terminal 2*, na pasta AiFood-2026/Frontend/Rascunho_Dash (o site):
 sh
 npm run dev
 

@@ -8,7 +8,7 @@ Segredos e dados pessoais aparecem como `[...]`. Começa em 17/10 ~20h; os promp
 **Prompt:** "a nova key do gemini: [key do Gemini] cadastre ela. use o scribe mesmo! pode criar a key no
 eleven labs.io entao entrando no meu browser se nao me de o link pra eu ir la criar"
 
-**Resposta:** Key validada com 1 chamada e cadastrada num secret novo, `hackathon-gemini`, só do HackFood
+**Resposta:** Key validada com 1 chamada e cadastrada num secret novo, `hackathon-gemini`, só do AiFood
 (o `llm-conversor` é compartilhado com o handwrite_bot e ficou intocado). Scribe confirmado (`scribe_v2`).
 A key da ElevenLabs o agente não cria nem copia pelo navegador: mandou o link
 https://elevenlabs.io/app/settings/api-keys pra criar e colar no chat. Código do Scribe pronto e testado (o áudio

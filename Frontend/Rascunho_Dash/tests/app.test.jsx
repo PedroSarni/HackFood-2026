@@ -20,10 +20,10 @@ describe('Navegação enxuta e mais análises', () => {
     await user.click(screen.getByRole('link', { name: 'Conversão' }));
     expect(screen.getAllByRole('button', { name: /Ver conversas/ }).length).toBe(10);
     expect(screen.getByText('Por que os clientes desistem?')).toBeTruthy();
-    expect(localStorage.getItem('hackfood-mode')).toBe('advanced');
+    expect(localStorage.getItem('aifood-mode')).toBe('advanced');
     await user.click(screen.getByRole('switch', { name: 'Mais análises' }));
     expect(screen.getByRole('heading', { name: 'Agentes.' })).toBeTruthy();   // saiu da página que só existe em mais análises
-    expect(localStorage.getItem('hackfood-mode')).toBe('basic');
+    expect(localStorage.getItem('aifood-mode')).toBe('basic');
   });
 
   it('endereços antigos levam pras telas novas', () => {
@@ -32,7 +32,7 @@ describe('Navegação enxuta e mais análises', () => {
   });
 
   it('filtra por etapa sem empilhar as páginas', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     const user = userEvent.setup(); mount('/conversao');
     await user.click(screen.getByRole('button', { name: /Pedido confirmado:.*Ver conversas/ }));
     expect(screen.getByRole('button', { name: /Alcançou: Pedido confirmado/ })).toBeTruthy();
@@ -51,7 +51,7 @@ describe('Conversas e fonte dos dados', () => {
     await user.click(screen.getAllByRole('button', { name: 'Abrir conversa de Marina Costa' })[0]);
     const drawer = screen.getByRole('dialog');
     expect(within(drawer).getByText(/Conversa simulada/)).toBeTruthy();
-    expect(within(drawer).getAllByText('HackFood · assistente').length).toBeGreaterThan(0);
+    expect(within(drawer).getAllByText('AiFood · assistente').length).toBeGreaterThan(0);
     await user.click(within(drawer).getByRole('tab', { name: 'Eventos e análise' }));
     expect(within(drawer).getByText('Esta conversa virou uma compra')).toBeTruthy();
     expect(within(drawer).getByText('order_confirmed')).toBeTruthy();
@@ -79,7 +79,7 @@ describe('Conversas e fonte dos dados', () => {
   });
 
   it('aplica filtros globais e paginação sem alterar a fonte', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     const user = userEvent.setup(); mount('/conversas');
     await user.selectOptions(screen.getByLabelText('Restaurante'), 'Burger da Vila');
     expect([...document.querySelectorAll('tbody tr')].every(r => r.textContent.includes('Burger da Vila'))).toBe(true);

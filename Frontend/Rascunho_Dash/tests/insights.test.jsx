@@ -30,7 +30,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('Insights com IA', () => {
   it('baixa em PDF os insights que estão na tela', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     const user = userEvent.setup();
     stubInsights();
     mount('/conversao');
@@ -44,13 +44,13 @@ describe('Insights com IA', () => {
   });
 
   it('o botão só aparece em Conversão, Clientes e Mercado', () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     mount('/dinheiro');
     expect(screen.queryByRole('button', { name: /Gerar insights com IA/ })).toBeNull();
   });
 
   it('varre a página, manda só agregados e mostra os insights por time', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     const user = userEvent.setup();
     const posts = stubInsights();
     mount('/conversao');
@@ -73,7 +73,7 @@ describe('Insights com IA', () => {
   });
 
   it('com a Sofia desligada, avisa e deixa tentar de novo', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     const user = userEvent.setup();
     stubInsights(() => ({ ok: false, body: { erro: 'desligado' } }));
     mount('/clientes');
@@ -83,7 +83,7 @@ describe('Insights com IA', () => {
   });
 
   it('mercado manda cidades e lojas, não clientes', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     const user = userEvent.setup();
     const posts = stubInsights();
     mount('/mercado');

@@ -1,4 +1,4 @@
-# Contexto do evento — HackFood 2026
+# Contexto do evento — AiFood 2026
 
 > Fonte de verdade sobre o que o evento, os mentores e o iFood disseram.
 > Agentes: leiam antes de decidir algo de produto ou de MCP.
@@ -51,7 +51,7 @@ Detalhes no JSON do repo. Aqui só o que importa no dia a dia.
 - O llms.txt cita outros hosts (api-mcp.ifood.com, dev-api-mcp.ifood.com, auth.ifood.com.br, dev-auth.ifood.com.br). Usar o gateway acima até confirmar
 - Auth: OAuth 2.1 com PKCE. authorize em https://id.ifood.com.br/authorize, token em https://id.ifood.com.br/token
 - Access token dura ~1h, refresh token ~30 dias e rotaciona. client_secret só no backend
-- Nosso agente: "HackFood Agent", aprovado em menos de 1h (criado ~15h10, aprovado antes das 15h58)
+- Nosso agente: "AiFood Agent", aprovado em menos de 1h (criado ~15h10, aprovado antes das 15h58)
   - Redirect cadastrado: http://localhost:8080/callback
   - Escopos: user, discovery e cart (via "Criação de pedidos")
   - Client Secret é gerado no portal após a aprovação e aparece uma única vez (ver o problema do /token na seção 8)
@@ -93,7 +93,7 @@ Ver docs/decisoes.md.
 ## 8. Bugs e inconsistências do MCP (alimenta o entregável 06)
 Marcar cada item como [só na doc] ou [testado].
 - [14h40-15h03] Portal de cadastro fora do ar. Mentores avisaram que estavam resolvendo [testado]
-- [16h30] Agente "HackFood Agent" (Davi): POST /token devolve invalid_client com o secret recém gerado (post, Basic e sem secret). RESOLVIDO: o secret estava errado, não era problema do iFood [testado]
+- [16h30] Agente "AiFood Agent" (Davi): POST /token devolve invalid_client com o secret recém gerado (post, Basic e sem secret). RESOLVIDO: o secret estava errado, não era problema do iFood [testado]
 - [17h05] RESOLVIDO para o agente "Compras pelo WhatsApp": com o client_id GbC9J7... + o secret dele, POST /token devolve invalid_grant (não invalid_client) usando um code falso — ou seja, a autenticação do cliente PASSA, tanto por client_secret_post quanto por Basic. Logo, o invalid_client do item acima era específico do agente/secret do Davi, NÃO um bug geral do iFood. O OAuth do nosso agente está completo (authorize + escopos mcp.* + redirect + /token). Falta só um login humano real. [testado]
 - Dica pro invalid_client: conferir se o secret é do MESMO agente do client_id (cada agente tem o seu), e gerar de novo no portal se tiver dúvida (some ao recarregar a página) [testado]
 - Hosts diferentes entre os guias (consumer-mcp.ifood.com.br) e o llms.txt (api-mcp.ifood.com / dev-api-mcp.ifood.com). Os do llms.txt nem resolvem no DNS; o consumer-mcp responde 401 com `resource_metadata` [testado]
@@ -128,4 +128,4 @@ Marcar cada item como [só na doc] ou [testado].
 
 ## 9. Links
 - Portal: https://mcp-developer.ifood.com.br
-- Repo: https://github.com/PedroSarni/HackFood-2026
+- Repo: https://github.com/PedroSarni/AiFood-2026

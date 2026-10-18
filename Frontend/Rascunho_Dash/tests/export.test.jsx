@@ -32,7 +32,7 @@ describe('Exportação de relatórios na interface', () => {
   });
 
   it('leva o mesmo filtro de restaurante ao PDF na página de Relatórios', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     downloadAnalyticsPdf.mockResolvedValue(undefined);
     const user = userEvent.setup(); mount('/relatorios');
     await user.selectOptions(screen.getByLabelText('Restaurante'), 'Sushi Nori');
@@ -57,7 +57,7 @@ describe('Exportação de relatórios na interface', () => {
   });
 
   it('trata falhas e permite uma nova tentativa sem perder os filtros', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     downloadAnalyticsPdf.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined);
     const user = userEvent.setup(); mount('/relatorios');
     await user.selectOptions(screen.getByLabelText('Cidade'), 'Campinas');
@@ -70,7 +70,7 @@ describe('Exportação de relatórios na interface', () => {
   });
 
   it('evita exportações duplicadas enquanto o documento está sendo gerado', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
+    localStorage.setItem('aifood-mode', 'advanced');
     let resolve;
     downloadAnalyticsPdf.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
     const user = userEvent.setup(); mount('/relatorios');

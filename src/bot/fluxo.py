@@ -34,7 +34,7 @@ POR_PAGINA = 10         # cards por vez no carrossel ("Mais opções" mostra os 
 POR_PAGINA_VOZ = 3      # modo áudio: as opções são ditas uma a uma, mais que 3 ninguém guarda de ouvido
 POR_PAGINA_SEM_CARROSSEL = 3  # se a Meta recusar o carrossel, volta pros cards soltos
 # carrossel exige foto em todo card: produto sem foto usa a nossa logo
-FOTO_PADRAO = (os.environ.get('HACKFOOD_BASE') or 'https://fabio-araujo-silva--hackfood-bot.us-east.modal.run') + '/logo.png'
+FOTO_PADRAO = (os.environ.get('AIFOOD_BASE') or 'https://fabio-araujo-silva--hackfood-bot.us-east.modal.run') + '/logo.png'
 LISTAS_GUARDADAS = 3    # listas antigas que ainda aceitam toque de botão
 PEDIDOS_GUARDADOS = 10
 TRIVIAIS = {'saudacao', 'agradecer', 'sim'}

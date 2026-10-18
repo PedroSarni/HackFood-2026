@@ -26,8 +26,8 @@ export function createInsightsPdf({ page, data, filters = {}, source, teamColors
   const sourceLabel = source === 'demo' ? 'Demonstração' : 'Dados reais';
   const context = reportContext(filters, true, referenceDate);
   const generated = generatedAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
-  doc.setProperties({ title: `HackFood Analytics - Insights da Sofia - ${label}`, author: 'HackFood Analytics',
-    subject: `Insights por time do iFood - ${sourceLabel}`, keywords: 'HackFood, insights, Sofia' });
+  doc.setProperties({ title: `AiFood Analytics - Insights da Sofia - ${label}`, author: 'AiFood Analytics',
+    subject: `Insights por time do iFood - ${sourceLabel}`, keywords: 'AiFood, insights, Sofia' });
   doc.setCreationDate(generatedAt);
 
   const text = (value, x, y, size = 10, color = COLORS.ink, bold = false, options) => {
@@ -45,7 +45,7 @@ export function createInsightsPdf({ page, data, filters = {}, source, teamColors
     doc.setFillColor(...COLORS.red);
     doc.rect(0, 0, 210, 3, 'F');
     if (logo) doc.addImage(logo, 'PNG', 16, 12, 13, 13, 'brand-smile');
-    text('hackfood', logo ? 33 : 16, 18, 17, COLORS.ink, true);
+    text('aifood', logo ? 33 : 16, 18, 17, COLORS.ink, true);
     text('A N A L Y T I C S', logo ? 33 : 16, 24, 7, COLORS.muted);
     doc.setFillColor(...COLORS.blush);
     doc.roundedRect(151, 14, 43, 8, 2, 2, 'F');
@@ -111,7 +111,7 @@ export function createInsightsPdf({ page, data, filters = {}, source, teamColors
   const pages = doc.getNumberOfPages();
   for (let n = 1; n <= pages; n++) {
     doc.setPage(n); doc.setDrawColor(...COLORS.line); doc.setLineWidth(.2); doc.line(16, 280, 194, 280);
-    text(`HackFood Analytics | Insights da Sofia | ${sourceLabel} | America/Sao_Paulo`, MARGIN, 286, 7, COLORS.muted);
+    text(`AiFood Analytics | Insights da Sofia | ${sourceLabel} | America/Sao_Paulo`, MARGIN, 286, 7, COLORS.muted);
     text(`${n} / ${pages}`, 194, 286, 8, COLORS.muted, false, { align: 'right' });
   }
   return doc;

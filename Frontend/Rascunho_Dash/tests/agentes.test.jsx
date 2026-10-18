@@ -72,7 +72,7 @@ describe('Uso do MCP', () => {
   });
 
   it('fonte de demonstração vem com o rótulo de demonstração', async () => {
-    localStorage.setItem('hackfood-source', 'demo');
+    localStorage.setItem('aifood-source', 'demo');
     stubFetch(() => ({ ...mcp(), fonte: 'demo' }));
     mount('/mcp');
     expect(await screen.findByText(/Dados simulados/)).toBeTruthy();
