@@ -1,7 +1,7 @@
 # Estado do projeto
 
 > Atualizar a cada ~1h ou depois de entrega importante. Quem terminou o trabalho atualiza.
-> Última atualização: 17/10 21h18 por Davi
+> Última atualização: 17/10 21h34 por Davi
 
 ## Ideia escolhida
 Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital): botões sempre, 3 opções por vez com Mais opções, texto, áudio e foto, várias mensagens seguidas, e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência, usando o MCP do iFood como agente externo. Ainda a decidir: pedido em grupo e áudio de saída (item B2).
@@ -21,12 +21,15 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
   Importante: o escopo `openid` NÃO é permitido pro nosso cliente — a string é só `mcp.*`.
 - Pedido completo testado no mock (login, endereço, 3 cards, "Mais opções", carrinho, pagamento, resumo,
   confirmação, rastreio, lembrete). Pra demo sem conta iFood, voltar ao mock: `IFOOD_MOCK=1` no secret.
-- Como tudo funciona: `docs/como-funciona.md`. 68 testes passando (`.venv/Scripts/python.exe -m pytest`).
+- Como tudo funciona: `docs/como-funciona.md`. 137 testes passando em 17/10 21h34 (`.venv/Scripts/python.exe -m pytest`).
 
 ## Em andamento
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
 - Fabio: 2º agente "Compras pelo WhatsApp" (criado às ~16h05) já APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
-- Pedro: `Frontend/Rascunho_Dash` (dashboard de analytics, só dados simulados), sem claim ainda
+- Pedro: dash em `Frontend/Rascunho_Dash` saiu do rascunho: lê o diário de eventos do bot ao vivo (Fabio, claim `dash-live-data`, done) e ganhou mascote no perfil (Breno, claim `dash-profile-mascot`)
+- Breno, claim `dash-profile-mascot` (done): mascote como foto de perfil do workspace no dash
+- Painel com seletor dados reais ou demonstração (aad024d); diário de prompts em `docs/prompts/` (regra do Fabio, 6bbeb88)
+- Fabio: stub `src/shared/voz.py` (texto -> nota de voz), áudio de saída em preparação (d22fa3d)
 - Rascunho do 06 (Davi): em andamento, fora do repo
 
 ## Bloqueado ou esperando
@@ -55,6 +58,7 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 ### Produto
 - [ ] B1 Regra da ordem de prioridade dos itens (ranking). Davi decide, Fabio implementa em src/bot/ranking.py
 - [ ] B2 Decidir se pedido em grupo, áudio de saída e foto entram ou ficam fora — time
+  - voz.py (stub do Fabio) sugere que áudio de saída pode voltar; confirmar com Fabio
 - [ ] B3 (futuro) Mockar cupom e clube, se der tempo — time
 ### MCP real
 - [x] C1 Credenciais reais funcionando no bot (2º agente do Fabio) — Fabio

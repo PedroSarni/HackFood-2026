@@ -64,3 +64,13 @@ foram no topo, porque o diário é "mais novo no topo", e não no fim como o pro
 **Prompt:** "vc consegue registrar essas mudanças q fiz agora no diario de prompts?"
 
 **Resposta:** Criado este arquivo com as entradas da sessão (de ~18h45 até agora).
+
+## 2026-10-17 21:34 — estado.md fiel ao repo (testes, dash, voz)
+
+**Prompt:** "TAREFA: deixar docs/estado.md fiel ao que existe agora. Edição mínima [...] troque "68 testes
+passando" pela contagem real [...] Pedro: o dash saiu do rascunho [...] Breno [...] seletor real/demonstração
+e diário de prompts [...] stub src/shared/voz.py [...] No B2, acrescente uma sub-linha [...]"
+
+**Resposta:** pytest rodado: 137 passando. Atualizados "Última atualização", "No ar agora" (contagem), "Em
+andamento" (dash do Pedro com Fabio e Breno, seletor real/demo aad024d, diário de prompts 6bbeb88, stub voz.py
+d22fa3d como "em preparação") e a sub-linha do B2. Nada marcado [x]. O claim do Breno já está `done`.
