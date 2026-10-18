@@ -47,8 +47,9 @@ IDLE_MAX = 1800
 FASES_QUE_EXPIRAM = {'endereco', 'complemento', 'bairro', 'cpf', 'endereco_escolha', 'quantidade', 'opcao',
                      'tirar', 'mudar', 'foto', 'kit', 'grupo_pessoas', 'grupo_tema'}
 VOLTOU = 'Faz um tempinho que você sumiu, recomeçamos? 🙂'
-# calou no meio de uma pergunta aberta: depois disso o bot cutuca uma vez (src/app.py dispara)
-FOLLOWUP_SEG = 180
+# calou no meio de uma pergunta aberta: depois disso o bot cutuca uma vez (src/app.py dispara).
+# 1 min desde 18/10 (decisão do Fabio; antes 3 min)
+FOLLOWUP_SEG = 60
 ABANDONO_SEG = 300  # continuou calada com itens no carrinho: esquece o carrinho (decisão do Fabio)
 FASES_FOLLOWUP = {'endereco', 'complemento', 'bairro', 'endereco_escolha', 'escolhendo', 'quantidade', 'opcao',
                   'mais', 'tirar', 'pagamento', 'confirmar'}

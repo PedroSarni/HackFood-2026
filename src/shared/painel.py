@@ -728,9 +728,9 @@ def _rotinas():
     """id -> (nome, quando dispara), com os tempos de verdade do bot."""
     from src.bot.fluxo import ABANDONO_SEG, FOLLOWUP_SEG
     return {
-        'cutucada': ('Cutucada', f'Aos {FOLLOWUP_SEG // 60} min sem resposta no meio de uma pergunta, '
+        'cutucada': ('Cutucada', f'Depois de {FOLLOWUP_SEG // 60} min sem resposta no meio de uma pergunta, '
                                  'repete a pergunta uma vez.'),
-        'abandono': ('Carrinho esquecido', f'Aos {ABANDONO_SEG // 60} min calada com itens no carrinho, '
+        'abandono': ('Carrinho esquecido', f'Depois de {ABANDONO_SEG // 60} min calada com itens no carrinho, '
                                            'esvazia o carrinho e volta pro menu.'),
         'lembrete': ('Lembrete de recompra', 'O cron procura lembrete vencido. Na janela de 24h manda os botões; '
                                              'fora dela, mostra quando a pessoa voltar.'),

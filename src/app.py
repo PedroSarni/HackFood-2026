@@ -84,7 +84,7 @@ def rodada(wa_id: str, seq: int, espera: float, mid: str = ''):
             bot.processar(wa_id, msgs)
         finally:
             ctx.diario.descarregar()
-        try:  # calou com pergunta aberta ou carrinho cheio: follow-up aos 3 min, abandono aos 5
+        try:  # calou com pergunta aberta ou carrinho cheio: follow-up com 1 min, abandono aos 5
             marca = bot.marca_followup() or bot.marca_abandono()
             if marca:
                 pessoa_calada.spawn(wa_id, marca)

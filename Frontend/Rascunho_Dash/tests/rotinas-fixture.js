@@ -5,10 +5,10 @@ const iso = seconds => new Date(NOW + seconds * 1000).toISOString();
 export const rotinas = () => ({
   fonte: 'real', estado: 'pronto', agora: NOW / 1000, conversa: null,
   rotinas: [
-    { id: 'cutucada', nome: 'Cutucada', quando: 'Aos 3 min sem resposta no meio de uma pergunta, repete a pergunta uma vez.',
+    { id: 'cutucada', nome: 'Cutucada', quando: 'Depois de 1 min sem resposta no meio de uma pergunta, repete a pergunta uma vez.',
       disparos: 8, conversas: 7, ultimo: iso(-90), serie: [0, 1, 2, 0, 5], resultados: { voltou: 5, 'sem resposta': 3 }, canais: null,
       destaque: { rotulo: 'voltaram a falar', n: 5, de: 8, pct: 62.5 } },
-    { id: 'abandono', nome: 'Carrinho esquecido', quando: 'Aos 5 min calada com itens no carrinho, esvazia o carrinho e volta pro menu.',
+    { id: 'abandono', nome: 'Carrinho esquecido', quando: 'Depois de 5 min calada com itens no carrinho, esvazia o carrinho e volta pro menu.',
       disparos: 3, conversas: 3, ultimo: iso(-3600), serie: [1, 0, 0, 2, 0], resultados: { comprou: 1, 'sem resposta': 2 }, canais: null,
       destaque: { rotulo: 'compraram em 24h', n: 1, de: 3, pct: 33.3 } },
     { id: 'lembrete', nome: 'Lembrete de recompra', quando: 'O cron procura lembrete vencido. Na janela de 24h manda os botões; fora dela, mostra quando a pessoa voltar.',

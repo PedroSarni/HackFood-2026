@@ -366,7 +366,7 @@ A etapa atual (`u['fase']`) é o que o fluxo usa pra saber o que fazer com a pr�
 `inicio`, `pedido`, `endereco`, `escolhendo`, `quantidade`, `opcao`, `mais`, `pagamento`, `cpf`,
 `confirmar`, `acompanhando`, `recorrencia`, etc.
 
-Quem cala: rodada que termina com pergunta aberta ou itens no carrinho dispara `pessoa_calada` (`src/app.py`). Aos 3 min (`FOLLOWUP_SEG`)
+Quem cala: rodada que termina com pergunta aberta ou itens no carrinho dispara `pessoa_calada` (`src/app.py`). Com 1 min (`FOLLOWUP_SEG`)
 o bot cutuca uma vez ("Ainda está por aí?" + a pergunta da etapa); aos 5 min (`ABANDONO_SEG`), ainda calada e com itens, esquece o carrinho
 (só o local, sem chamar o iFood) e volta ao menu, até no resumo. Nada disso muda `u['ultima_msg']`: a volta depois de 30 min (`IDLE_MAX`) segue igual.
 
@@ -491,7 +491,7 @@ disparos do período, o gráfico por dia (ou por hora no "Último dia"), o últi
 
 | Rotina | Onde está | Quando dispara | Desfecho que o dash conta |
 |---|---|---|---|
-| Cutucada | `pessoa_calada` em `src/app.py` | 3 min de silêncio no meio de uma pergunta | voltou a falar em até 10 min |
+| Cutucada | `pessoa_calada` em `src/app.py` | 1 min de silêncio no meio de uma pergunta | voltou a falar em até 10 min |
 | Carrinho esquecido | `pessoa_calada` em `src/app.py` | 5 min de silêncio com itens no carrinho | comprou ou voltou em até 24h |
 | Lembrete de recompra | `lembretes` em `src/app.py`, regras em `src/bot/recorrencia.py` | cron a cada 15 min acha lembrete vencido | virou pedido, "hoje não" ou desligou |
 | Rastreio do pedido | `src/bot/rastreio.py` | cada mudança de status do pedido | o status avisado |

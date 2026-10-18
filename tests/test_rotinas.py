@@ -7,6 +7,7 @@ import pytest
 
 from src.bot import recorrencia
 from src.bot import textos as T
+from src.bot.fluxo import ABANDONO_SEG, FOLLOWUP_SEG
 from src.painel import simulador
 from src.painel.simulador import MundoAnotado
 from src.shared import painel
@@ -70,7 +71,7 @@ def test_resumo_conta_disparos_desfechos_canais_e_a_varredura():
     assert cut['disparos'] == 3 and cut['conversas'] == 3
     assert cut['resultados'] == {'voltou': 1, 'sem resposta': 1, 'esperando': 1}
     assert cut['destaque'] == {'rotulo': 'voltaram a falar', 'n': 1, 'de': 2, 'pct': 50.0}
-    assert '3 min' in cut['quando'] and len(cut['serie']) == 24 and sum(cut['serie']) == 3   # último dia: por hora
+    assert f'{FOLLOWUP_SEG // 60} min' in cut['quando'] and len(cut['serie']) == 24 and sum(cut['serie']) == 3   # por hora
     assert por['abandono']['resultados'] == {'comprou': 1}
     lem = por['lembrete']
     assert lem['resultados'] == {'comprou': 1, 'parou': 1} and lem['canais'] == {'na janela': 1, 'na volta': 1}
@@ -139,7 +140,7 @@ def test_quem_cala_leva_a_cutucada_e_depois_perde_o_carrinho():
     assert simulador.calar(m, ritmo=0, volta=0) == 'carrinho esquecido'
     saidas = [e for e in m.eventos() if e['tipo'] == 'saida' and e.get('origem')]
     assert [painel.rotina_da_saida(e) for e in saidas] == ['cutucada', 'abandono']
-    assert saidas[1]['ts'] - saidas[0]['ts'] == pytest.approx(120, abs=1)
+    assert saidas[1]['ts'] - saidas[0]['ts'] == pytest.approx(ABANDONO_SEG - FOLLOWUP_SEG, abs=1)
     assert not (m.estado().get('carrinho') or {}).get('itens')
     por = {x['id']: x for x in painel.resumo_rotinas(m.eventos(), {}, agora=m.agora)['rotinas']}
     assert por['cutucada']['disparos'] == 1 and por['abandono']['disparos'] == 1

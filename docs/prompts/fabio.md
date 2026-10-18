@@ -599,3 +599,12 @@ recorrencia, como followup e afins, algum indicativo que foram disparados, sabe?
 do time da conversa, e ficou num cartão "Fora da conversa, no painel" na tela Agentes, com a ficha (modelo e
 interruptor) a um toque, porque o botão de insights depende dela. Testes: 459 no back e 49 no front.
 
+## 2026-10-18 ~05h45 — cutucada com 1 min, e deploy
+
+**Prompts:** "coloque a cutucada pra 1 min, ok?", "pode dar deploy inclusive"
+
+**Resposta:** `FOLLOWUP_SEG` foi de 180 pra 60 s (`src/bot/fluxo.py`); o carrinho esquecido continua aos 5 min. O
+dash e a demo leem a constante, então o cartão da Cutucada já diz "Depois de 1 min". Deploy logo depois deste
+commit, com o main inteiro: inclui o Claude na frente dos agentes (47d3f17), a origem própria do abandono e a
+passada do cron dos lembretes no diário. Testes: 463 no back e 51 no front.
+

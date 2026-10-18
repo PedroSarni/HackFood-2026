@@ -7,7 +7,7 @@ mesmos espiões da produção (src/shared/painel.py), então o caminho até o da
 Primeiro preenche os últimos 7 dias num relógio adiantado (o gráfico já nasce com histórico),
 depois segue ao vivo, um cliente novo a cada poucos segundos.
 As rotinas automáticas rodam também, com as mesmas funções que o src/app.py chama: quem cala leva a
-cutucada aos 3 min e perde o carrinho aos 5, quem repete a compra pode ligar o lembrete de recompra
+cutucada com 1 min e perde o carrinho aos 5, quem repete a compra pode ligar o lembrete de recompra
 e o cron dos lembretes passa a cada 15 min (no histórico, no relógio adiantado).
 Nada disso vai pro modal.Dict do bot: o diário simulado fica num dict em memória.
 """
