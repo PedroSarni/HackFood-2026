@@ -426,3 +426,13 @@ continua como [PREENCHER]."
 
 **Resposta:** A7 e A8 viraram imagens no 04 e na entrega única; os textos seguem `textos.py` (abertura "Tá com fome de
 quê?", "Itens: R$ 69,98 + entrega", kit com entrega, total, por pessoa e limite). Restam [PRINT A9] e os [PREENCHER].
+
+## 2026-10-18 12:50 — print A9 e texto da seção
+
+**Prompt:** "O print A9.png está em docs/entregaveis/prints/ [...] Troque [PRINT A9] [...] Corrija o texto da seção A9 para
+bater com o que o bot realmente responde [...] Apague a linha "> Prints: [PREENCHER ...]" do topo [...] Não mexa nos
+outros [PREENCHER]."
+
+**Resposta:** A9 virou imagem no 04 e na entrega única. A recusa da piada vem da IA (não é texto fixo); o fixo
+(`FORA_DO_ESCOPO`) fica como plano B. A ajuda em 4 passos existe em `textos.AJUDA`, inclusive com "Nada é comprado sem
+você confirmar.", então foi mantida, sem print. Nota "Prints" do topo removida. Restam 2 [PREENCHER] por arquivo.

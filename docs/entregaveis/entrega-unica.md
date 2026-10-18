@@ -161,8 +161,6 @@ Cartão de crédito, retirada na loja, entrega agendada, cancelamento e reembols
 
 O produto tem duas interfaces: **a conversa no WhatsApp**, para quem compra (nenhum app novo: botões, listas e cards com foto), e **o dash do time**, para quem opera (React + Vite).
 
-> Prints: [PREENCHER com os prints das telas abaixo, na ordem. Sem CPF, telefone, endereço ou código de entrega visíveis.]
-
 ## Parte A — A conversa no WhatsApp
 
 Regras visuais: frases curtas, um emoji por ideia (🛒 pedido, 🏠 endereço, 💳 pagamento, 💰 valor), negrito no que importa, toda mensagem termina com o próximo passo e nada em inglês chega à tela.
@@ -192,8 +190,8 @@ Regras visuais: frases curtas, um emoji por ideia (🛒 pedido, 🏠 endereço, 
 **A8. Kit em grupo.** "👥 Kit pra 8 pessoas · <loja>", itens com preço, entrega, total, **👥 R$ 42,98 por pessoa (8 pessoas)**, "✅ Dentro do seu limite de R$ 350,00" e "Pode ser? Toque em *Quero esse kit* ou me diga o que mudar (ex.: _sem refri_, _mais barato_)". Botões **✅ Quero esse kit**, **🔄 Outra loja**, **❌ Não quero**.
 ![Kit em grupo com valor por pessoa (captura de 18/10 em modo de teste, catálogo simulado)](prints/A8.png)
 
-**A9. Ajuda e papo fora do assunto.** "Eu faço pedidos no iFood pra você. 🛒" com os 4 passos e "Nada é comprado sem você confirmar." Fora do assunto: "Eu só sei fazer pedidos no iFood 🙂".
-[PRINT A9]
+**A9. Ajuda e papo fora do assunto.** "Eu faço pedidos no iFood pra você. 🛒" com os 4 passos e "Nada é comprado sem você confirmar." Papo fora do assunto ("Me conta uma piada") recebe uma recusa leve da própria IA e volta ao pedido: "Haha, piada não é meu forte, mas sei fazer pedido rapidinho! 😄 Que tal uma marmita ou um lanche?…", seguido de "O que você quer pedir? Pode escrever do seu jeito ✍️ Exemplo: pão, leite e café" e o botão **Ver opções**. Sem a IA, a resposta fixa é "Eu só sei fazer pedidos no iFood 🙂". Os 4 passos acima são a resposta de "ajuda", sem print.
+![Papo fora do assunto (captura de 18/10 em modo de teste, catálogo simulado)](prints/A9.png)
 
 ## Parte B — O dash do time
 

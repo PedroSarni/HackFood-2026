@@ -6,8 +6,6 @@ O produto tem duas interfaces:
 - **A conversa no WhatsApp**, para quem compra. Nenhum app novo: a interface é o próprio WhatsApp, com botões, listas e cards com foto.
 - **O dash do time**, para quem opera (React + Vite), com os agentes, o uso do MCP, o dinheiro e as conversas ao vivo.
 
-> Prints: [PREENCHER com os prints das telas abaixo, na ordem. Sem CPF, telefone, endereço ou código de entrega visíveis.]
-
 ## Parte A — A conversa no WhatsApp
 
 Regras visuais que valem em todas as telas:
@@ -76,8 +74,12 @@ Botões: **✅ Quero esse kit**, **🔄 Outra loja**, **❌ Não quero**.
 > 1️⃣ Me escreva o que você quer · 2️⃣ Eu mostro as opções com foto · 3️⃣ Você toca em *Quero esse* · 4️⃣ No final eu mostro o resumo e você confirma
 > Nada é comprado sem você confirmar.
 
-Fora do assunto: "Eu só sei fazer pedidos no iFood 🙂".
-[PRINT A9]
+Papo fora do assunto ("Me conta uma piada") recebe uma recusa leve da própria IA e volta ao pedido, como na captura abaixo:
+> Haha, piada não é meu forte, mas sei fazer pedido rapidinho! 😄 Que tal uma marmita ou um lanche? É só me dizer o que você quer 😉
+> O que você quer pedir? Pode escrever do seu jeito ✍️ Exemplo: pão, leite e café
+
+Botão **Ver opções**. Sem a IA, a resposta fixa é "Eu só sei fazer pedidos no iFood 🙂". A explicação em 4 passos acima é a resposta de "ajuda" e não tem print.
+![Papo fora do assunto (captura de 18/10 em modo de teste, catálogo simulado)](prints/A9.png)
 
 ## Parte B — O dash do time
 
