@@ -99,11 +99,15 @@ def resto_do_pedido(texto, padrao):
 
 # ---------------------------------------------------------------------------- gravador
 
+NUMEROS = {n: f'{n}️⃣' for n in range(1, 10)} | {10: '🔟'}  # legenda da foto: "1️⃣"
+
+
 class Gravador:
     """Mesma cara do WhatsApp. Com o modo áudio ligado (`ativo()`), NADA sai na hora: texto,
     botões, cards e lista viram `falas` pro roteiro e ficam guardados como plano B. Quem pediu
-    áudio recebe SÓ áudio (17/10 22h: texto + áudio juntos foi reclamação). Exceção: o link de
-    entrar no iFood, que não tem como ser feito por voz. Desligado, é transparente."""
+    áudio recebe SÓ áudio (17/10 22h: texto + áudio juntos foi reclamação). Exceções: as fotos das
+    opções de produto (numeradas, ver `carrossel`) e o link de entrar no iFood, que não tem como
+    ser feito por voz. Desligado, é transparente."""
 
     def __init__(self, wpp, ativo):
         self._wpp = wpp
@@ -144,8 +148,21 @@ class Gravador:
                              to, texto, rotulo, linhas, *a, **kw)
 
     def carrossel(self, to, texto, cards, *a, **kw):
+        """Opções de produto: a ÚNICA coisa além do áudio (17/10 23h, pedido do Fabio): a foto de cada
+        uma, numerada e sem nome/preço, sai na hora; o áudio, que vem depois, diz o que é cada número."""
         opcoes = [' · '.join(x for x in str(c[1] or '').split('\n')[:2] if x) for c in cards]
-        return self._segurar('carrossel', 'opcoes', texto, opcoes, to, texto, cards, *a, **kw)
+        if not self._ativo():
+            return self._wpp.carrossel(to, texto, cards, *a, **kw)
+        fotos = 0
+        for n, (imagem, _, _) in enumerate(cards, 1):
+            try:
+                self._wpp.imagem(to, imagem, NUMEROS.get(n, str(n)))
+                fotos += 1
+            except Exception as e:  # noqa: BLE001 - sem uma foto, o áudio ainda diz as opções
+                print(f'foto da opção {n} falhou: {e!r}')
+        r = self._segurar('carrossel', 'opcoes', texto, opcoes, to, texto, cards, *a, **kw)
+        self.falas[-1]['fotos'] = fotos == len(cards)
+        return r
 
     def imagem(self, to, link, legenda='', *a, **kw):
         return self._segurar('imagem', 'texto', legenda, None, to, link, legenda, *a, **kw)
@@ -161,9 +178,10 @@ class Gravador:
 
 SISTEMA = """\
 Você é o atendente de um assistente que faz pedidos no iFood pelo WhatsApp. A pessoa pediu pra ser \
-respondida SÓ por ÁUDIO: ela não vai ver texto, botão, foto nem lista, só vai OUVIR a sua nota de \
-voz. Você grava UMA nota de voz que substitui todas as mensagens abaixo. Quem ouve são, em geral, \
-pessoas idosas ou com pouca prática com celular.
+respondida SÓ por ÁUDIO: ela não vai ver texto, botão nem lista, só vai OUVIR a sua nota de voz. \
+Você grava UMA nota de voz que substitui todas as mensagens abaixo. A única coisa que ela VÊ são as \
+fotos das opções de produto, quando houver: uma foto por opção, numerada (1, 2, 3), sem nome e sem \
+preço. Quem ouve são, em geral, pessoas idosas ou com pouca prática com celular.
 
 REGRA DE OURO: as MENSAGENS DO ASSISTENTE são a única verdade sobre o que aconteceu e qual é o \
 próximo passo. Você só reconta elas em voz. O que a pessoa disse serve só pra você soar natural; \
@@ -175,8 +193,11 @@ Escreva exatamente o que vai ser FALADO (o texto vai direto pra uma voz sintéti
 - Soe como um atendente de verdade mandando áudio no WhatsApp: caloroso, natural, português do \
 Brasil informal ("então", "tá bom?", "rapidinho", "prontinho"), sem exagero nem gíria forçada. Não \
 leia as mensagens palavra por palavra: conte com as suas palavras o que elas dizem.
-- PROIBIDO falar de botão, tocar, clicar, tela, foto, card, lista, arrastar, "aqui embaixo" ou \
+- PROIBIDO falar de botão, tocar, clicar, tela, card, lista, arrastar, "aqui embaixo" ou \
 "escrito na mensagem": a pessoa não vê nada disso. Peça direto o que ela tem que DIZER ou fazer.
+- Fotos: só quando as mensagens dizem que ela JÁ RECEBEU as fotos das opções. Aí diga que mandou \
+as fotos e use o número delas ("a foto 1 é o pão francês, por sete e noventa"). Fora isso, nunca \
+fale de foto.
 - Quando houver escolha, diga as opções em voz e pergunte qual ela quer: "é no Centro ou no Jardim \
 São Paulo?", "quer 1, 2 ou 3?", "quer fechar o pedido, pedir mais alguma coisa ou tirar um item?". \
 Produtos: numere e diga nome curto e preço de cada um ("o primeiro é o pão francês, por sete e \
@@ -226,6 +247,8 @@ def _para_llm(falas):
         if f['opcoes']:
             ops = [re.sub(r'~[^~\n]+~', '', o)[:90] for o in f['opcoes'][:10]]  # sem o preço antigo riscado
             if f['tipo'] == 'opcoes':  # produto: numerado, a pessoa escolhe dizendo "o segundo"
+                if f.get('fotos'):
+                    b += '\n(Ela JÁ RECEBEU uma foto de cada opção, numerada assim, sem nome nem preço.)'
                 b += '\nOpções: ' + ' | '.join(f'{n}) {o}' for n, o in enumerate(ops, 1))
             else:  # resposta pronta: só o texto ("1, 2 ou 3" já são números; "Não tem" não precisa)
                 b += '\nRespostas possíveis: ' + ' | '.join(ops)
@@ -250,21 +273,24 @@ def roteiro(llm, falas, disse='', etapa='', antes=''):
     except Exception as e:  # noqa: BLE001 - sem Gemini ainda dá pra falar o texto limpo
         print(f'roteiro do áudio falhou: {e!r}')
         fala = ''
-    fala = _sem_tela(_reais_falados(_falavel(fala)), etapa)  # "R$" escapou: a voz soletraria
+    fotos = any(f.get('fotos') for f in falas)
+    fala = _sem_tela(_reais_falados(_falavel(fala)), etapa, fotos)  # "R$" escapou: a voz soletraria
     return _caber(fala) if len(fala) >= 15 else roteiro_simples(falas, etapa)
 
 
 _EMOJI = re.compile('[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍⃣]')
 # a pessoa só ouve: frase que manda tocar/olhar alguma coisa na tela não serve (o Gemini às vezes escapa)
-_TELA = re.compile(r'\b(?:bot(?:ao|ão|oes|ões)|toqu\w*|toca\w*|clic\w*|tela|fotos?|fotinhos?|cards?|arrast\w*'
+_TELA = re.compile(r'\b(?:bot(?:ao|ão|oes|ões)|toqu\w*|toca\w*|clic\w*|tela|cards?|arrast\w*'
                    r'|aqui embaixo|abaixo|escrito na mensagem|na mensagem escrita)\b', re.I)
+_FOTO = re.compile(r'\b(?:fotos?|fotinhos?|imagens?)\b', re.I)  # só vale na rodada em que as fotos foram
 _FRASES = re.compile(r'[^.!?]+[.!?]*')
 
 
-def _sem_tela(fala, etapa=''):
-    """Tira as frases que falam de botão/tela; se sumiu o convite pra responder, põe de volta."""
+def _sem_tela(fala, etapa='', fotos=False):
+    """Tira as frases que falam de botão/tela (e de foto, se nenhuma foi mandada); se sumiu o
+    convite pra responder, põe de volta."""
     frases = [f.strip() for f in _FRASES.findall(fala) if f.strip()]
-    boas = [f for f in frases if not _TELA.search(f)]
+    boas = [f for f in frases if not _TELA.search(f) and (fotos or not _FOTO.search(f))]
     if len(boas) == len(frases):
         return fala
     fala = ' '.join(boas)
@@ -317,7 +343,8 @@ def roteiro_simples(falas, etapa=''):
         t = _sem_tela(_reais_falados(_falavel(f['texto'])), etapa)
         if f['tipo'] == 'opcoes':
             itens = [f'o {ORDINAIS[i]}, {_reais_falados(_falavel(o))}' for i, o in enumerate(f['opcoes'][:len(ORDINAIS)])]
-            t = f'Achei {len(itens)} opções: ' + '; '.join(itens) + '. Qual você quer? Pode falar o número ou o nome.'
+            t = (('Te mandei as fotos. ' if f.get('fotos') else '') + f'Achei {len(itens)} opções: '
+                 + '; '.join(itens) + '. Qual você quer? Pode falar o número ou o nome.')
         elif f['opcoes'] and f['tipo'] in ('botoes', 'lista') and len(f['opcoes']) > 1:
             ops = [_falavel(o) for o in f['opcoes']]
             t += ' Você quer ' + ', '.join(ops[:-1]) + ' ou ' + ops[-1] + '?'

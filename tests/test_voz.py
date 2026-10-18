@@ -81,8 +81,22 @@ def test_recorta_o_pedido_e_deixa_o_resto(frase, resto):
 # --- liga só quando pede -------------------------------------------------------------------
 
 def so_audio(m):
-    """No modo áudio a pessoa só recebe nota de voz (17/10 22h: texto + áudio foi reclamação)."""
-    return tipos(m) and set(tipos(m)) == {'audio'}
+    """No modo áudio a pessoa só recebe nota de voz (17/10 22h: texto + áudio foi reclamação), fora
+    as fotos numeradas das opções de produto (17/10 23h), que vêm antes do áudio."""
+    t = tipos(m)
+    return bool(t) and t[-1] == 'audio' and set(t) <= {'audio', 'imagem'} and all(d.get('legenda', '') in voz.NUMEROS.values() for k, d in m.wpp.saida if k == 'imagem')
+
+
+def test_opcoes_de_produto_chegam_como_fotos_numeradas_e_depois_o_audio():
+    m, loc = mundo_com_voz()
+    endereco_pronto(m)
+    m.enviar('me responde por áudio')
+    m.wpp.limpar()
+    m.enviar('quero leite')
+    fotos = [d for k, d in m.wpp.saida if k == 'imagem']
+    assert len(fotos) == 3 and [d['legenda'] for d in fotos] == ['1️⃣', '2️⃣', '3️⃣']
+    assert tipos(m) == ['imagem', 'imagem', 'imagem', 'audio']  # nada de card, botão ou texto
+    assert 'Te mandei as fotos' in loc.falas[-1] or 'foto' in loc.falas[-1].lower()
 
 
 def test_sem_pedido_nunca_manda_audio():

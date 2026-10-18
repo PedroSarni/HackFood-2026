@@ -207,7 +207,7 @@ def _simplificar(p):
     if p['type'] == 'text':
         return 'texto', {'to': to, 'texto': p['text']['body']}
     if p['type'] == 'image':
-        return 'imagem', {'to': to, 'link': p['image']['link']}
+        return 'imagem', {'to': to, 'link': p['image']['link'], 'legenda': p['image'].get('caption', '')}
     if p['type'] == 'template':
         return 'template', {'to': to, 'nome': p['template']['name']}
     if p['type'] == 'audio':
