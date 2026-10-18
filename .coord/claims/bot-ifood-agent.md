@@ -30,6 +30,7 @@ NÃO cobre: lado do restaurante, cancelamento/reembolso (a API não tem), painel
 - `src/shared/geocoder.py` — `normalizar(texto)`: texto com CEP -> endereço canônico pro iFood (BrasilAPI/ViaCEP, grátis) — pronto
 - `src/shared/llm.py` — `gerar_json(sistema, partes, esquema)`: Gemini com texto/áudio/foto — pronto
 - `src/shared/scribe.py` — `transcrever(mime, dados)`: áudio -> texto (Scribe da ElevenLabs) — pronto
+- `src/shared/voz.py` — `falar(texto) -> (mime, bytes)`: texto -> nota de voz (TTS da ElevenLabs) + `WhatsApp.subir_midia/audio` — stub
 
 ## Onde está (preencher ao terminar)
 
