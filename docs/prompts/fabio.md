@@ -133,3 +133,9 @@ os testes passam (213). Entra no ar quando aquela janela commitar e fizer o depl
 **Prompt:** em "D:/Users/fabio/Desktop/hackathon" vamos desenvolver a feature DE QUANDO A PESSOA PEDIR SOMENTE POR AUDIO (ouvir o que é dito pelo audio da pessoa ja esta sendo finalizado) SE ELA PEDIR somente se ela pedir pra ser respondida por audio, que naquela sessao em especifico e ao final dela acabe isso, seja respondida por audios personificados com o eleven labs, gere o audio rapidamente e mande no chat, vamos testar bem isso com cuidado, pq as respostas aqui precisam ser um pouquinho diferentes do ipsis litteris do chat, precisa parecer um pouquinho mais uma pessoa pedindo instrucoes pra pessoa mandar novamente em forma de audio ou texto como resposta, sabe? deve parecer de fato um atendente mandando audio
 
 **Resposta:** Modo áudio (`src/bot/voz.py`, TTS em `src/shared/voz.py`): liga só com pedido explícito ("me responde por áudio"), desliga com pedido feito, 30 min parado, "sair" ou "pode escrever". O texto solto da rodada vira UMA nota de voz no fim, reescrita pelo Gemini como fala de atendente (fila própria, ~0,9 s); botões e cards continuam, número do pedido fica escrito, no CPF pede pra escrever. Falhou, vai escrito; se nem o 1º áudio sai, avisa que não dá. Commits 51ef4ff e o seguinte. Bloqueio: a key do secret `hackathon-elevenlabs` não tem a permissão `text_to_speech` (401). Falta liberar e fazer o `modal deploy`.
+
+## 2026-10-17 21:42 — (continuação) a voz também foi pro ar
+
+**Resposta:** Durante a conferência a outra janela publicou a voz (`51ef4ff`) e um conserto dela (`56aa1b3`).
+Deploy feito a partir do main limpo, com 215 testes passando: v24 no Modal às 21:42, com voz, mock
+consistente, sugestão do mínimo e Scribe. O que ainda estiver só na pasta, sem commit, não está no ar.
