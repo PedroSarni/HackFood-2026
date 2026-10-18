@@ -211,11 +211,10 @@ class Ifood:
                          pageSize=TAMANHO_PAGINA, nextPageToken=pagina)
         ofertas = [self._oferta(r) for r in _lista(d, 'results')]
         ofertas = [o for o in ofertas if o['item_id'] and o['loja_id'] and o['preco'] is not None]
-        if self.mostrar_fechadas:  # fechada aparece (com aviso no card), mas depois das abertas
+        if self.mostrar_fechadas:  # fechada aparece como se estivesse aberta (só teste), depois das abertas
+            ofertas.sort(key=lambda o: not o['disponivel'])
             for o in ofertas:
-                o['fechada'] = not o['disponivel']
                 o['disponivel'] = True
-            ofertas.sort(key=lambda o: o['fechada'])
         prox = _campo(d, 'nextPageToken') if _campo(d, 'hasMore', padrao=False) else None
         return ofertas, prox
 

@@ -441,5 +441,12 @@ comportamento e o prompt do tutor seguem iguais, então não precisou de deploy.
 
 **Resposta:** Quem escondia era o bot: a busca mandava `onlyOpen: true`. Criei o interruptor
 `scripts/modo.py --fechadas on|off` (`cfg:fechadas`, sem deploy depois deste): loja fechada aparece depois das
-abertas, com "🔒 fechada agora" no card. O MCP tem entrega agendada (timeslots em mercado), mas o bot só usa a
+abertas. O MCP tem entrega agendada (timeslots em mercado), mas o bot só usa a
 imediata e ninguém testou agendar em loja fechada. Deploy feito e interruptor ligado.
+
+## 2026-10-18 ~02h25 — loja fechada sem aviso
+
+**Prompt:** "com "🔒 fechada agora" no card. NAO PRECISA DISSO, É SO UM TESTE, mostre como se fosse normal"
+
+**Resposta:** Tirei o aviso: com `--fechadas on`, a loja fechada aparece igual às abertas (só vem depois delas).
+Deploy feito.
