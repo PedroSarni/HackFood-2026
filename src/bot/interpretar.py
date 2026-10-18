@@ -50,8 +50,9 @@ Responda só o JSON do esquema. Campos:
 - acao: uma de comprar, sugerir, mais_opcoes, escolher, sim, nao, quantidade, endereco, ver_pedido, \
 finalizar, tirar_item, cancelar, acompanhar, repetir, ajuda, saudacao, agradecer, sair, \
 apagar_dados, parar_lembrete, agendar, fora_do_escopo, nao_entendi.
-- itens: quando acao=comprar, cada produto pedido, na ordem. termo curto e no singular \
-("pão francês", "leite integral", "carne moída", "dipirona"), sem a quantidade. Sabor, tamanho \
+- itens: quando acao=comprar (ou agendar, se a pessoa disse o que quer no automático), cada produto \
+pedido, na ordem. termo curto e no singular ("pão francês", "leite integral", "carne moída", \
+"dipirona"), sem a quantidade. Sabor, tamanho \
 e volume fazem parte do produto e vão no termo ("pizza de calabresa", "coca-cola 2 litros"), não na \
 observacao. quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
 detalhes ("bem passado", "sem cebola", "marca Italac"). Quando acao=sugerir, até 3 produtos \
@@ -90,7 +91,8 @@ Regras:
 - "o de sempre", "pedir igual da outra vez", "repetir" = repetir.
 - "me sugere algo", "o que você recomenda", "qualquer coisa", "você escolhe", "algo pra completar \
 o valor" ou "o pedido mínimo" = sugerir (quando a pessoa não disse o produto).
-- "quero isso todo dia às 18h", "toda semana", "todo mês", "deixa no automático", "me lembra de pedir", "pedido recorrente", "assinatura" = agendar (mesmo no meio de um pedido).
+- "quero isso todo dia às 18h", "toda semana", "todo mês", "deixa no automático", "me lembra de pedir", "pedido recorrente", "assinatura" = agendar (mesmo no meio de um pedido). Se a pessoa disse o que quer \
+("todo dia às 7h dois pães"), os produtos vão em itens.
 - Conversa que não é sobre pedido (piada, política, receita, perguntas gerais) = fora_do_escopo.
 - Só "oi", "bom dia", "olá" = saudacao. "obrigado", "valeu" = agradecer.
 - Se não der pra entender = nao_entendi. Nunca invente produto que a pessoa não pediu (fora o sugerir)."""
@@ -137,6 +139,24 @@ def numero_em(texto):
         return int(m.group(1))
     t = re.sub(r'^(o|a|quero o|quero a|quero|opcao) ', '', t)
     return NUMEROS.get(t)
+
+
+def hora_em(texto):
+    """'às 7h', '7 horas', '7h30', '19:30', '8 da noite', 'meio-dia' -> 'HH:MM'; None se não disse hora.
+    Rede de segurança do agendar: o Gemini às vezes devolve hora=None pra "todo dia as 7h"."""
+    t = unicodedata.normalize('NFKD', str(texto or '').lower())
+    t = ''.join(c for c in t if not unicodedata.combining(c))
+    if re.search(r'\bmeio[ -]dia\b', t):
+        return '12:00'
+    m = (re.search(r'\b(\d{1,2}):(\d{2})\b', t)
+         or re.search(r'\b(\d{1,2}) ?(?:horas|hora|hrs|hs|h)(\d{2})?\b', t)
+         or re.search(r'\b(\d{1,2})()(?= (?:da|de) (?:manha|tarde|noite)\b)', t))
+    if not m:
+        return None
+    h, mi = int(m.group(1)), int(m.group(2) or 0)
+    if h < 12 and re.match(r' (?:da|de) (?:tarde|noite)\b', t[m.end():]):
+        h += 12
+    return f'{h:02d}:{mi:02d}' if h < 24 and mi < 60 else None
 
 
 def regra_rapida(texto):
@@ -253,4 +273,6 @@ def interpretar(llm, estado, partes, aviso=None):
     if dados['acao'] == 'comprar' and not itens:
         dados['acao'] = 'nao_entendi'
     dados['resposta'] = ' '.join(str(dados.get('resposta') or '').split())[:500] or None
+    if dados['acao'] == 'agendar' and not dados.get('hora'):
+        dados['hora'] = hora_em(' '.join(p[1] for p in partes if p[0] == 'texto'))
     return dados

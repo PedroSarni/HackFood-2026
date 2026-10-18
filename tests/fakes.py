@@ -264,6 +264,11 @@ class LlmFake:
             return {'acao': 'fora_do_escopo', 'resposta': '[fala] Haha 😄 piada eu não sei, mas pedido eu faço!'}, 'fake', 0.01
         if 'ta ai' in texto:
             return {'acao': 'saudacao', 'resposta': '[fala] Tô aqui sim! 😊 O iFood tá instável, mas já volta.'}, 'fake', 0.01
+        if 'todo dia' in texto:  # "todo dia as 7h quero pao": agendar com o que a pessoa disse
+            import re
+            h = re.search(r'\b(\d{1,2}) ?h\b', texto)
+            return {'acao': 'agendar', 'numero': 1, 'hora': f'{int(h.group(1)):02d}:00' if h else None,
+                    'itens': itens}, 'fake', 0.01
         if itens:
             return {'acao': 'comprar', 'itens': itens}, 'fake', 0.01
         return {'acao': 'nao_entendi'}, 'fake', 0.01

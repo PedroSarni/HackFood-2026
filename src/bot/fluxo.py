@@ -680,7 +680,7 @@ class Bot:
         elif a == 'parar_lembrete':
             self.parar_lembretes()
         elif a == 'agendar':
-            self.agendar(it.get('numero'), it.get('hora'))
+            self.agendar(it.get('numero'), it.get('hora'), it.get('itens'))
         elif a == 'fora_do_escopo':
             fala = self._resposta or T.FORA_DO_ESCOPO
             self.repetir_pergunta(fala) if botoes else self.menu(fala)
@@ -1412,6 +1412,10 @@ class Bot:
                            f'Seu pedido está em {T.reais(car.get("subtotal"))}. Quer colocar mais alguma coisa?',
                            [T.B_SUGERIR, T.B_MAIS_COISAS, T.B_CANCELAR], fase='mais')
             return
+        modelo = u.pop('agendar_modelo', None)
+        if modelo:  # "todo dia às 7h peça dois pães": este carrinho vira o modelo do automático, nada sai agora
+            self._salvar_modelo(car, modelo)
+            return
         # 1. entrega (a doc exige getCartDeliveryMethods -> setCartDelivery antes do pagamento).
         # Escolhe sozinho a entrega padrão: uma pergunta a menos, e o resumo mostra prazo e taxa.
         if not car.get('entrega'):
@@ -1745,8 +1749,11 @@ class Bot:
             return
         self._refazer(ped['id'], ped.get('loja'))
 
-    def _refazer(self, pedido_id, loja=None):
-        car = self.ctx.ifood(self.wa).repetir_pedido(pedido_id)
+    def _refazer(self, pedido_id, loja=None, modelo=None):
+        api = self.ctx.ifood(self.wa)
+        # modelo do automático ("todo dia às 7h, 2 pães"): o carrinho sai dos itens guardados, não de um pedido
+        car = (api.criar_carrinho(modelo['loja_id'], self.u['endereco']['id'], modelo['itens']) if modelo
+               else api.repetir_pedido(pedido_id))
         car['loja'] = car.get('loja') or loja
         self.u['carrinho'] = car
         self.u['fila'] = []
@@ -1772,13 +1779,21 @@ class Bot:
         if demo:
             self.ctx.agendar_lembrete(self.wa, rec['proximo'])
 
-    def agendar(self, dias=None, hora=None):
-        """"todo dia às 18h", "deixa no automático": a recorrência é nossa (o iFood não tem)."""
+    def agendar(self, dias=None, hora=None, itens=None):
+        """"todo dia às 18h", "deixa no automático": a recorrência é nossa (o iFood não tem).
+        Com itens ("todo dia às 7h peça dois pães") o automático é do que a pessoa disse: monta o pedido
+        uma vez com ela e guarda como modelo, sem pedir agora (no dia o lembrete monta o carrinho dele).
+        Sem itens, oferece deixar o último pedido no automático."""
         u = self.u
         dias = dias if isinstance(dias, int) and 0 < dias <= 90 else 7
         hora = hora if isinstance(hora, str) and re.fullmatch(r'\d{1,2}:\d{2}', hora) else None
         u['agendar_hora'] = hora
         car = u.get('carrinho') or {}
+        if itens and not car.get('itens'):
+            u['agendar_modelo'] = {'dias': dias, 'hora': hora}
+            self.dizer(T.agendar_itens(itens, dias, hora))
+            self.iniciar_compra(itens)
+            return
         if car.get('itens'):  # no meio do pedido: agenda assim que este sair
             u['agendar_depois'] = dias
             self.repetir_pergunta(T.agendar_depois(dias, hora))
@@ -1787,8 +1802,25 @@ class Bot:
         if not ped:
             self.perguntar(T.AGENDAR_SEM_PEDIDO, self._menu(), fase='pedido')
             return
-        self.perguntar(T.oferecer_repetir(ped.get('resumo')),
+        self.perguntar(T.confirmar_agendar(ped.get('resumo'), dias, hora),
                        [(f'rec:{dias}', T.quando(dias, hora).capitalize()), T.B_REC_NAO], fase='recorrencia')
+
+    def _salvar_modelo(self, car, modelo):
+        """Guarda loja + itens do carrinho como modelo do automático e esvazia o carrinho: nada é pedido."""
+        u = self.u
+        linhas = [{'item_id': i['item_id'], 'qtd': i['qtd'], 'opcoes': i.get('opcoes') or [], 'obs': i.get('obs'),
+                   'nome': i.get('nome')} for i in car['itens']]
+        resumo = ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens'])
+        demo = bool(self.ctx.armazem.get('cfg:demo_rapido'))
+        rec = self.ctx.recorrencias.criar(
+            self.wa, {'id': None, 'resumo': resumo, 'loja': car.get('loja'), 'total': car.get('subtotal'),
+                      'loja_id': car.get('loja_id'), 'itens': linhas},
+            modelo['dias'], hora=modelo.get('hora'), ciclo=DEMO_SEGUNDOS if demo else None)
+        u.update(carrinho=None, fila=[], agendar_hora=None)
+        self.perguntar(T.modelo_ok(resumo, car.get('loja'), modelo['dias'], modelo.get('hora')), self._menu(),
+                       fase='pedido')
+        if demo:
+            self.ctx.agendar_lembrete(self.wa, rec['proximo'])
 
     def responder_lembrete(self, arg):
         oque, _, rid = arg.partition(':')
@@ -1803,7 +1835,7 @@ class Bot:
                 return
             self.ctx.recorrencias.respondido(self.wa, rid)
             self._direto = {'teto': rec.get('total')}  # o "sim" aqui é a confirmação do pedido
-            self._refazer(rec['pedido_id'], rec.get('loja'))
+            self._refazer(rec.get('pedido_id'), rec.get('loja'), modelo=rec if rec.get('itens') else None)
         elif oque == 'parar':
             self.ctx.recorrencias.remover(self.wa, rid)
             self.perguntar(T.LEMBRETE_PARADO, self._menu(), fase='pedido')

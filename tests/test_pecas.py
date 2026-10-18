@@ -435,3 +435,23 @@ def test_mock_tem_esfiharia_e_prato_do_dia_e_entende_a_grafia_de_casa():
     assert primeiro('esfiha de carne') == 'Esfiha de carne'
     assert primeiro('esfirra').startswith('Esfiha')
     assert primeiro('estrogonofe') == 'Strogonoff de frango'
+
+
+def test_hora_dita_sem_depender_do_gemini():
+    from src.bot.interpretar import hora_em
+    assert hora_em('todo dia as 7h peça dois paes') == '07:00'
+    assert hora_em('todo dia às 9h') == '09:00'
+    assert hora_em('as 19:30') == '19:30'
+    assert hora_em('as 7h30') == '07:30'
+    assert hora_em('7 horas da noite') == '19:00'
+    assert hora_em('8 da noite') == '20:00'
+    assert hora_em('ao meio-dia') == '12:00'
+    assert hora_em('quero dois paes') is None
+
+
+def test_mock_tem_cafeteria_pro_cafe_expresso():
+    mcp = McpFake()
+    loc = {'latitude': -22.0, 'longitude': -47.9}
+    r = mcp.chamar('searchOffers', query='café expresso', userLocation=loc, resultKind='ITEM',
+                   merchantType='RESTAURANT')
+    assert r['results'][0]['itemName'] == 'Café expresso'

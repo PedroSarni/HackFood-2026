@@ -151,10 +151,16 @@ def lista_de_compras(termos):
     return f'📝 Anotei sua lista:\n{linhas}\n\nVou te mostrar um de cada vez. Começando por *{termos[0]}*:'
 
 
+def _item_dito(i):
+    """'*2x pão francês*', '*pizza* (frango catupiry)': quantidade e observação só se a pessoa disse."""
+    qtd = f"{i['quantidade']}x " if i.get('quantidade') else ''
+    return f"*{qtd}{i['termo']}*" + (f" ({i['observacao']})" if i.get('observacao') else '')
+
+
 def anotei(itens):
     """'Anotei: *pizza de calabresa*, *pizza* (frango catupiry) e *coca-cola* (2 litros) ✅'; sem itens, só
     'Anotei ✅'. O que veio na observação (sabor, tamanho) aparece entre parênteses."""
-    nomes = [f"*{i['termo']}*" + (f" ({i['observacao']})" if i.get('observacao') else '') for i in itens]
+    nomes = [_item_dito(i) for i in itens]
     if not nomes:
         return 'Anotei ✅'
     return 'Anotei: ' + (nomes[0] if len(nomes) == 1 else ', '.join(nomes[:-1]) + ' e ' + nomes[-1]) + ' ✅'
@@ -341,8 +347,27 @@ def agendar_depois(dias, hora=None):
             'no dia eu te chamo aqui e só peço com o seu *sim*. 😉\nVamos terminar o de hoje?')
 
 
-AGENDAR_SEM_PEDIDO = ('Bora deixar no automático! 🔁 Primeiro me diga o que você quer pedir: '
-                      'depois que ele sair, eu combino com você o dia de repetir. 😋')
+AGENDAR_SEM_PEDIDO = ('Bora deixar no automático! 🔁 Me diga o que e quando, do seu jeito '
+                      '(ex.: _todo dia às 7h, dois pães_), que eu monto com você. 😋')
+
+
+def agendar_itens(itens, dias, hora=None):
+    """Começo do automático com itens: o que entra, quando, e que hoje nada é pedido."""
+    return (f'{anotei(itens)} 🔁 Vou deixar no automático *{quando(dias, hora)}*.\n'
+            'Agora a gente escolhe uma vez a loja e o produto, e *nada é pedido hoje*. No dia eu te chamo '
+            'e só peço com o seu *sim*. 😉')
+
+
+def modelo_ok(resumo, loja, dias, hora=None):
+    return (f'Combinado! ✅ *{quando(dias, hora).capitalize()}* eu te chamo aqui pra pedir *{resumo}*'
+            + (f' do *{loja}*' if loja else '') + '. Nada foi pedido agora: no dia, com o seu *sim*, '
+            'o pedido sai. 🛵\nPra parar, é só escrever *parar lembrete*.')
+
+
+def confirmar_agendar(resumo, dias, hora=None):
+    """Pediu automático sem dizer o quê: oferece o último pedido (sem o papo de "segunda vez")."""
+    return (f'Quer deixar *{resumo}* no automático *{quando(dias, hora)}*? 🔁\n'
+            'No dia eu te chamo aqui com tudo pronto e só peço com o seu *sim*. Dá pra parar quando quiser.')
 
 
 def recorrencia_ok(dias, hora=None):

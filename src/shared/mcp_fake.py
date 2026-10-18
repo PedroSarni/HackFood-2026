@@ -39,6 +39,7 @@ LOJAS = {
     'p1': ('Pet Feliz', 'PETSTORE', {'min': 40, 'max': 60}, 7.90, 4.6, 3.3, 40.0),
     'l1': ('Lanchonete do Bairro', 'RESTAURANT', {'min': 20, 'max': 35}, 3.99, 4.7, 0.8, 30.0),
     'r3': ('Esfiharia do Líbano', 'RESTAURANT', {'min': 25, 'max': 40}, 4.90, 4.6, 1.5, 20.0),
+    'c1': ('Cafeteria Grão Bom', 'RESTAURANT', {'min': 15, 'max': 25}, 2.99, 4.8, 0.7, 15.0),
 }
 
 # grupo: (nome, minSelections, maxSelections, [(opção, preço adicional)])
@@ -164,6 +165,13 @@ CATALOGO = [
     ('r2', 'Strogonoff de frango', 'Com arroz e batata palha', 28.90, None, None),
     ('r2', 'Parmegiana de carne', 'Com arroz e fritas', 34.90, None, None),
     ('r2', 'Feijoada', 'Porção individual com acompanhamentos', 36.90, None, None),
+    ('c1', 'Café expresso', 'Xícara 50 ml', 6.50, None, None),
+    ('c1', 'Café com leite', 'Copo 200 ml', 7.50, None, None),
+    ('c1', 'Cappuccino', 'Xícara 180 ml', 11.90, None, None),
+    ('c1', 'Pão de queijo (porção)', '6 unidades', 12.90, None, None),
+    ('c1', 'Bolo de cenoura com chocolate', 'Fatia', 9.90, None, None),
+    ('c1', 'Misto quente', 'Pão de forma, presunto e queijo', 13.90, None, None),
+    ('c1', 'Suco natural de laranja', 'Copo 300 ml', 8.90, None, None),
 ]
 SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
              'remedio': ['dipirona', 'paracetamol'], 'racao': ['racao'], 'almoco': ['marmita', 'sopa'],
@@ -175,7 +183,7 @@ SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contraf
              'margarita': ['margherita'], 'marguerita': ['margherita'], 'mussarela': ['mucarela'],
              'muzzarela': ['mucarela'], 'esfirra': ['esfiha'], 'quibe': ['kibe'],
              'salgado': ['coxinha', 'esfiha', 'pastel', 'kibe'], 'estrogonofe': ['strogonoff'],
-             'strogonof': ['strogonoff']}
+             'strogonof': ['strogonoff'], 'espresso': ['expresso']}
 # não ajudam a achar produto: "pão de forma" é pão + forma, e o "de" casava com meio catálogo
 PALAVRAS_VAZIAS = {'de', 'da', 'do', 'das', 'dos', 'e', 'com', 'sem', 'pra', 'para', 'um', 'uma', 'o', 'a',
                    'os', 'as', 'em', 'no', 'na', 'in', 'natura', 'kg', 'g', 'ml', 'l', 'un'}

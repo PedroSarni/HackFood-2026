@@ -71,11 +71,15 @@ class Recorrencias:
         proximo = self.agora() + (ciclo or int(dias) * 86400)
         if hora and not ciclo:
             proximo = _na_hora(proximo, hora)
-        recs = [r for r in self._todas(wa_id) if r.get('pedido_id') != pedido['id']]
+        # modelo (sem pedido feito: "todo dia às 7h, 2 pães") se identifica pela loja e pelo que leva
+        chave = pedido['id'] or ('modelo', pedido.get('loja_id'), pedido.get('resumo'))
+        recs = [r for r in self._todas(wa_id)
+                if (r.get('pedido_id') or ('modelo', r.get('loja_id'), r.get('resumo'))) != chave]
         rec = {'id': secrets.token_hex(3), 'pedido_id': pedido['id'], 'dias': int(dias),
                'resumo': pedido.get('resumo', ''), 'loja': pedido.get('loja'),
                'total': pedido.get('total'), 'pagamento': pagamento, 'ciclo': ciclo, 'hora': hora,
-               'proximo': proximo, 'avisado': False}
+               'proximo': proximo, 'avisado': False,
+               'loja_id': pedido.get('loja_id'), 'itens': pedido.get('itens')}
         recs.append(rec)
         self._gravar(wa_id, recs[-10:])
         return rec

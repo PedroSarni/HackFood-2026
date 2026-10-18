@@ -840,6 +840,45 @@ def test_papo_no_endereco_sem_endereco_nenhum_responde_e_pede_de_novo():
     assert 'quente' in textos and 'Pra onde eu mando' in textos and m.estado()['fase'] == 'endereco'
 
 
+def test_todo_dia_com_itens_monta_o_modelo_do_que_foi_dito_e_nao_pede_agora():
+    m = Mundo()
+    endereco_pronto(m)
+    m.wpp.limpar()
+    m.enviar('todo dia as 7h quero pao')
+    textos = ' '.join(m.wpp.textos())
+    assert 'automático' in textos and 'nada é pedido hoje' in textos and m.wpp.cards()  # buscou o pão dito
+    m.tocar('pick:')
+    m.tocar('qtd:3')               # 3 pacotes passam do mínimo da loja
+    m.tocar('fim')
+    assert not m.mcp.chamadas_de('submitOrder')                         # nada foi pedido agora
+    rec = m.recs_dic[m.wa][0]
+    assert rec['itens'] and rec['hora'] == '07:00' and rec['dias'] == 1 and not rec['pedido_id']
+    assert 'Combinado' in m.wpp.textos()[-1] and not m.estado()['carrinho']
+
+
+def test_lembrete_do_modelo_monta_o_carrinho_com_os_itens_guardados():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('todo dia as 7h quero pao')
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.tocar('fim')
+    rec = m.recs_dic[m.wa][0]
+    m.enviar(('botao', f'lem:pedir:{rec["id"]}'))
+    cria = m.mcp.chamadas_de('createCart')[-1]
+    assert cria.get('merchantId') and cria['items'][0]['quantity'] == 3 and 'orderId' not in cria
+
+
+def test_automatico_sem_dizer_o_que_oferece_o_ultimo_pedido_sem_o_papo_de_segunda_vez():
+    m = Mundo()
+    u = m.armazem.get(f'u:{m.wa}') or {}
+    u['pedidos'] = [{'id': 'p1', 'resumo': '1x X-Salada'}]
+    m.armazem[f'u:{m.wa}'] = u
+    m.enviar('deixa no automatico todo dia as 9h')
+    texto = m.wpp.textos()[-1]
+    assert 'segunda vez' not in texto and 'X-Salada' in texto and 'todo dia às 9h' in texto
+
+
 def test_audio_vira_pedido():
     m = Mundo()
     endereco_pronto(m)
