@@ -604,6 +604,22 @@ def status_pedido(codigo, descricao=''):
     return '📦 Seu pedido teve uma atualização. Os detalhes estão no app do iFood.'
 
 
+def aviso_status(codigo, descricao='', pedido=None):
+    """Aviso do rastreio com um mini resumo de QUAL pedido é (18/10: "saiu pra entrega" solto no meio de outro
+    pedido parecia o bot chapando). Sem o registro do pedido, fica só o status."""
+    status = status_pedido(codigo, descricao)
+    if not pedido:
+        return status
+    quem = ' · '.join(x for x in ((f'pedido *{pedido["codigo"]}*' if pedido.get('codigo') else 'pedido'),
+                                   f'*{pedido["loja"]}*' if pedido.get('loja') else '') if x)
+    itens = ' '.join(str(pedido.get('resumo') or '').split())
+    if len(itens) > 90:
+        itens = itens[:89].rstrip(' ,') + '…'
+    total = f' ({reais(pedido["total"])})' if pedido.get('total') else ''
+    linha = f'📦 {quem[0].upper() + quem[1:]}' + (f': {itens}' if itens else '') + total
+    return f'{status}\n{linha}'
+
+
 # --- conta ------------------------------------------------------------------------------
 
 SAIU = 'Pronto, desconectei sua conta do iFood. 👋 Quando quiser voltar, é só mandar um oi.'

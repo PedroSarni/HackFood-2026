@@ -51,6 +51,15 @@ def _apagou(ctx, wa_id):
         return False
 
 
+def _registro(ctx, wa_id, pedido_id):
+    """O pedido como o bot guardou (loja, itens, total, código): lido a cada aviso, o código chega depois."""
+    try:
+        pedidos = (ctx.armazem.get(f'u:{wa_id}') or {}).get('pedidos') or []
+        return next((p for p in pedidos if p.get('id') == pedido_id), None)
+    except Exception:  # noqa: BLE001 - sem armazém, o aviso sai sem o resumo
+        return None
+
+
 def acompanhar(ctx, wa_id, pedido_id, dormir=time.sleep, relogio=time.time):
     """Cada mudança de status vira aviso (em áudio, pra quem pediu tudo áudio: src/bot/voz.py).
     Acabou o acompanhamento, de qualquer jeito: acaba também a sessão do modo áudio."""
@@ -90,7 +99,7 @@ def _acompanhar(ctx, wa_id, pedido_id, dormir, relogio):
             if codigo in PAGAMENTO and vistos & LOJA_CONFIRMOU:
                 print(f'rastreio {pedido_id}: {codigo} depois da loja confirmar, sem aviso')
             elif codigo not in CALADOS and codigo not in vistos:  # o iFood vai e volta: cada status avisa 1 vez
-                voz.avisar(ctx, wa_id, T.status_pedido(codigo, st.get('descricao')))
+                voz.avisar(ctx, wa_id, T.aviso_status(codigo, st.get('descricao'), _registro(ctx, wa_id, pedido_id)))
             vistos.add(codigo)
             ultimo = codigo
         # a doc manda decidir o fim pelo pollingStop (a lista de códigos terminais não é fechada)

@@ -222,3 +222,31 @@ def test_meu_pedido_com_carrinho_montando_mostra_o_carrinho_e_cade_e_do_que_ja_s
     m.enviar('meu pedido')
     assert 'Seu pedido:*' in m.wpp.textos()[-1] and '2x' in m.wpp.textos()[-1]   # U21: era o pedido antigo
     assert interpretar.regra_rapida('cadê meu pedido') == {'acao': 'acompanhar', 'sobre': 'status'}
+
+
+def test_aviso_do_rastreio_diz_qual_pedido_e():
+    """18/10: "saiu pra entrega" solto no meio de outro pedido parecia o bot chapando. Com o registro do pedido no
+    armazém, cada aviso vem com loja, itens e valor; sem registro (ctx sem armazém), fica só o status."""
+    from tests.fakes import Armazem
+    fila = iter(['CONFIRMED', 'DISPATCHED', 'DELIVERED'])
+
+    class Api:
+        def rastrear(self, _pid):
+            c = next(fila)
+            return {'codigo': c, 'descricao': '', 'parar': c == 'DELIVERED', 'proxima': None}
+
+    class Ctx:
+        wpp = WhatsAppFake()
+        armazem = Armazem()
+
+        def ifood(self, _wa):
+            return Api()
+    ctx = Ctx()
+    ctx.armazem['u:wa'] = {'pedidos': [{'id': 'outro', 'loja': 'Pizzaria'}, {'id': 'p1', 'codigo': 'B1013',
+                           'loja': 'Supermercado Dona Lurdes', 'resumo': '2x Picanha bovina Seara, 1x Carvão vegetal',
+                           'total': 157.7}]}
+    acompanhar(ctx, 'wa', 'p1', dormir=lambda s: None)
+    avisos = [d['texto'] for _, d in ctx.wpp.saida]
+    assert len(avisos) == 3 and all(a.startswith(T.STATUS[c]) for a, c in zip(avisos, ('CONFIRMED', 'DISPATCHED', 'DELIVERED')))
+    assert all('Pedido *B1013* · *Supermercado Dona Lurdes*' in a and 'Picanha' in a and 'R$ 157,70' in a for a in avisos), avisos
+    assert 'Pizzaria' not in avisos[1]
