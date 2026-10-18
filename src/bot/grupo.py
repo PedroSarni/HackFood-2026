@@ -261,6 +261,8 @@ Bebida alcoólica só se pedirem.
 - produtos marcados [pedido] a pessoa pediu: entram SEMPRE.
 - respeite o ajuste ('sem refri', 'mais barato', '2 são vegetarianos', 'troca coca por guaraná', \
 'mais batata') e o orçamento por pessoa, se houver.
+- se vier o kit atual, parta dele: mude SÓ o que o ajuste pede e mantenha o resto igual, mesmos produtos \
+e mesmas quantidades ('sem batata e sem refri' tira a batata e o refri; os lanches ficam os mesmos).
 - use SÓ os números da lista e no máximo 8 produtos diferentes. NÃO calcule preços: o sistema calcula.
 - explicacao: 1 frase curta, calorosa, em português, dizendo como pensou o kit, com 1 emoji \
 ("1 lanche pra cada, 2 Cocas de 2 litros e batata pra dividir 😋"). Sem valores em reais.
@@ -329,10 +331,29 @@ def _lista_pro_modelo(cands):
     return '\n'.join(linhas)
 
 
-def compor(llm, pessoas, tema, cands, ajuste=None):
-    """O Gemini escolhe o que entra e quantos; o código confere. Devolve ([(índice, qtd)], explicação)."""
+_TIRA = re.compile(r'\b(?:sem|tira\w*)\b')
+_POE_OU_TROCA = re.compile(r'\b(?:troc\w*|mais|menos|barat\w*|vegetarian\w*|adicion\w*|coloc\w*|bota\w*|com'
+                           r'|acrescent\w*|mud\w*|outr\w*|em vez)\b')
+
+
+def _so_tira(ajuste):
+    t = normalizar(ajuste)
+    return bool(_TIRA.search(t)) and not _POE_OU_TROCA.search(t)
+
+
+def _citado(nome, ajuste):
+    t = f' {normalizar(ajuste)} '
+    return any(f' {p} ' in t for p in normalizar(nome).split() if len(p) >= 4)
+
+
+def compor(llm, pessoas, tema, cands, ajuste=None, atual=None):
+    """O Gemini escolhe o que entra e quantos; o código confere. Devolve ([(índice, qtd)], explicação).
+    atual: o kit da tela [(índice, qtd)]; com ajuste, ele parte dali em vez de recompor do zero
+    (18/10: "sem a batata e sem o refri" trocou o X-Bacon por X-Salada)."""
+    kit_atual = ('\nKit atual: ' + ', '.join(f'{q}x n{n}' for n, q in atual)) if atual and ajuste else ''
     texto = (f'Pessoas: {pessoas}\nQuerem comer: {tema["termo"]}'
-             + (f'\nAjuste pedido: {ajuste}' if ajuste else '') + f'\n\nProdutos da loja:\n{_lista_pro_modelo(cands)}')
+             + (f'\nAjuste pedido: {ajuste}' if ajuste else '') + kit_atual
+             + f'\n\nProdutos da loja:\n{_lista_pro_modelo(cands)}')
     try:
         dados, _modelo, _seg = llm(SISTEMA, [('texto', texto)], ESQUEMA)
     except Exception as e:  # noqa: BLE001 - sem o Gemini, a regra fixa monta o kit
@@ -352,6 +373,16 @@ def compor(llm, pessoas, tema, cands, ajuste=None):
     for termo in dict.fromkeys(c['termo'] for c in cands if c['papel'] == 'pedido'):
         if not any(cands[n]['papel'] == 'pedido' and cands[n]['termo'] == termo for n, _ in escolha):
             escolha += [(n, q) for n, q in padrao if cands[n]['termo'] == termo][:1]  # o que pediram entra sempre
+    if atual and ajuste and _so_tira(ajuste):
+        # ajuste que só tira: nada novo entra e o principal que não foi citado fica como estava
+        mantidos = {n for n, _ in escolha}
+        sem_bebida = re.search(r'\b(?:refri\w*|bebida\w*)\b', normalizar(ajuste))
+        tirado = {n for n, _ in atual if _citado(cands[n]['nome'], ajuste)
+                  or (sem_bebida and cands[n]['papel'] == 'bebida')}
+        travada = [(n, q) for n, q in atual if n not in tirado
+                   and (n in mantidos or cands[n]['papel'] == 'principal')]
+        if any(cands[n]['papel'] == 'principal' for n, _ in travada):
+            escolha = travada
     explicacao = ' '.join(str((dados or {}).get('explicacao') or '').split())[:200] or None
     if explicacao and re.search(r'r\$|\d+[.,]\d{2}', explicacao.lower()):
         explicacao = None  # dinheiro quem fala é o código
@@ -427,7 +458,11 @@ def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=N
         fonte = escolher_loja(lista, vistas)  # nenhum principal abriu nessa loja: tenta a próxima
     if not cands:
         return None, 'sem_principal'
-    escolha, explicacao = compor(llm, pessoas, tema, cands, ajuste)
+    atual = None
+    if reaproveita and anterior.get('linhas'):  # mesma loja e mesmos candidatos: os números batem
+        pos = {c['item_id']: i for i, c in enumerate(cands)}
+        atual = [(pos[lin['item_id']], lin['qtd']) for lin in anterior['linhas'] if lin['item_id'] in pos]
+    escolha, explicacao = compor(llm, pessoas, tema, cands, ajuste, atual)
     linhas, faltou_abrir = _linhas(api, endereco, cands, escolha, pessoas)
     if not any(lin['papel'] == 'principal' for lin in linhas):
         return None, 'sem_principal'

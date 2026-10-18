@@ -301,7 +301,7 @@ def _grupo_fake(texto, contexto):
     no_kit = 'Etapa atual da conversa: kit' in contexto
     n = re.search(r'\b(?:em|pra|somos|para) (\d+)\b|\b(\d+) pessoas', texto)
     numero = int(n.group(1) or n.group(2)) if n else None
-    if no_kit and ('sem refri' in texto or 'barato' in texto or numero):
+    if no_kit and (re.search(r'\bsem (?:o |a )?(?:refri|batata)', texto) or 'barato' in texto or numero):
         return {'acao': 'grupo', 'numero': numero, 'texto': None if numero else texto, 'itens': []}
     if not any(k in texto for k in ('pessoas', 'dividir', 'galera', 'rachar')):
         return None

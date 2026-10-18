@@ -509,3 +509,22 @@ def test_legenda_pra_mim_e_mais_3_vira_kit_mesmo_sem_o_gemini_contar_as_pessoas(
                   'parecidos': [{'termo': 'hambúrguer', 'busca': 'hamburguer', 'tipo_loja': 'RESTAURANTE'}]}
     m.enviar(('foto', 'f1', 'quero desse pra mim e mais 3 amigos'))
     assert m.estado()['kit']['pessoas'] == 4
+
+
+def test_ajuste_que_so_tira_mantem_os_lanches_do_kit():
+    # 18/10 04h18: "quero esse mesmo pedido so que sem a batata e sem o refri" trocou X-Bacon por X-Salada
+    m = pronto(Mundo())
+    m.enviar('quero lanchar em 5 pessoas hamburguer')
+    antes = kit_na_tela(m)
+    lanches = sorted((lin['item_id'], lin['qtd']) for lin in antes['linhas'] if lin['papel'] == 'principal')
+    cands = antes['candidatos']
+    fora = [i for i, c in enumerate(cands) if c['papel'] == 'principal'
+            and c['item_id'] not in {x for x, _ in lanches}]
+    bebida = next(i for i, c in enumerate(cands) if c['papel'] == 'bebida')
+    assert fora  # o mock tem outro lanche pra o Gemini "trocar"
+    m.llm.kit = {'itens': [{'n': fora[0], 'qtd': 5}, {'n': bebida, 'qtd': 2}], 'explicacao': 'Trocado 🍔'}
+    m.enviar('quero esse mesmo pedido so que sem a batata e sem o refri')
+    k = kit_na_tela(m)
+    assert sorted((lin['item_id'], lin['qtd']) for lin in k['linhas'] if lin['papel'] == 'principal') == lanches
+    assert not any(lin['papel'] == 'bebida' or 'atata' in lin['nome'] for lin in k['linhas'])
+    assert 'Kit atual:' in m.llm.prompts[-1][1]  # o Gemini viu o kit da tela
