@@ -326,12 +326,25 @@ def _resultado_item(i):
 
 _ITEM_POR_ID = {_id_item(i): i for i in range(len(CATALOGO))}
 _LOJA_POR_ID = {_id_loja(k): k for k in LOJAS}
-if os.path.isfile(CATALOGO_EXTERNO):
+def recarregar(caminho=None):
+    """Lê o catálogo de fora se ele existe e é de outra versão (subiram um novo no Volume, ou o container montou o
+    Volume antes do upload). Devolve True se trocou."""
+    caminho = caminho or CATALOGO_EXTERNO
+    if not os.path.isfile(caminho):
+        return False
     try:
-        with open(CATALOGO_EXTERNO, encoding='utf-8') as _f:
-            print('mock: catálogo de fora com %d lojas e %d itens' % usar_catalogo(json.load(_f)))
-    except Exception as _e:  # noqa: BLE001 - catálogo quebrado não derruba o bot: fica o daqui
-        print(f'mock: catálogo de fora ilegível, ficou o embutido: {_e!r}')
+        with open(caminho, encoding='utf-8') as f:
+            dados = json.load(f)
+        if str(dados.get('versao') or 'externo') == VERSAO:
+            return False
+        print('mock: catálogo de fora com %d lojas e %d itens' % usar_catalogo(dados))
+        return True
+    except Exception as e:  # noqa: BLE001 - catálogo quebrado não derruba o bot: fica o que estava
+        print(f'mock: catálogo de fora ilegível, ficou o que estava: {e!r}')
+        return False
+
+
+recarregar()
 
 
 def loja_do_mock(merchant_id):

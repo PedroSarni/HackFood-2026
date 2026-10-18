@@ -49,14 +49,30 @@ segredos = [modal.Secret.from_name('hackathon-whatsapp'),
 
 estado = modal.Dict.from_name('hackfood-estado', create_if_missing=True)
 # catálogo de reserva do MCP (src/shared/mcp_fake.py lê /mock/catalogo.json; as fotos saem em /mock/img/). Mora só
-# no Volume, fora do git: sobe com `modal volume put hackfood-mock ...` e vale sem deploy (container novo lê de novo)
+# no Volume, fora do git: sobe com `modal volume put hackfood-mock ...` e vale sem deploy (ver mock_em_dia)
 VOLUMES = {'/mock': modal.Volume.from_name('hackfood-mock', create_if_missing=True)}
 entrada = modal.Queue.from_name('hackfood-entrada', create_if_missing=True)
+MOCK_RECARGA = 60    # s entre recargas do Volume num mesmo container
+_mock_visto = {'quando': 0.0}
 
 
 def _cfg(nome):
     v = os.environ.get(nome, '')
     return '' if v == 'PREENCHER' else v
+
+
+def mock_em_dia(forcar=False):
+    """Volume montado não se atualiza sozinho: um container que subiu antes do upload ficava sem fotos e com o mock
+    embutido (18/10, 404 em toda foto). Recarrega no máximo a cada MOCK_RECARGA s e relê o catálogo se mudou."""
+    if not forcar and time.time() - _mock_visto['quando'] < MOCK_RECARGA:
+        return
+    _mock_visto['quando'] = time.time()
+    try:
+        VOLUMES['/mock'].reload()
+    except Exception as e:  # noqa: BLE001 - arquivo aberto ou Volume fora: fica o que estava
+        print(f'mock: recarregar o Volume falhou: {e!r}')
+    from src.shared import mcp_fake
+    mcp_fake.recarregar()
 
 
 # --- conversa -------------------------------------------------------------------------
@@ -74,6 +90,7 @@ def rodada(wa_id: str, seq: int, espera: float, mid: str = ''):
         return 'rajada continua'
     if not caixa.pegar_trava(wa_id, seq):
         return 'outra rodada assumiu'
+    mock_em_dia()
     try:
         msgs = caixa.retirar(wa_id)
         if not msgs:
@@ -273,6 +290,9 @@ def web():
         if not re.fullmatch(r'[a-z0-9][a-z0-9._-]{0,80}\.(?:jpg|png|webp)', arquivo):
             return Response(status_code=404)
         caminho = pathlib.Path('/mock/img') / arquivo
+        if not caminho.is_file():  # pode ser o Volume velho deste container: recarrega e olha de novo
+            import asyncio
+            await asyncio.to_thread(mock_em_dia)
         if not caminho.is_file():
             return Response(status_code=404)
         tipo = {'jpg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp'}[arquivo.rsplit('.', 1)[1]]

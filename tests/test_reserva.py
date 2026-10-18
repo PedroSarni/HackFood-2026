@@ -146,3 +146,18 @@ def test_modo_palco_desligado_por_padrao_e_so_ele_arma_a_troca():
     assert not reserva_armada(estado)          # fora do palco: queda do iFood dá erro, nunca pedido de mentira
     estado['cfg:reserva_auto'] = True
     assert reserva_armada(estado)
+
+
+def test_catalogo_novo_no_volume_entra_sem_deploy(tmp_path):
+    import json
+    arq = tmp_path / 'catalogo.json'
+    assert mcp_fake.recarregar(str(arq)) is False              # sem arquivo: fica o que está
+    dados = {'versao': 'v9', 'img_base': '', 'lojas': {'x': {'nome': 'Loja X', 'tipo': 'GROCERIES',
+             'eta': {'min': 10, 'max': 20}, 'taxa': 0, 'nota': 5, 'km': 1, 'minimo': 10}},
+             'itens': [{'loja': 'x', 'nome': 'Pão', 'preco': 1.0}]}
+    arq.write_text(json.dumps(dados), encoding='utf-8')
+    try:
+        assert mcp_fake.recarregar(str(arq)) is True and mcp_fake.VERSAO == 'v9'
+        assert mcp_fake.recarregar(str(arq)) is False             # mesma versão: não relê à toa
+    finally:
+        importlib.reload(mcp_fake)
