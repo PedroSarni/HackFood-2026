@@ -207,6 +207,25 @@ Definição: `.claude/agents/redundancy-checker.md`.
 - Quando rodar: a cada ~2h, depois de muitas integrações e antes da demo.
 - Ele **só reporta**. Consolidar vira um claim `refactor-dedupe-<x>`, combinado com os autores envolvidos.
 
+## 8. Registro de prompts (pro time acompanhar)
+
+A cada prompt do humano, o agente acrescenta uma entrada no fim de `docs/prompts/<primeiro-nome>.md`
+(minúsculo e sem acento, ex.: `docs/prompts/fabio.md`). Um arquivo por pessoa, pra não dar conflito:
+
+```md
+## 2026-10-17 20:45 — assunto em poucas palavras
+
+**Prompt:** o que a pessoa escreveu, do jeito que escreveu.
+
+**Resposta:** 2 a 4 linhas: o que o agente respondeu ou fez (commits, deploy) e o que ficou pendente.
+```
+
+- **Nunca** copie segredo (key, token, senha, client secret), CPF, telefone ou dado de conta: troque por
+  `[key do Gemini]`, `[CPF]`, `[telefone]`. O arquivo vai pro git.
+- Print, foto ou áudio no prompt: descreva em uma frase, entre colchetes.
+- Vários prompts seguidos sobre o mesmo assunto podem virar uma entrada só, com os prompts em lista.
+- Vai no mesmo commit do trabalho daquele prompt; prompt sem código ganha um `docs(prompts): ...` próprio.
+
 ## Cola rápida
 
 ```
@@ -215,5 +234,6 @@ pedido   → já existe? em andamento? → perguntar : claim + push
 peça     → existe? → reusar : stub em src/shared/ + push → implementar
 código   → passo funcionou → commit → ver o que chegou → pull --rebase → push   (≤ 20 min)
 terminou → claim done + "Onde está" → push
+prompt   → entrada em docs/prompts/<nome>.md: o prompt (sem segredo) + resumo da resposta
 nunca    → co-autoria de IA · --no-verify · --force na main · reformatar o que não é seu
 ```
