@@ -74,3 +74,13 @@ e diário de prompts [...] stub src/shared/voz.py [...] No B2, acrescente uma su
 **Resposta:** pytest rodado: 137 passando. Atualizados "Última atualização", "No ar agora" (contagem), "Em
 andamento" (dash do Pedro com Fabio e Breno, seletor real/demo aad024d, diário de prompts 6bbeb88, stub voz.py
 d22fa3d como "em preparação") e a sub-linha do B2. Nada marcado [x]. O claim do Breno já está `done`.
+
+## 2026-10-17 22:10 — bug: "Olá" virava complemento do endereço
+
+**Prompt:** "BUG: na fase 'complemento', "Olá" é salvo como complemento do endereço (ficou "Rua X, 593, Olá,
+Centro"). A fase 'bairro' tem o mesmo risco. [...] mudança mínima, mesmo padrão do d0b0c3c [...]"
+
+**Resposta:** No complemento e no bairro, saudação e "quero fazer um novo pedido" não salvam nada: o bot repete a
+pergunta da etapa (com "Não tem" no complemento). O commit do Fabio das 22h02 já mandava o resto pro Gemini,
+mas o "Olá" escapava. 4 testes novos (230 passando). Pendente: "menu", "voltar" e "cancelar" digitados no
+complemento ainda viram complemento.

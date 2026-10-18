@@ -480,6 +480,12 @@ class Bot:
                 self.receber_cpf(texto)
                 return
         if not midias:
+            if fase in ('complemento', 'bairro'):
+                r = regra_rapida(texto)
+                if (r and r['acao'] == 'saudacao') or (not r and _quer_novo_pedido(texto)):
+                    # "oi" ou "quero fazer um pedido" não é complemento nem bairro: não salva, repete a pergunta
+                    self._voltar_pra_etapa(T.ENDERECO_FALTA_POUCO)
+                    return
             if fase in ('endereco', 'complemento', 'bairro') and not regra_rapida(texto):
                 texto = self._etapa_ou_outro_assunto(texto, fase)
                 if texto is None:  # era outro assunto e já foi atendido

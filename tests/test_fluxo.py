@@ -169,6 +169,54 @@ def test_duas_falhas_seguidas_no_endereco_mostram_botoes():
     assert m.estado()['fase'] == 'endereco'
 
 
+def _salvos(m):
+    """Chamadas do createAddress que SALVAM (o passo 2, com candidateId); o passo 1 só geocodifica."""
+    return [c for c in m.mcp.chamadas_de('createAddress') if c.get('candidateId')]
+
+
+def test_ola_no_complemento_nao_salva_e_mostra_nao_tem():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.enviar('Rua das Flores, 120, São Carlos')
+    m.tocar('cand:0')
+    assert m.estado()['fase'] == 'complemento'
+    m.enviar('Olá')
+    assert not _salvos(m)
+    assert m.estado()['fase'] == 'complemento'
+    assert 'compl_nao' in [i for i, _ in m.wpp.ultimos_botoes()]
+
+
+def test_apto_no_complemento_continua_salvando():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.enviar('Rua das Flores, 120, São Carlos')
+    m.tocar('cand:0')
+    m.enviar('apto 12')
+    assert _salvos(m)[-1]['complement'] == 'apto 12'
+
+
+def test_ola_no_bairro_nao_salva():
+    m = Mundo()
+    m.enviar('quero leite')
+    m.enviar('Rua Sem Bairro, 55, São Carlos')
+    assert m.estado()['fase'] == 'bairro'
+    m.enviar('Olá')
+    assert m.estado()['fase'] == 'bairro'
+    assert (m.estado().get('novo_endereco') or {}).get('bairro') is None
+    assert not _salvos(m)
+
+
+def test_novo_pedido_no_complemento_nao_salva():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.enviar('Rua das Flores, 120, São Carlos')
+    m.tocar('cand:0')
+    m.enviar('Quero fazer um novo pedido')
+    assert not _salvos(m)
+    assert m.estado()['fase'] == 'complemento'
+    assert 'compl_nao' in [i for i, _ in m.wpp.ultimos_botoes()]
+
+
 # --- sessão ociosa -----------------------------------------------------------------------
 
 def test_sumiu_31_min_no_endereco_e_disse_oi_volta_pro_menu():
