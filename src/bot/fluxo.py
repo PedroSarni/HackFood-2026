@@ -2434,7 +2434,7 @@ class Bot:
             self.perguntar(T.LEMBRETE_PARADO, self._menu(), fase='pedido')
         else:
             self.ctx.recorrencias.respondido(self.wa, rid)
-            self.perguntar(T.LEMBRETE_ADIADO, self._menu(), fase='pedido')
+            self.perguntar(T.lembrete_adiado(rec.get('dias')), self._menu(), fase='pedido')
 
     def parar_lembretes(self):
         n = self.ctx.recorrencias.remover_todas(self.wa)

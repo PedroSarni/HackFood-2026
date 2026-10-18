@@ -1767,3 +1767,25 @@ def test_combinado_e_lembrete_do_automatico_somam_o_mesmo_produto():
     assert f'4x {nome}' in m.wpp.textos()[-1] and f'3x {nome}' not in m.wpp.textos()[-1]  # o "Combinado!"
     rec = m.recs_dic[m.wa][0]
     assert f'🧾 4x {nome}' in T.lembrete(rec)
+
+
+# --- U28: "Hoje não" diz quando volta -----------------------------------------------------------
+
+def test_hoje_nao_diz_quando_o_lembrete_volta():
+    m = pedido_ate_o_resumo(Mundo())
+    _ja_pediu_isso_antes(m)
+    m.tocar('ok:')
+    m.tocar('rec:7')
+    m.agora += 7 * 86400 + 60
+    m.enviar('oi')
+    m.tocar('lem:hoje:')
+    texto = m.wpp.textos()[-1]
+    assert 'na semana que vem' in texto and 'próxima vez' not in texto
+    rec = m.ctx.recorrencias._todas(m.wa)[0]
+    assert rec['proximo'] == m.agora + 7 * 86400  # e é mesmo daqui a uma semana
+
+
+def test_hoje_nao_fala_a_frequencia_de_cada_lembrete():
+    from src.bot import textos as T
+    assert 'amanhã' in T.lembrete_adiado(1) and 'no mês que vem' in T.lembrete_adiado(30)
+    assert 'daqui a 15 dias' in T.lembrete_adiado(15) and 'daqui a 3 dias' in T.lembrete_adiado(3)

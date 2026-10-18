@@ -528,7 +528,10 @@ B_LEMBRETE_PEDIR = 'Sim, pode pedir'
 B_LEMBRETE_HOJE_NAO = 'Hoje não'
 B_LEMBRETE_PARAR = 'Parar lembretes'
 LEMBRETE_PARADO = 'Pronto, não vou mais lembrar desse pedido. 🙂'
-LEMBRETE_ADIADO = 'Tudo bem! Te lembro na próxima vez. 🙂'
+def lembrete_adiado(dias):
+    """'Hoje não': o próximo lembrete vem daqui a um ciclo inteiro (recorrencia.respondido)."""
+    depois = {1: 'amanhã', 7: 'na semana que vem', 15: 'daqui a 15 dias', 30: 'no mês que vem'}
+    return f'Tudo bem! Te chamo de novo {depois.get(dias, f"daqui a {dias} dias")}. 🙂'
 
 # --- pós-pedido -------------------------------------------------------------------------
 
