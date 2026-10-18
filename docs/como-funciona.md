@@ -467,6 +467,21 @@ Quem orquestra é o código (`src/bot/fluxo.py`, o "Maestro"). Os agentes não s
 - **Agente novo:** crie `src/agentes/<id>.py` com a `FICHA` e acrescente o módulo em `_carregar()`
   (`src/agentes/__init__.py`). O roteador reconhece o agente pelo system prompt.
 
+### 13.3 Insights com IA (Conversão, Clientes e Mercado)
+
+Em "Mais análises", as páginas Conversão, Clientes e Mercado têm um botão flutuante de IA, no canto inferior
+direito. O clique faz a varredura de arco-íris de cima a baixo e a borda da tela fica brilhando enquanto a
+**Sofia** (`src/agentes/analista.py`) pensa. Depois abre um painel com 3 a 5 insights, cada um com:
+- o time dono (Produto, Growth e CRM, Operações, Comercial e parcerias...);
+- a evidência numérica;
+- a ação, o impacto, o prazo e a métrica a acompanhar.
+
+Caminho: o dash monta só agregados da página (`pageSummary` em `insights.jsx`, nenhum nome de cliente) →
+`POST /api/insights` no servidor local (cache de 10 min; "Gerar de novo" ignora o cache) → função Modal
+`analisar_pagina` (as keys de IA só existem lá) → `src/painel/analista.py` (prompt, esquema, validação), com a
+fila e o interruptor da ficha da Sofia.
+
+
 ---
 
 ## 14. Limitações conhecidas (entram no entregável 06)

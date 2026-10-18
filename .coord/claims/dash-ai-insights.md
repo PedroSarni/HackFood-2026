@@ -1,7 +1,7 @@
 ---
 slug: dash-ai-insights
 owner: araujo.fabio@usp.br
-status: active
+status: done
 started: 2026-10-18 06:10
 ---
 
@@ -26,6 +26,15 @@ NÃO cobre: insights nas outras páginas, agendar/enviar insights pra alguém.
 
 ## Peças compartilháveis que vou criar
 
-- `src/painel/analista.py` — `analisar(pagina, dados, gerar) -> dict` — stub
+- `src/painel/analista.py` — `analisar(pagina, dados, gerar) -> dict` — pronto
 
 ## Onde está (preencher ao terminar)
+
+- `src/painel/analista.py` — `SISTEMA`, `ESQUEMA`, `TIMES`, `PAGINAS`, `limpar()`, `analisar()`
+- `src/agentes/analista.py` — ficha da Sofia (fila própria: gemini-3.8-flash → 3.5-flash-lite)
+- `src/app.py` — função Modal `analisar_pagina(pagina, dados)`
+- `src/painel/servidor.py` — `POST /api/insights` (cache 10 min), `chamar_analista()`, `_origem_local()`
+- `Frontend/Rascunho_Dash/insights.jsx` — `<InsightsFab />`, `pageSummary()`, `INSIGHT_PAGES`; estilos `.ai-*` em `styles.css`
+- Testes: `tests/test_analista.py`, `Frontend/Rascunho_Dash/tests/insights.test.jsx`
+- Deploy: 2026-10-18 ~06h30 (9626e97)
+

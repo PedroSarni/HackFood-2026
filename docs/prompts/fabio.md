@@ -540,3 +540,27 @@ pauzinhos por cima. Medido no navegador: o balão para 21px acima da ponta dos p
 o modal.Dict inteiro (medido: 11 a 15 s). Agora o bot mantém a chave `recentes` (últimos 120 eventos) e o servidor lê
 só ela (~1 s), com a varredura completa em segundo plano a cada minuto. O palco busca a cada 0,7 s e toca rajadas mais
 rápido. Deploy feito (09b35fd), 429 testes no back e 37 no front.
+
+## 2026-10-18 ~06h10 — botão de IA com varredura de arco-íris e insights por time
+
+**Prompt:** "blz, vou tratar de uma featura um pouco trabalhosa [...] adicione um botao flutuante ao canto inferior
+direito das páginas: conversao, clientes e mercado, com o icone de i.a que quando eu clique faça uma animação de como
+se o botao tivesse varrido a página inteira em cores de arco iris bem sutis [...] como a apple faz na apple
+intelligence animation [...] capriche muito nessa animação que vem de cima a baixo. pra cada pagina ela deve gerar
+insights valiosos com o modelo setado [...] insights para os times responsaveis [...] quais times e quais medidas o
+ifood pode tomar, basicamente insights UTEIS"
+
+**Resposta:** Claim `dash-ai-insights`.
+- **Agente nova, a Sofia (Analista):** ficha, fila de modelos própria e interruptor. Roda no Modal (função
+  `analisar_pagina`), porque as keys de IA só existem lá.
+- **Dados enviados:** o dash manda só agregados de cada página (funil com perda por etapa, motivos de abandono,
+  recompra, concentração, cidades e lojas), nenhum nome de cliente.
+- **Animação:** onda de arco-íris desfocada e sutil descendo do topo ao rodapé, com uma linha brilhante na frente.
+  Depois a borda da tela brilha girando enquanto ela pensa e apaga quando os insights chegam. O botão tem um anel de
+  arco-íris.
+- **Painel:** resumo + 3 a 5 cartões com time dono, evidência, ação, impacto, prazo e métrica; "Gerar de novo".
+- **Testado de verdade nas 3 páginas:** ex. "Comercial e parcerias: baixa conversão na Drogaria Saúde".
+- **Cota do Gemini:** a key do Gemini está estourada (429), então quem respondeu foi o OpenRouter. Isso vale pro
+  bot inteiro.
+- **Testes e deploy:** 433 no back e 41 no front. Deploy 9626e97.
+
