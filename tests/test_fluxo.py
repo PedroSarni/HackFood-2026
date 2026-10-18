@@ -992,6 +992,54 @@ def test_automatico_sem_dizer_o_que_oferece_o_ultimo_pedido_sem_o_papo_de_segund
     assert 'segunda vez' not in texto and 'X-Salada' in texto and 'todo dia às 9h' in texto
 
 
+def test_terceira_compra_do_mesmo_item_nao_insiste_no_automatico():
+    from src.bot.interpretar import normalizar
+    m = pedido_ate_o_resumo(Mundo())
+    nome = m.estado()['carrinho']['itens'][0]['nome']
+    m.armazem[f'hist:{m.wa}'] = {normalizar(nome): {'nome': nome, 'vezes': 2, 'ultima': 0}}
+    m.tocar('ok:')                 # 3ª compra: já ofereceu na 2ª
+    assert not any(i.startswith('rec:') for i in m.wpp.todos_ids())
+
+
+def test_nao_precisa_segura_a_oferta_por_uma_semana():
+    m = pedido_ate_o_resumo(Mundo())
+    _ja_pediu_isso_antes(m)
+    m.tocar('ok:')                 # 2ª compra: oferece
+    assert any(i.startswith('rec:') for i in m.wpp.todos_ids())
+    m.tocar('rec:0')               # "Não precisa"
+    assert m.estado()['rec_pausa_ate'] > m.agora
+
+
+def test_com_pausa_a_segunda_compra_nao_oferece():
+    m = pedido_ate_o_resumo(Mundo())
+    _ja_pediu_isso_antes(m)
+    u = m.armazem[f'u:{m.wa}']
+    u['rec_pausa_ate'] = m.agora + 3600
+    m.armazem[f'u:{m.wa}'] = u
+    m.tocar('ok:')
+    assert not any(i.startswith('rec:') for i in m.wpp.todos_ids())
+
+
+def test_cancelar_o_pedido_cancela_mesmo_com_o_gemini_fora():
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    m.llm.falhar = True
+    m.wpp.limpar()
+    m.enviar('cancelar o pediod')
+    assert 'Não achei' not in ' '.join(m.wpp.textos()) and not m.estado()['carrinho']
+
+
+def test_sem_gemini_tira_o_quero_jantar_hj_e_busca_pizza_no_restaurante():
+    m = Mundo()
+    endereco_pronto(m)
+    m.llm.falhar = True
+    m.enviar('quero jantar pizza hj')
+    busca = m.mcp.chamadas_de('searchOffers')[-1]
+    assert busca['query'] == 'pizza' and busca['merchantType'] == 'RESTAURANT'
+
+
 def test_audio_vira_pedido():
     m = Mundo()
     endereco_pronto(m)

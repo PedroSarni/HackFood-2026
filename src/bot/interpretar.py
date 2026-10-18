@@ -129,6 +129,10 @@ COMANDOS = {
     'parar lembrete': 'parar_lembrete', 'parar lembretes': 'parar_lembrete',
     'meu pedido': 'acompanhar', 'cade meu pedido': 'acompanhar',
 }
+# "cancelar o pedido", "quero cancelar", "cancela tudo" (com erro de digitação no fim, "pediod"); "cancela a
+# coca" NÃO casa: tirar um item fica com o Gemini
+CANCELAR = re.compile(r'^(?:quero |pode |por favor )?cancel(?:a|ar)(?: (?:o|a|meu|minha|esse|essa))?'
+                      r'(?: (?:pedi\w*|compra|tudo|isso|carrinho))?$')
 
 
 def numero_em(texto):
@@ -168,6 +172,8 @@ def regra_rapida(texto):
         return None
     if t in COMANDOS:
         return {'acao': COMANDOS[t]}
+    if CANCELAR.match(t):
+        return {'acao': 'cancelar'}
     if t in SIM:
         return {'acao': 'sim'}
     if t in NAO:

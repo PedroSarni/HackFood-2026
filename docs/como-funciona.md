@@ -224,7 +224,8 @@ Sequência obrigatória do iFood, que o fluxo (`finalizar`) respeita:
   status vira uma mensagem no WhatsApp ("saiu pra entrega", "o entregador chegou"). Isso resolve
   a falta de notificação automática da API.
 - **Recorrência** (`src/bot/recorrencia.py`): o MCP não tem recorrência nativa, então ela é nossa.
-  O bot oferece "deixar no automático" na 2ª compra do mesmo item **ou da mesma categoria**, de
+  O bot oferece "deixar no automático" na 2ª compra do mesmo item **ou da mesma categoria** (só na 2ª,
+  e um "Não precisa" segura a oferta por uma semana), de
   qualquer loja (X-Bacon numa e Smash Burger noutra = 2º hambúrguer; `categoria()`), ou quando a
   pessoa pede ("todo dia às 18h" = `acao=agendar`, até no meio de um pedido). Se ela diz **o que**
   quer ("todo dia às 7h, dois pães"), o automático é disso: o bot monta o pedido uma vez com ela (loja

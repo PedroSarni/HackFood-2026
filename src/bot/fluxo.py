@@ -577,11 +577,13 @@ class Bot:
             self._resposta = intent.get('resposta')
         except ErroLLM as e:
             print(f'LLM falhou: {e!r}')
-            # sem Gemini, texto curto ainda vira busca ("pão", "leite integral"); frase não:
-            # "algo que complete esse valor" ia pra busca do iFood ao pé da letra
-            if texto and fase in ('inicio', 'pedido', 'escolhendo', 'mais', None) and len(texto.split()) <= 4:
-                intent = {'acao': 'comprar', 'itens': [{'termo': texto[:60], 'quantidade': None,
-                                                        'tipo_loja': 'MERCADO', 'observacao': None}]}
+            # sem Gemini, texto curto ainda vira busca ("pão", "leite integral"), sem o "quero ... hj" em
+            # volta; frase não: "algo que complete esse valor" ia pra busca do iFood ao pé da letra
+            termo = ' '.join(w for w in texto.split() if normalizar(w) not in ENCHIMENTO)
+            if termo and fase in ('inicio', 'pedido', 'escolhendo', 'mais', None) and len(termo.split()) <= 4:
+                loja = 'RESTAURANTE' if categoria(termo) in DE_RESTAURANTE else 'MERCADO'
+                intent = {'acao': 'comprar', 'itens': [{'termo': termo[:60], 'quantidade': None,
+                                                        'tipo_loja': loja, 'observacao': None}]}
             elif midias and not texto:
                 self.dizer(T.AUDIO_RUIM)
                 return
@@ -1657,7 +1659,7 @@ class Bot:
                            [(f'rec:{dias_pedidos}', T.quando(dias_pedidos, u.get('agendar_hora')).capitalize()),
                             T.B_REC_NAO],
                            fase='recorrencia')
-        elif repetidos:
+        elif repetidos and self.ctx.agora() >= float(u.get('rec_pausa_ate') or 0):  # "Não precisa" vale 1 semana
             self.perguntar(T.oferecer_repetir(repetidos[0]), [T.B_REC_SEMANA, T.B_REC_MES, T.B_REC_NAO],
                            fase='recorrencia')
         else:
@@ -1668,7 +1670,8 @@ class Bot:
         = {nome normalizado: {nome, vezes, ultima}} + {'cat:<categoria>': ...}. Chave pelo nome, não
         pelo id: pão francês de outra padaria ainda é a 2ª vez do pão; e X-Bacon de uma hamburgueria
         depois de Smash Burger de outra é a 2ª vez de hambúrguer (categoria conta 1x por pedido).
-        Devolve o que já tinha sido comprado antes: categoria primeiro, depois nomes."""
+        Devolve o que chegou agora na 2ª compra (só aí o automático é oferecido: a cada pedido vira
+        chatice): categoria primeiro, depois nomes."""
         chave = f'hist:{self.wa}'
         hist = self.ctx.armazem.get(chave) or {}
         repetidos, cats = [], []
@@ -1679,7 +1682,7 @@ class Bot:
             h = hist.get(k) or {'nome': i.get('nome'), 'vezes': 0}
             h.update(nome=i.get('nome'), vezes=h['vezes'] + 1, ultima=self.ctx.agora())
             hist[k] = h
-            if h['vezes'] >= 2:
+            if h['vezes'] == 2:
                 repetidos.append(h['nome'])
             cat = categoria(i.get('nome'))
             if cat and cat not in cats:
@@ -1688,7 +1691,7 @@ class Bot:
             h = hist.get(f'cat:{cat}') or {'nome': cat, 'vezes': 0}
             h.update(vezes=h['vezes'] + 1, ultima=self.ctx.agora())
             hist[f'cat:{cat}'] = h
-            if h['vezes'] >= 2:
+            if h['vezes'] == 2:
                 repetidos.insert(0, cat)
         self.ctx.armazem[chave] = hist
         return repetidos
@@ -1803,6 +1806,8 @@ class Bot:
         hora = self.u.pop('agendar_hora', None)
         ped = (self.u.get('pedidos') or [None])[0]
         if not dias or not ped:
+            if not dias:  # "Não precisa": uma semana sem oferecer automático sozinho (pedir continua valendo)
+                self.u['rec_pausa_ate'] = self.ctx.agora() + 7 * 86400
             self.perguntar(T.DE_NADA, [T.B_PEDIR, T.B_MEU_PEDIDO], fase='acompanhando')
             return
         demo = bool(self.ctx.armazem.get('cfg:demo_rapido'))
@@ -1985,6 +1990,16 @@ def _cara_de_etapa(texto, fase):
 # palavras que entregam inglês: as mensagens da API vêm em inglês, e às vezes são instrução pro agente
 INGLES = re.compile(r"\b(the|this|that|not|please|again|attempt|order|error|failed|try|unable|invalid|found"
                     r"|request|cannot|could|should|must|was|were|is|are|your|you)\b", re.I)
+
+
+# o que vem em volta do produto quando o Gemini cai ("quero jantar pizza hj" -> "pizza")
+ENCHIMENTO = {'quero', 'queria', 'quer', 'gostaria', 'pode', 'me', 've', 'manda', 'traz', 'pede', 'pedir',
+              'comer', 'jantar', 'almocar', 'lanchar', 'tomar', 'beber', 'hoje', 'hj', 'agora', 'ja', 'pra',
+              'para', 'mim', 'eu', 'um', 'uma', 'uns', 'umas', 'o', 'a', 'por', 'favor', 'pf', 'pfv', 'ai',
+              'aqui', 'oi', 'ola'}
+# categoria (recorrencia.categoria) que só restaurante vende: sem Gemini, a busca vai pra vertical certa
+DE_RESTAURANTE = {'hambúrguer', 'pizza', 'açaí', 'sushi', 'pastel', 'esfiha', 'marmita', 'lanche', 'frango',
+                  'sorvete'}
 
 
 def _em_portugues(texto):

@@ -314,16 +314,13 @@ OFERECER_REPETIR = 'Quer que eu te lembre de pedir isso de novo? 🔁'
 
 
 def oferecer_repetir(oque):
-    """Oferta a partir da 2ª compra do item/categoria. Deixa claro o combinado: no dia eu pergunto,
+    """Oferta na 2ª compra do item/categoria (só nela, pra não virar chatice). Deixa claro o combinado: no dia eu pergunto,
     e só peço com o "sim" da pessoa."""
     if not oque:
         return OFERECER_REPETIR
-    return (f'Opa, segunda vez de *{oque}* por aqui! 😋 Bateu fome, já sabe: é só chamar.\n\n'
-            '🔁 Quer deixar no automático? No dia combinado eu te chamo aqui com tudo pronto: '
-            'mesmo pedido, mesmo endereço, mesma forma de pagamento. '
-            'Você só responde *sim* e eu peço pra entregar na sua casa. '
-            'Sem precisar procurar de novo, é pra facilitar sua vida. 💜\n\n'
-            'Nada é pedido nem cobrado sem o seu sim, e dá pra parar quando quiser.')
+    return (f'Opa, segunda vez de *{oque}* por aqui! 😋\n\n'
+            '🔁 Quer deixar no automático? No dia combinado eu te chamo com tudo pronto (mesmo pedido, '
+            'endereço e pagamento) e só peço com o seu *sim*. Dá pra parar quando quiser.')
 
 
 B_REC_SEMANA = ('rec:7', 'Toda semana')
