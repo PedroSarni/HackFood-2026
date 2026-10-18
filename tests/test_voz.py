@@ -93,7 +93,7 @@ def test_pedido_de_audio_responde_em_audio_e_mantem_os_botoes():
     m.enviar('me responde por áudio')
     assert m.estado()['voz']
     assert tipos(m)[-1] == 'audio' and m.wpp.saida[-1][1]['voz'] is True  # nota de voz, por último
-    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir', 'repetir', 'meu_pedido']  # menu ainda tocável
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir']  # menu ainda tocável (sem pedido, sem atalho)
     assert T.VOZ_LIGADA not in escritos(m)  # o "pode deixar" foi falado, não escrito
     assert len(loc.falas) == 1 and 'áudio ou escrevendo' in loc.falas[0]
     assert m.wpp.midias and b'audio/ogg' in m.wpp.midias[0]  # subiu o ogg pra Meta
@@ -240,7 +240,7 @@ def test_ligar_com_conversa_junto_nao_vira_nao_entendi():
     m.enviar('me responde por áudio, não enxergo bem')  # o fake diz nao_entendi pro resto
     assert m.estado()['voz']
     assert T.NAO_ENTENDI not in ' '.join(loc.falas) and 'Desculpe' not in loc.falas[-1]
-    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir', 'repetir', 'meu_pedido']
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir']
 
 
 def test_codigo_do_pedido_nem_chega_no_gemini():
