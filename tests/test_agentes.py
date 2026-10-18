@@ -127,3 +127,6 @@ def test_dash_desliga_agente_na_demo_e_o_passo_aparece_ao_vivo():
     assert pulo and pulo[0]['agente'] == 'entendimento'
     assert 'leite' not in json.dumps(passos)   # sem texto de ninguém
     assert json.loads(cli.get('/api/equipe?fonte=demo').text)['agentes'][0]['ligado'] is False
+    uso = json.loads(p.consulta('agentes'))
+    lia_uso = next(a for a in uso['agentes'] if a['agente'] == 'entendimento')
+    assert lia_uso['pulos'] >= 1 and lia_uso['erros'] == 0   # desligado não suja a taxa de erro

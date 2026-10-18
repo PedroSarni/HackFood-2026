@@ -633,7 +633,11 @@ def resumo_agentes(eventos, rotulos, de=None, conversa=None):
     linha = [] if conversa else None
     for ev, conv in _recorte(eventos, rotulos, ('entrada', 'saida', 'mcp', 'ia'), de, conversa):
         regra = None
-        if ev['tipo'] == 'ia':
+        if ev['tipo'] == 'ia' and ev.get('erro') == 'desligado':
+            # desligado no dash: não é chamada nem erro, é o plano B entrando (conta à parte)
+            a = ia.setdefault(ev.get('agente') or 'outro', {'n': 0, 'erros': 0, 'ms': [], 'conv': set(), 'modelos': {}, 'reserva': 0})
+            a['pulos'] = a.get('pulos', 0) + 1
+        elif ev['tipo'] == 'ia':
             a = ia.setdefault(ev.get('agente') or 'outro', {'n': 0, 'erros': 0, 'ms': [], 'conv': set(), 'modelos': {}, 'reserva': 0})
             a['n'] += 1
             total += 1
@@ -671,6 +675,7 @@ def resumo_agentes(eventos, rotulos, de=None, conversa=None):
                                a['n'], a['erros'], a['ms'], a['conv'], total)
         linha_uso['modelos'] = [{'modelo': m, 'n': n} for m, n in sorted(a['modelos'].items(), key=lambda kv: -kv[1])]
         linha_uso['reserva'] = a['reserva']
+        linha_uso['pulos'] = a.get('pulos', 0)
         agentes.append(linha_uso)
     agentes.sort(key=lambda a: -a['chamadas'])
     lista_regras = [{'agente': r, 'nome': nome, 'tipo': 'regra', 'disparos': regras.get(r, {}).get('n', 0),
