@@ -41,13 +41,45 @@ export function filterSessions(sessions, filters, advanced = true, previous = fa
   });
 }
 
-export function metrics(sessions) {
+export function metrics(sessions, { period, referenceDate = REFERENCE_DATE } = {}) {
   const sales = sessions.filter(isSale);
   const gmv = sales.reduce((sum, s) => sum + s.amountCents, 0);
   const abandoned = sessions.filter(s => s.status === 'abandoned').length;
   const recovered = sessions.filter(s => s.status === 'recovered').length;
   const carts = sessions.filter(s => s.stage >= 5).length;
-  return { gmv, orders: sales.length, ticket: sales.length ? gmv / sales.length : 0, conversion: ratio(sales.length, sessions.length), abandoned, recovered, carts, total: sessions.length, recovery: ratio(recovered, abandoned + recovered), abandonment: ratio(abandoned, carts), stages: STAGES.map((label, i) => ({ label, count: sessions.filter(s => s.stage > i).length })) };
+  const buyers = new Map(), daily = new Map();
+  for (const session of sessions) {
+    buyers.set(session.clientId, (buyers.get(session.clientId) || 0) + Number(isSale(session)));
+    if (isSale(session)) daily.set(dateKey(session.startedAt), (daily.get(dateKey(session.startedAt)) || 0) + session.amountCents);
+  }
+  const recommended = sessions.filter(s => s.stage >= 3);
+  const accepted = recommended.filter(s => s.stage >= 4 && s.firstAccepted);
+  const recurring = [...buyers.values()].filter(orders => orders >= 2).length;
+  const purchasing = [...buyers.values()].filter(orders => orders >= 1).length;
+  const days = Number(period || 0), end = new Date(`${referenceDate}T12:00:00-03:00`);
+  return {
+    gmv, orders: sales.length, ticket: sales.length ? gmv / sales.length : 0, conversion: ratio(sales.length, sessions.length), abandoned, recovered, carts, total: sessions.length,
+    recovery: ratio(recovered, abandoned + recovered), abandonment: ratio(abandoned, carts),
+    stages: STAGES.map((label, i) => ({ label, count: sessions.filter(s => s.stage > i).length })),
+    recoveredGmv: sessions.filter(s => s.status === 'recovered').reduce((sum, s) => sum + s.amountCents, 0),
+    abandonedValue: sessions.filter(s => s.status === 'abandoned').reduce((sum, s) => sum + s.amountCents, 0),
+    clients: buyers.size, recurring, purchasing, repurchase: ratio(recurring, purchasing),
+    recommended: recommended.length, accepted: accepted.length, acceptedOrders: accepted.filter(isSale).length,
+    acceptance: ratio(accepted.length, recommended.length), firstListConversion: ratio(accepted.filter(isSale).length, recommended.length),
+    failures: sessions.filter(s => s.status === 'failed').length,
+    failureRate: ratio(sessions.filter(s => s.status === 'failed').length, sessions.length),
+    averageLatency: sessions.length ? sessions.reduce((sum, s) => sum + s.latency, 0) / sessions.length : null,
+    dailySales: Array.from({ length: days }, (_, i) => {
+      const day = dateKey(new Date(end.getTime() - (days - 1 - i) * 86400000));
+      return { day, amountCents: daily.get(day) || 0 };
+    }),
+    outcomes: [
+      { label: 'Concluídas', count: sales.length, color: '#219978' },
+      { label: 'Abandonadas', count: abandoned, color: '#e8ad4c' },
+      { label: 'Canceladas', count: sessions.filter(s => s.status === 'cancelled').length, color: '#a4a6af' },
+      { label: 'Outras', count: sessions.filter(s => ['active','payment','failed','idle'].includes(s.status)).length, color: '#8b89c8' },
+    ],
+  };
 }
 
 export function groupBy(sessions, key) {

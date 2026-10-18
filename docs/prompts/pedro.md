@@ -126,3 +126,11 @@ Demonstração disponível em http://127.0.0.1:5173/?fonte=demo; dados reais con
 **Resposta:** Pedido repetido após interrupção; revisei o gerador PDF, seus testes e os cálculos das páginas do dashboard.
 Preparei o claim `dash-pdf-insights` para substituir conversas individuais por indicadores e gráficos agregados, reutilizando os cálculos e filtros da tela e identificando corretamente a fonte real ou demonstração.
 Implementação pendente da publicação obrigatória do claim (§1.2 de AGENTS.md); o envio ao GitHub será verificado antes de alterar código.
+
+## 2026-10-17 21:55 — continuar com commits locais do PDF
+
+**Prompt:** já pode commitar
+
+**Resposta:** O push voltou a falhar por falta de autenticação. Interpretei a resposta à pergunta anterior como autorização para continuar com commits locais e informei essa interpretação antes de editar.
+Centralizei cálculos de vendas diárias, resultados, clientes, IA e financeiro em `metrics`, reutilizados pelas telas e pelo relatório; 16 testes da interface e métricas passaram.
+Reestruturação e verificação visual do PDF em andamento; envio dos commits permanece pendente.

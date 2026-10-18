@@ -28,4 +28,5 @@ Reorganizar o PDF com gráficos e indicadores agregados das páginas do dashboar
 
 ## Onde está (preencher ao terminar)
 
-- Pendente: publicar este claim antes de alterar o código. Relatório existente em `Frontend/Rascunho_Dash/pdf-report.js`, função `createAnalyticsPdf`.
+- Em implementação local após resposta do Pedro "já pode commitar" à solicitação de autenticar ou autorizar trabalho local. Interpretação comunicada antes das edições; push continua bloqueado por autenticação.
+- `Frontend/Rascunho_Dash/data.js` — `metrics` estendida para compartilhar os indicadores das páginas e a série diária de vendas.
