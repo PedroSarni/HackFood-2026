@@ -276,19 +276,36 @@ pede outro número; 1 pessoa vira pedido normal.
 Como o kit é montado, **sempre numa loja só** (o iFood fecha um pedido por loja):
 
 1. busca o principal e agrupa as ofertas por loja, na ordem do iFood (guardado pro **🔄 Outra loja**, que
-   troca de loja sem buscar de novo);
+   troca de loja sem buscar de novo). Só conta como principal o que **é o prato** (`e_o_prato`, pela receita
+   da comida em `RECEITAS`): "Omelete de pizza" não é pizza, carvão e carne moída não são churrasco (18/10
+   07h44 o kit de pizza saiu com 5 omeletes de uma padaria, que era a loja "mais barata"). O que a receita não
+   decide fica com o filtro do modelo (a pizzaria que chama a pizza só de "Calabresa" continua valendo);
 2. abre os principais da loja (`getItem`) e já escolhe as opções obrigatórias pelo código: pizza pra 3+
    pessoas vai **grande**, o que bate com o pedido ("coca") vem antes;
-3. busca na mesma loja o que acompanha (`combina.py`: refri e batata pro lanche) e o que pediram junto
-   ("com coca"); bebida alcoólica só se pedirem;
-4. **o Gemini decide a composição** (1 lanche por pessoa variando sabor, pizza grande serve ~3, refri de 2
-   litros pra cada ~4, batata pra cada ~3, o que pediram entra sempre, respeita "sem refri", "mais barato");
-   se ele falhar ou devolver bobagem, uma regra fixa monta o kit (`kit_padrao`);
+3. busca na mesma loja o que a receita diz que acompanha (refri e batata pro lanche; carvão, refri e pão de
+   alho pro churrasco; `combina.py` pra comida sem receita) e o que pediram junto ("com coca"); bebida
+   alcoólica só se pedirem;
+4. **o Beto (modelo) decide a composição** (1 lanche por pessoa variando sabor, pizza grande serve ~3, refri
+   de 2 litros pra cada ~4, batata pra cada ~3, o que pediram entra sempre) e **o código confere**
+   (`_validar`): principal em quantidade de gente (`quantas_principais`: fatias, peças, ~400 g de carne por
+   pessoa; fora da faixa, as quantidades são refeitas na proporção dos sabores que ele escolheu), no máximo
+   2 bebidas e por cabeça, uma bebida sempre (a não ser "sem refri") e o que não pode faltar na receita
+   (carvão no churrasco). Se ele falhar ou devolver bobagem, a receita monta o kit (`kit_padrao`); se ele
+   disser que a loja não tem o prato (`falta_o_prato`), vai pra próxima loja;
 5. **o código faz a conta**: preço × quantidade + taxa de entrega da loja, e o **por pessoa arredondado pra
    cima no centavo** (5 × R$ 36,42 cobre R$ 182,09). A fala do modelo nunca traz valor em reais.
 
 O kit aparece com *✅ Quero esse kit*, *🔄 Outra loja* (só se houver outra) e *❌ Não quero*; texto livre
-ajusta ("sem refri", "agora somos 6", "troca por guaraná", "na verdade quero pizza" = outro kit). Só no
+ajusta, e **o ajuste é aplicado pelo código em cima do kit da tela** (`src/bot/kit_ajuste.py`, 18/10 08h: antes
+o modelo recebia o ajuste e devolvia outro kit inteiro): "sem refri" só tira o refri; "troca a coca por guaraná"
+troca só essa linha (o guaraná vem da lista da loja, de uma busca nela ou da opção do mesmo item); "mais
+batata", "menos 1 refri", "só 3 pizzas" mexem só nessa quantidade; "põe cerveja" busca na loja e avisa se não
+tem; "mais barato" desce um degrau por vez (todo principal vira o mais em conta da loja → sai o acompanhamento
+→ a bebida vira a mais em conta ou sai); "agora somos 6" refaz só as quantidades dos mesmos produtos. O que o
+código não entende ("2 são vegetarianos") vai pro modelo com o kit atual, e mesmo aí só os principais e o que
+foi citado podem mudar (`conferir`). A explicação na tela é do código ("Tirei Coca-Cola 2 litros 👍"). Os
+ajustes ficam guardados no kit (`ajustes`, `restricoes`) e valem no **Outra loja**; "na verdade quero pizza" =
+outro kit. Só no
 "Quero esse kit" o carrinho é criado (`createCart` com todas as linhas e opções); se já havia pedido de
 outra loja, o kit avisou que troca, e da mesma loja, soma. Daí é o pedido de sempre, e o **"👥 R$ X por
 pessoa"** aparece no total, no resumo e no "Pedido feito". "Vamos dividir em 3" com um pedido já montado só

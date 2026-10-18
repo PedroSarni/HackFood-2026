@@ -523,11 +523,14 @@ def test_ajuste_que_so_tira_mantem_os_lanches_do_kit():
     bebida = next(i for i, c in enumerate(cands) if c['papel'] == 'bebida')
     assert fora  # o mock tem outro lanche pra o Gemini "trocar"
     m.llm.kit = {'itens': [{'n': fora[0], 'qtd': 5}, {'n': bebida, 'qtd': 2}], 'explicacao': 'Trocado 🍔'}
+    antes_llm = len(m.llm.prompts)
     m.enviar('quero esse mesmo pedido so que sem a batata e sem o refri')
     k = kit_na_tela(m)
     assert sorted((lin['item_id'], lin['qtd']) for lin in k['linhas'] if lin['papel'] == 'principal') == lanches
     assert not any(lin['papel'] == 'bebida' or 'atata' in lin['nome'] for lin in k['linhas'])
-    assert 'Kit atual:' in m.llm.prompts[-1][1]  # o Gemini viu o kit da tela
+    # 18/10 08h: "sem X" é o código que aplica (src/bot/kit_ajuste.py): o modelo nem é chamado, e a fala é do código
+    assert not any('Produtos da loja' in t for _, t in m.llm.prompts[antes_llm:])
+    assert k['explicacao'].startswith('Tirei') and 'Batata' in k['explicacao'] and 'Coca' in k['explicacao']
 
 
 def test_lista_anotada_mostra_a_quantidade_so_quando_tem():

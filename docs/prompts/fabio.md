@@ -691,3 +691,42 @@ seguinte ele recebe "😕 Precisei recomeçar seu pedido…".? torna-lo mais nat
   (dava "seu pedido expirou"): sobe `IfoodTrocou` e o fluxo faz a mesma troca e roda a ação de novo.
 - De quebra, a linha levada pra outra loja guarda a unidade de venda do produto de lá. 518 testes.
 
+
+## 2026-10-18 ~08h00 — o Beto chapando: omelete no lugar de pizza, churrasco sem carne, ajustes alucinados
+
+**Prompt:** "abra /hackathon preciso de um ajuste urgente, acredito que no agente beto, de montagem de kits, ele
+sempre esta chapando, sugerindo coisas horriveis, faltando com materiais essenciais do kit, exemplo, churrasco sem
+carne, e alucinando na mudança de itens, preciso que essas montagens e alteracoes de montagens sejam muito
+consistentes. [print do WhatsApp: "vou fazer uma pizzada com mais 4 amigos, orçamento de 130 reais" virou kit da
+Padaria Santa Fé com 5x Omelete de Pizza + Coca 2 L, R$ 116,99]"
+
+**Resposta:** Claim `bot-kit-consistency`. Três causas, três remédios, tudo no código (o modelo deixou de mandar):
+- **O principal não era o prato.** A busca do iFood e o filtro de relevância deixam passar "Omelete de pizza" pra
+  pizza e carvão/sal grosso/carne moída pra churrasco, e a padaria era a loja "mais barata". Agora cada comida tem
+  uma receita (`RECEITAS` em `src/bot/grupo.py`): o que conta como o prato, o que nunca conta, quanto por pessoa
+  (fatias, peças, ~400 g de carne), o que acompanha e o que não pode faltar (carvão no churrasco). Loja sem o prato
+  nem entra na lista; se o modelo disser que não tem (`falta_o_prato`), pula pra próxima.
+- **Composição com crivo.** O que o modelo devolve passa por `_validar`: principal em quantidade de gente (fora da
+  faixa, refaz na proporção dos sabores), no máximo 2 bebidas e por cabeça, uma bebida sempre (salvo "sem refri"),
+  o que pediram entra, o que a receita exige entra.
+- **Ajuste é do código** (`src/bot/kit_ajuste.py`): "sem refri", "troca a coca por guaraná", "mais batata", "só 3
+  pizzas", "põe cerveja" (busca na loja, avisa se não tem), "mais barato" (um degrau por vez), "agora somos 6"
+  (refaz só as quantidades) são aplicados em cima do kit da tela, sem chamar o modelo; a explicação é do código
+  ("Tirei Coca-Cola 2 litros 👍"). O que o código não lê ("2 são vegetarianos") vai pro modelo, que só pode mexer
+  nos principais e no que citou. Os ajustes ficam no kit e valem no "Outra loja".
+- Mock ganhou a padaria com omelete e um churrasco de verdade; 19 testes novos (`tests/test_kit_ajuste.py`), 532
+  passando (os 5 que faltam pedem o `fastapi`, que não está neste Python). Docs §9.2 atualizada.
+
+## 2026-10-18 ~08h30 — "o Otto tá demorando demais"
+
+**Prompt:** "da uma olhada na otto ele ta demorando demais, pqp ve se tem algo a ser feito"
+
+**Resposta:** Pelo diário do painel (2 dias, 59 áudios): o Otto (Scribe) leva 0,3–0,8 s por áudio, média 466 ms,
+zero erro. A demora que se sente nas conversas por áudio é o resto da corrente: o kit em grupo com o iFood real
+(11h06: 47 s e 60 s, com ~15 chamadas de searchOffers/getItem de ~2,5 s cada, em fila, mais um filtro de
+relevância por busca) e o fechamento (7 chamadas do MCP em fila, ~30 s; getCartDeliveryMethods sozinho 9,5 s), mais
+a resposta falada (roteiro no Claude 2,5–4 s + ElevenLabs 1–1,4 s). Feito agora: os getItem dos principais e as
+buscas do que acompanha vão em paralelo e UM filtro do modelo cobre todas as buscas (`_em_paralelo` em
+`src/bot/grupo.py`); o freio do iFood segura o ritmo. Opções sem código, pra decidir no dash: pôr o
+`gemini-3.5-flash-lite` na frente da fila da Vina (roteiro da voz) e da Duda (relevância), que respondem em ~1,2 s
+contra 2,5–5 s do Sonnet; e baixar o `ESPERA_AUDIO` (1,8 s) do buffer.

@@ -44,6 +44,8 @@ LOJAS = {
     'c1': ('Cafeteria Grão Bom', 'RESTAURANT', {'min': 15, 'max': 25}, 2.99, 4.8, 0.7, 15.0),
     'l2': ('Burger House', 'RESTAURANT', {'min': 30, 'max': 45}, 5.90, 4.8, 2.4, 35.0),
     'r4': ('Pizzaria Forno a Lenha', 'RESTAURANT', {'min': 30, 'max': 45}, 3.90, 4.6, 1.4, 30.0),
+    # 18/10 08h: a padaria cujo "pizza" é omelete (o iFood real tem, Padaria Santa Fé, 07h44): barata, e não é pizzaria
+    'l3': ('Padaria Santa Fé', 'RESTAURANT', {'min': 15, 'max': 25}, 2.99, 4.5, 0.5, 15.0),
 }
 
 # grupo: (nome, minSelections, maxSelections, [(opção, preço adicional)])
@@ -220,6 +222,17 @@ CATALOGO = [
     ('r4', 'Coca-Cola 2 litros', 'Garrafa 2 litros', 13.90, None, None),
     ('r4', 'Guaraná Antarctica 2 litros', 'Garrafa 2 litros', 11.90, None, None),
     ('r4', 'Refrigerante lata 350 ml', 'Lata', 5.90, None, None),
+    # 18/10 08h: o Beto chapando (claim bot-kit-consistency). A padaria com "Omelete de pizza" (a busca de pizza acha e
+    # o kit NÃO pode usar) e um churrasco de verdade no mercado: carne, carvão, pão de alho e o que NÃO é carne
+    ('l3', 'Omelete de pizza', 'Omelete recheado com molho, muçarela e calabresa', 18.00, None, None),
+    ('l3', 'Pão na chapa', 'Pão francês na manteiga', 6.00, None, None),
+    ('m2', 'Linguiça toscana', 'Pacote 1 kg', 29.90, None, None),
+    ('m2', 'Carvão', 'Saco 3 kg', 18.90, None, None),
+    ('m2', 'Pão de alho', 'Pacote com 4', 12.90, None, None),
+    ('m2', 'Sal grosso para churrasco', 'Pacote 1 kg', 3.99, None, None),
+    ('m2', 'Tempero para churrasco', 'Pote 100 g', 7.90, None, None),
+    ('m1', 'Linguiça toscana', 'Pacote 1 kg', 28.90, None, None),
+    ('m1', 'Carvão', 'Saco 3 kg', 19.90, None, None),
 ]
 SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
              'remedio': ['dipirona', 'paracetamol'], 'racao': ['racao'], 'almoco': ['marmita', 'sopa'],

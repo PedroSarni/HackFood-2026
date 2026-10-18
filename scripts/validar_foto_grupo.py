@@ -75,7 +75,7 @@ def validar():
               [i['termo'] for i in it.get('itens') or []], it.get('texto'))
     print('== kit (compor) ==')
     for pessoas, ajuste in ((5, None), (5, 'sem refri'), (2, None), (12, 'mais barato')):
-        escolha, fala = grupo.compor(gerar_json, pessoas, {'termo': 'hambúrguer'}, CANDIDATOS, ajuste)
+        escolha, fala, _falta = grupo.compor(gerar_json, pessoas, {'termo': 'hambúrguer'}, CANDIDATOS, ajuste)
         print(pessoas, ajuste, '->', [(CANDIDATOS[n]['nome'], q) for n, q in escolha], '|', fala)
         principais = sum(q for n, q in escolha if CANDIDATOS[n]['papel'] == 'principal')
         ok &= principais >= pessoas * 0.8 and fala is not None
