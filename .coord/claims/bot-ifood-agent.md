@@ -19,7 +19,7 @@ NÃO cobre: lado do restaurante, cancelamento/reembolso (a API não tem), painel
 ## Arquivos que vou tocar
 
 - `src/` (app Modal, bot, web), `tests/`
-- `docs/whatsapp.md`, `.env.example`, `requirements.txt`
+- `docs/whatsapp.md`, `docs/como-funciona.md`, `.env.example`, `requirements.txt`
 
 ## Peças compartilháveis que vou criar
 
@@ -29,6 +29,7 @@ NÃO cobre: lado do restaurante, cancelamento/reembolso (a API não tem), painel
 - `src/shared/buffer.py` — `Caixa`: junta rajada de mensagens por pessoa — pronto
 - `src/shared/geocoder.py` — `normalizar(texto)`: texto com CEP -> endereço canônico pro iFood (BrasilAPI/ViaCEP, grátis) — pronto
 - `src/shared/llm.py` — `gerar_json(sistema, partes, esquema)`: Gemini com texto/áudio/foto — pronto
+- `src/shared/scribe.py` — `transcrever(mime, dados)`: áudio -> texto (Scribe da ElevenLabs) — pronto
 
 ## Onde está (preencher ao terminar)
 

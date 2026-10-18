@@ -24,6 +24,23 @@ B_INICIO = ('inicio', '🏠 Início')
 B_OUTRA = ('outra', '🔎 Procurar outra')
 B_FINALIZAR = ('fim', '✅ Finalizar pedido')
 B_MAIS_COISAS = ('add', '➕ Quero mais coisas')
+B_SUGERIR = ('sugerir', '💡 Me sugere algo')
+
+
+def falta_minimo(falta, loja=None):
+    return f'Faltam *{reais(falta)}* pro pedido mínimo' + (f' do *{loja}*.' if loja else '.')
+
+
+def sugestao(termo, de_onde, falta=None, loja=None):
+    """de_onde: 'costuma' (histórico nosso), 'combina' (o Gemini sugeriu) ou 'parecido' (carrinho)."""
+    motivo = {'costuma': 'que você costuma levar', 'combina': 'que combina com o seu pedido',
+              'parecido': 'parecido com o que você já pegou'}[de_onde]
+    topo = falta_minimo(falta, loja) + ' 🙂\n' if falta else ''
+    return f'{topo}Separei *{termo}*, {motivo}. Olha as opções 👇'
+
+
+SEM_SUGESTAO = ('Não achei uma sugestão boa nessa loja. 😕\n'
+                'Me diz o que você quer que eu procuro ✍️')
 B_TIRAR = ('tirar', '🗑️ Tirar um item')
 B_TENTAR = ('tentar', '🔁 Tentar de novo')
 B_SIM = 'Sim'

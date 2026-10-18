@@ -49,6 +49,7 @@ interface. O bot não sabe a diferença.
 | `src/shared/whatsapp.py` | Cliente da Cloud API da Meta: manda texto/botões/lista/cards/link, "digitando...", baixa áudio/foto |
 | `src/shared/buffer.py` | Junta a rajada de mensagens de cada pessoa antes de responder |
 | `src/shared/llm.py` | Gemini: texto/áudio/foto entram, JSON garantido sai (com modelo reserva) |
+| `src/shared/scribe.py` | Scribe (ElevenLabs): o áudio vira texto e segue o caminho de uma mensagem escrita; desligado, o Gemini ouve |
 | `src/shared/ifood_mcp.py` | Cliente do MCP do iFood (JSON-RPC sobre HTTP) + OAuth (login, refresh, revoke) |
 | `src/shared/mcp_fake.py` | iFood falso (mesmas tools, dados inventados) para demo/teste sem credencial |
 | `src/bot/fluxo.py` | A conversa: a máquina de etapas que conduz o pedido. O coração do bot |
@@ -241,6 +242,11 @@ Sequência obrigatória do iFood, que o fluxo (`finalizar`) respeita:
 - **Botão é o caminho principal.** Texto/áudio/foto são entendidos, mas a resposta sempre oferece
   botões. Quem digita o número de uma opção é atendido igual a quem toca.
 - **Uma loja por pedido.**
+- **Pedido mínimo não trava ninguém.** O aviso de mínimo (e o "O que mais você quer?" abaixo dele)
+  vem com **💡 Me sugere algo**: na loja do carrinho, o bot oferece 1º o que a pessoa costuma comprar
+  (histórico `hist:`), depois o que combina (Gemini), depois algo parecido com o carrinho, e quem
+  fecha o mínimo sozinho aparece primeiro. "Me sugere", "algo que complete esse valor" e afins caem
+  na sugestão mesmo com o Gemini fora (`pede_sugestao`, sem IA).
 - **Pagamento: só PIX e vales** (limitação da API para cartão).
 - **O CPF e documentos não passam pela IA.**
 - **"Mais opções" reaproveita a lista já buscada** a partir do 3º item.
@@ -277,7 +283,8 @@ A etapa atual (`u['fase']`) é o que o fluxo usa pra saber o que fazer com a pr�
 |---|---|
 | `hackathon-whatsapp` | Número, token e verify token da Cloud API da Meta (emprestados do handwrite_bot) |
 | `hackathon-ifood` | `IFOOD_CLIENT_ID`, `IFOOD_CLIENT_SECRET` (agente "Compras pelo WhatsApp", aprovado). Sem `IFOOD_MOCK` = modo real |
-| `llm-conversor` | `GEMINI_API_KEY` (o mesmo do handwrite_bot) |
+| `hackathon-gemini` | `GEMINI_API_KEY` (key própria do HackFood; o `llm-conversor` do handwrite_bot não é mais usado aqui) |
+| `hackathon-elevenlabs` | `ELEVENLABS_API_KEY` do Scribe (`PREENCHER` = desligado: o áudio vai pro Gemini, como antes) |
 
 - **Modo real** (atual): o bot fala com o iFood de verdade. A pessoa precisa fazer o login real
   (conta iFood própria ou uma conta de teste do portal, que tem OTP na tela).
@@ -295,7 +302,7 @@ A etapa atual (`u['fase']`) é o que o fluxo usa pra saber o que fazer com a pr�
 ## 13. Rodar, testar, publicar
 
 ```powershell
-# testes (68, roda em segundos)
+# testes (118, roda em segundos)
 .venv\Scripts\python.exe -m pytest
 
 # publicar no Modal

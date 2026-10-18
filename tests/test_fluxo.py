@@ -567,12 +567,103 @@ def test_gemini_fora_do_ar_ainda_busca_pelo_texto():
     assert m.wpp.cards()
 
 
+def test_gemini_fora_do_ar_nao_busca_frase_ao_pe_da_letra():
+    m = Mundo()
+    endereco_pronto(m)
+    m.llm.falhar = True
+    m.wpp.limpar()
+    m.enviar('nossa hoje ta muito calor aqui viu')
+    textos = ' '.join(m.wpp.textos())
+    assert 'Não achei' not in textos and 'não entendi' in textos
+
+
+def test_pedido_minimo_sugere_o_que_a_pessoa_costuma_levar_na_mesma_loja():
+    m = Mundo()
+    m.armazem[f'hist:{m.wa}'] = {'leite integral': {'nome': 'Leite integral', 'vezes': 3, 'ultima': 1.0}}
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    u = m.armazem[f'u:{m.wa}']
+    u['carrinho']['minimo'] = 60.0      # loja com mínimo alto: o pão sozinho não fecha
+    m.armazem[f'u:{m.wa}'] = u
+    m.tocar('fim')
+    assert 'sugerir' in m.wpp.todos_ids()   # 💡 junto do aviso de pedido mínimo
+    m.wpp.limpar()
+    m.enviar(('botao', 'sugerir'))
+    textos = ' '.join(m.wpp.textos())
+    assert 'pedido mínimo' in textos and 'Leite integral' in textos and 'costuma' in textos
+    busca = m.mcp.chamadas_de('searchOffers')[-1]
+    assert busca['query'].lower() == 'leite integral'
+    assert busca['refinements']['merchantId'] == m.estado()['carrinho']['loja_id']
+    assert m.wpp.cards()
+
+
+def test_completar_o_valor_sugere_algo_parecido_mesmo_com_o_gemini_fora():
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    m.llm.falhar = True
+    m.wpp.limpar()
+    m.enviar('sla algo que complete esse valor')
+    textos = ' '.join(m.wpp.textos())
+    assert 'Não achei' not in textos and 'Separei' in textos and m.wpp.cards()
+    est = m.estado()
+    no_carrinho = {i['item_id'] for i in est['carrinho']['itens']}
+    sugeridas = {o['item_id'] for o in est['listas'][est['lista_atual']]['ofertas']}
+    assert sugeridas and not sugeridas & no_carrinho   # parecido, mas não o mesmo pão de novo
+
+
+def test_pedir_sugestao_de_novo_traz_outra_coisa():
+    m = Mundo()
+    m.armazem[f'hist:{m.wa}'] = {'leite integral': {'nome': 'Leite integral', 'vezes': 3, 'ultima': 1.0}}
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    m.enviar('me sugere algo')
+    m.enviar('me sugere algo')
+    consultas = [c['query'].lower() for c in m.mcp.chamadas_de('searchOffers')[-2:]]
+    assert consultas[0] == 'leite integral' and consultas[1] != 'leite integral'
+
+
 def test_audio_vira_pedido():
     m = Mundo()
     endereco_pronto(m)
     m.wpp.limpar()
     m.enviar(('audio', 'midia1'))
     assert m.wpp.cards()
+
+
+def test_audio_transcrito_pelo_scribe_segue_igual_texto():
+    ouvidos = []
+    m = Mundo(transcritor=lambda mime, dados: ouvidos.append(mime) or 'quero leite integral')
+    endereco_pronto(m)
+    m.wpp.limpar()
+    m.enviar(('audio', 'midia1'))
+    assert ouvidos == ['audio/ogg']                                    # baixou e mandou pro Scribe
+    assert m.mcp.chamadas_de('searchOffers')[-1]['query'] == 'leite'   # buscou o que foi dito
+    assert m.wpp.cards()
+
+
+def test_scribe_fora_do_ar_o_gemini_ouve_o_audio():
+    def surdo(mime, dados):
+        raise RuntimeError('scribe fora do ar')
+    m = Mundo(transcritor=surdo)
+    endereco_pronto(m)
+    antes = len(m.mcp.chamadas_de('searchOffers'))
+    m.wpp.limpar()
+    m.enviar(('audio', 'midia1'))
+    buscas = m.mcp.chamadas_de('searchOffers')
+    assert len(buscas) == antes + 1 and buscas[-1]['query'] == 'pao'  # o "áudio" do fake fala pão
+    assert m.wpp.cards()
+
+
+def test_cpf_falado_nao_vai_pro_scribe():
+    ouvidos = []
+    m = Mundo(transcritor=lambda mime, dados: ouvidos.append(mime) or '529.982.247-25')
+    m.armazem[f'u:{m.wa}'] = {**(m.armazem.get(f'u:{m.wa}') or {}), 'fase': 'cpf'}
+    m.enviar(('audio', 'midia1'))
+    assert not ouvidos and 'escreva o CPF' in ' '.join(m.wpp.textos())
 
 
 def test_fora_do_escopo_volta_pro_pedido():

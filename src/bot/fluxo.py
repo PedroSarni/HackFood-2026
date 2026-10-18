@@ -18,7 +18,8 @@ import traceback
 from src.bot import ranking, relevancia, tutor
 from src.bot import textos as T
 from src.bot.ifood import PrecisaLogin
-from src.bot.interpretar import cpf_em, igual_a_botao, interpretar, normalizar, numero_em, regra_rapida
+from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, pede_sugestao,
+                                 regra_rapida)
 from src.bot.recorrencia import DEMO_SEGUNDOS, botoes_lembrete, categoria
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 from src.shared.llm import ErroLLM
@@ -335,7 +336,7 @@ class Bot:
             'mud': self.mudar_o_que, 'cancelar': self.cancelar, 'rec': self.definir_recorrencia,
             'lem': self.responder_lembrete, 'pular': self.pular_item, 'reped': self.repetir_pedido,
             'apagar_sim': self.apagar, 'apagar_nao': self.menu, 'login': self.reenviar_login,
-            'tentar': self.tentar_de_novo, 'nada': lambda _a=None: None,
+            'tentar': self.tentar_de_novo, 'sugerir': self.sugerir, 'nada': lambda _a=None: None,
         }
         fn = rotas.get(acao)
         if not fn:
@@ -348,13 +349,15 @@ class Bot:
 
     def livre(self, entradas):
         u = self.u
+        fase = u.get('fase')
+        if fase != 'cpf':  # CPF nunca vai pra IA, nem falado: lá embaixo pede pra escrever
+            entradas = [self._ouvir(e) for e in entradas]
         textos = [e.texto for e in entradas if e.tipo in ('texto', 'localizacao') and e.texto]
         texto = '\n'.join(textos).strip()
         midias = [e for e in entradas if e.tipo in ('audio', 'imagem')]
         if not texto and not midias:
             self.repetir_pergunta(T.NAO_ENTENDI)
             return
-        fase = u.get('fase')
 
         if fase == 'cpf':  # CPF nunca vai pra IA
             if midias and not texto:
@@ -391,6 +394,9 @@ class Bot:
             if i is not None and len(texto) <= 40:
                 self.botao(u['pergunta']['botoes'][i][0])
                 return
+            if pede_sugestao(texto):  # "algo que complete esse valor": sem depender do Gemini
+                self.sugerir()
+                return
             r = regra_rapida(texto)
             if r:
                 self.intencao(r)
@@ -398,8 +404,8 @@ class Bot:
 
         partes = [('texto', texto)] if texto else []
         for m in midias:
-            try:
-                mime, dados = self.ctx.baixar_midia(m.media_id)
+            try:  # o áudio que o Scribe não entendeu já chega baixado
+                mime, dados = (m.mime, m.dados) if m.dados else self.ctx.baixar_midia(m.media_id)
             except Exception as e:  # noqa: BLE001
                 print(f'baixar mídia falhou: {e!r}')
                 continue
@@ -414,7 +420,9 @@ class Bot:
             self._resposta = intent.get('resposta')
         except ErroLLM as e:
             print(f'LLM falhou: {e!r}')
-            if texto and fase in ('inicio', 'pedido', 'escolhendo', 'mais', None):
+            # sem Gemini, texto curto ainda vira busca ("pão", "leite integral"); frase não:
+            # "algo que complete esse valor" ia pra busca do iFood ao pé da letra
+            if texto and fase in ('inicio', 'pedido', 'escolhendo', 'mais', None) and len(texto.split()) <= 4:
                 intent = {'acao': 'comprar', 'itens': [{'termo': texto[:60], 'quantidade': None,
                                                         'tipo_loja': 'MERCADO', 'observacao': None}]}
             elif midias and not texto:
@@ -426,6 +434,24 @@ class Bot:
         if intent.get('transcricao'):
             print(f'transcrição {self.wa}: {intent["transcricao"][:200]}')
         self.intencao(intent)
+
+    def _ouvir(self, e):
+        """Áudio vira texto no Scribe e daí segue igual mensagem digitada (botão, endereço, sugestão...).
+        Scribe desligado ou falhou: o áudio continua áudio e o Gemini ouve, como antes."""
+        if e.tipo != 'audio':
+            return e
+        try:
+            mime, dados = self.ctx.baixar_midia(e.media_id)
+        except Exception as erro:  # noqa: BLE001 - o Gemini tenta baixar de novo lá na frente
+            print(f'baixar áudio falhou: {erro!r}')
+            return e
+        texto = self.ctx.transcrever(mime or e.mime, dados)
+        if not texto:
+            e.mime, e.dados = mime or e.mime, dados  # já baixado: o Gemini não baixa de novo
+            return e
+        print(f'scribe {self.wa}: {texto[:200]}')
+        self._disse = ' / '.join(x for x in (self._disse, texto) if x)[:300]
+        return Entrada('texto', texto)
 
     def intencao(self, it):
         u = self.u
@@ -480,6 +506,8 @@ class Bot:
                 self.menu('Tudo bem! 🙂')
         elif a == 'comprar':
             self.iniciar_compra(it.get('itens') or [])
+        elif a == 'sugerir':
+            self.sugerir(itens=it.get('itens'))
         elif a == 'mais_opcoes':
             if u.get('lista_atual'):
                 self.mais_opcoes(u['lista_atual'])
@@ -604,7 +632,74 @@ class Bot:
         if car and car.get('itens'):
             texto = 'O que mais você quer? 😊\nÉ só escrever ✍️'
         botoes = [T.B_FINALIZAR, T.B_INICIO] if car and car.get('itens') else [T.B_REPETIR, T.B_MEU_PEDIDO]
+        falta = _falta(car or {})
+        if falta:  # abaixo do mínimo a sugestão vira botão: quem não sabe o que digitar só toca
+            texto = (f'O que mais você quer? 😊\n{T.falta_minimo(falta, car.get("loja"))}\n'
+                     'É só escrever ✍️ ou tocar em *Me sugere algo*.')
+            botoes = [T.B_SUGERIR] + botoes
         self.perguntar(texto, botoes, fase='pedido')
+
+    def sugerir(self, _arg=None, itens=None):
+        """'Me sugere algo', 'algo que complete esse valor' ou o botão 💡. Na loja do carrinho,
+        oferece 1º o que a pessoa costuma comprar (hist:{wa}), depois o que o Gemini achou que
+        combina, depois algo parecido com o carrinho; quem fecha o pedido mínimo vem na frente.
+        Cada pedido de sugestão traz outra coisa (u['sugeridos'], por loja). No máximo 3 buscas
+        por toque: o iFood barra rajada."""
+        if not self.exigir_login(None):
+            return
+        if not self.garantir_endereco({'acao': 'sugerir'}):
+            return
+        u = self.u
+        car = u.get('carrinho') or {}
+        ja = u.get('sugeridos') or {}
+        if ja.get('loja') != car.get('loja_id'):
+            ja = {'loja': car.get('loja_id'), 'termos': []}
+        candidatos = ([{'termo': t, 'de_onde': 'costuma'} for t in self._costuma(car)]
+                      + [{'termo': i['termo'], 'busca': i.get('busca'), 'tipo_loja': i.get('tipo_loja'),
+                          'de_onde': 'combina'} for i in itens or []]
+                      + [{'termo': t, 'de_onde': 'parecido'} for t in self._parecidos(car)])
+        candidatos = [c for c in candidatos if normalizar(c['termo'])]
+        if candidatos and all(normalizar(c['termo']) in ja['termos'] for c in candidatos):
+            ja['termos'] = []  # já sugeriu tudo: recomeça a roda
+        novos, vistos = [], set(ja['termos'])
+        for c in candidatos:
+            if normalizar(c['termo']) not in vistos:
+                vistos.add(normalizar(c['termo']))
+                novos.append(c)
+        if not novos:
+            self.perguntar_pedido()
+            return
+        falta = _falta(car)
+        tipo = (u.get('atual') or {}).get('tipo_loja') or 'MERCADO'
+        evitar = [i.get('item_id') for i in car.get('itens') or []]
+        for c in novos[:3]:
+            ja['termos'].append(normalizar(c['termo']))
+            u['sugeridos'] = ja
+            pedido = {'termo': c['termo'], 'busca': c.get('busca') or c['termo'], 'quantidade': None,
+                      'observacao': None, 'sugestao': {'falta': falta, 'evitar': evitar},
+                      # com carrinho a busca é na loja dele, que tem um tipo só
+                      'tipo_loja': tipo if car.get('itens') else (c.get('tipo_loja') or tipo)}
+            if self.buscar(pedido, antes=T.sugestao(c['termo'], c['de_onde'], falta, car.get('loja'))):
+                return
+        self.perguntar(T.SEM_SUGESTAO, [T.B_FINALIZAR, T.B_INICIO] if car.get('itens') else [T.B_INICIO],
+                       fase='pedido')
+
+    def _costuma(self, car):
+        """O que a pessoa mais compra (hist:{wa}, nomes e categorias) como termo de busca, fora o
+        que já está no carrinho. Mais vezes primeiro; no empate, o mais recente."""
+        hist = self.ctx.armazem.get(f'hist:{self.wa}') or {}
+        no_car = ' | '.join(normalizar(i.get('nome')) for i in car.get('itens') or [])
+        termos = []
+        for k, h in sorted(hist.items(), key=lambda kv: (-kv[1].get('vezes', 0), -kv[1].get('ultima', 0))):
+            termo = h.get('nome') if k.startswith('cat:') else _termo_curto(h.get('nome'))
+            if normalizar(termo) and normalizar(termo) not in no_car:
+                termos.append(termo)
+        return termos
+
+    def _parecidos(self, car):
+        """Algo parecido com o carrinho: a categoria ('Pão francês' -> 'pão') ou o nome curto, pra
+        busca na mesma loja mostrar as variações."""
+        return [categoria(i.get('nome')) or _termo_curto(i.get('nome')) for i in car.get('itens') or []]
 
     def iniciar_compra(self, itens):
         u = self.u
@@ -823,8 +918,10 @@ class Bot:
 
     # ================================================================== busca e cards
 
-    def buscar(self, pedido):
-        """pedido: {termo, quantidade, tipo_loja, observacao}. Busca uma vez e guarda a lista."""
+    def buscar(self, pedido, antes=None):
+        """pedido: {termo, quantidade, tipo_loja, observacao}. Busca uma vez e guarda a lista.
+        antes: fala que vai logo antes dos cards. Sugestão (pedido['sugestao']) sem resultado
+        devolve False calada, pra quem chamou tentar o próximo termo."""
         u = self.u
         car = u.get('carrinho') or {}
         loja_id = car.get('loja_id') if car.get('itens') else None
@@ -836,15 +933,19 @@ class Bot:
             achadas, proxima = self.ctx.ifood(self.wa).buscar(
                 consulta, u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
             ofertas = ranking.ordenar(relevancia.filtrar(self.ctx.llm, achadas, pedido), pedido)
+            if pedido.get('sugestao'):
+                ofertas = _sugeridas(ofertas, pedido['sugestao'])
             if ofertas:
                 pedido['consulta_usada'] = consulta
                 break
         u['atual'] = pedido
         if not ofertas:
+            if pedido.get('sugestao'):
+                return False
             botoes = [T.B_PULAR, T.B_ESCREVER] if u.get('fila') else [T.B_ESCREVER, T.B_INICIO]
             self.perguntar(T.nao_achei(pedido['termo'], car.get('loja') if loja_id else None), botoes,
                            fase='pedido')
-            return
+            return False
         u['contador'] = int(u.get('contador') or 0) + 1
         lid = f'L{u["contador"]}'
         u['listas'][lid] = {'termo': pedido['termo'], 'ofertas': ofertas, 'pos': 0, 'proxima': proxima,
@@ -852,7 +953,10 @@ class Bot:
         for velha in sorted(u['listas'], key=lambda k: int(k[1:]))[:-LISTAS_GUARDADAS]:
             u['listas'].pop(velha, None)
         u['lista_atual'] = lid
+        if antes:
+            self.dizer(antes)
         self.mostrar_pagina(lid)
+        return True
 
     def mostrar_pagina(self, lid):
         u = self.u
@@ -1123,7 +1227,7 @@ class Bot:
         if car.get('minimo') and (car.get('subtotal') or 0) < car['minimo']:
             self.perguntar(f'O pedido mínimo do *{car.get("loja")}* é {T.reais(car["minimo"])}. 🙂\n'
                            f'Seu pedido está em {T.reais(car.get("subtotal"))}. Quer colocar mais alguma coisa?',
-                           [T.B_MAIS_COISAS, T.B_CANCELAR], fase='mais')
+                           [T.B_SUGERIR, T.B_MAIS_COISAS, T.B_CANCELAR], fase='mais')
             return
         # 1. entrega (a doc exige getCartDeliveryMethods -> setCartDelivery antes do pagamento).
         # Escolhe sozinho a entrega padrão: uma pergunta a menos, e o resumo mostra prazo e taxa.
@@ -1592,3 +1696,26 @@ def _quer_novo_pedido(texto):
     """'Quero fazer um novo pedido' na etapa do endereço: é pedido de menu, não endereço."""
     t = normalizar(texto)
     return not re.search(r'\d', t) and not LOGRADOURO.search(t) and bool(NOVO_PEDIDO.search(t))
+
+
+def _falta(car):
+    """Quanto falta pro pedido mínimo da loja; None se já passou ou se a loja não tem mínimo."""
+    falta = (car.get('minimo') or 0) - (car.get('subtotal') or 0)
+    return round(falta, 2) if falta > 0.005 else None
+
+
+def _termo_curto(nome):
+    """Nome do iFood -> termo de busca: 'Leite Integral Italac 1L' -> 'Leite Integral',
+    'Pão de forma integral' -> 'Pão de forma'."""
+    p = str(nome or '').split()
+    n = 3 if len(p) > 2 and normalizar(p[1]) in ('de', 'da', 'do', 'com', 'e', 'em') else 2
+    return ' '.join(p[:n])
+
+
+def _sugeridas(ofertas, s):
+    """Sugestão: tira o que já está no carrinho e, faltando valor pro mínimo, põe na frente quem
+    fecha o mínimo sozinho (do que passa menos pro que passa mais); depois o resto, do mais caro."""
+    ofertas = [o for o in ofertas if o['item_id'] not in (s.get('evitar') or [])]
+    if s.get('falta'):
+        ofertas.sort(key=lambda o: (o['preco'] < s['falta'], abs(o['preco'] - s['falta'])))
+    return ofertas

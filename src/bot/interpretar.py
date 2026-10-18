@@ -14,7 +14,7 @@ import unicodedata
 ACOES = ['comprar', 'mais_opcoes', 'escolher', 'sim', 'nao', 'quantidade', 'endereco',
          'ver_pedido', 'finalizar', 'tirar_item', 'cancelar', 'acompanhar', 'repetir',
          'ajuda', 'saudacao', 'agradecer', 'sair', 'apagar_dados', 'parar_lembrete',
-         'agendar', 'fora_do_escopo', 'nao_entendi']
+         'agendar', 'sugerir', 'fora_do_escopo', 'nao_entendi']
 LOJAS = ['MERCADO', 'RESTAURANTE', 'FARMACIA', 'BEBIDAS', 'PET', 'LOJA']
 
 ESQUEMA = {
@@ -47,13 +47,14 @@ ou com pouca prática com celular: escrevem com erros, sem acento, abreviado, em
 mensagens picadas, ou mandam áudio e foto. Seja generoso: descubra o que a pessoa quer AGORA.
 
 Responda só o JSON do esquema. Campos:
-- acao: uma de comprar, mais_opcoes, escolher, sim, nao, quantidade, endereco, ver_pedido, \
+- acao: uma de comprar, sugerir, mais_opcoes, escolher, sim, nao, quantidade, endereco, ver_pedido, \
 finalizar, tirar_item, cancelar, acompanhar, repetir, ajuda, saudacao, agradecer, sair, \
 apagar_dados, parar_lembrete, agendar, fora_do_escopo, nao_entendi.
 - itens: quando acao=comprar, cada produto pedido, na ordem. termo curto e no singular \
 ("pão francês", "leite integral", "carne moída", "dipirona"), sem a quantidade. \
 quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
-detalhes ("bem passado", "sem cebola", "marca Italac").
+detalhes ("bem passado", "sem cebola", "marca Italac"). Quando acao=sugerir, até 3 produtos \
+que combinem com o que já está no pedido, no mesmo formato.
 - busca: o texto que vai na busca do iFood, que é burra (casa com nome de loja e com sabor). \
 1 a 4 palavras, como o produto aparece num catálogo. Se a palavra pura engana, desambigue: \
 "cebola" -> "cebola in natura" (senão vem salgadinho sabor cebola), "limão" -> "limão tahiti", \
@@ -86,10 +87,12 @@ Regras:
 - "acabou", "só isso", "pode fechar", "terminei" = finalizar.
 - "cadê meu pedido", "já saiu?", "vai demorar?" = acompanhar.
 - "o de sempre", "pedir igual da outra vez", "repetir" = repetir.
+- "me sugere algo", "o que você recomenda", "qualquer coisa", "você escolhe", "algo pra completar \
+o valor" ou "o pedido mínimo" = sugerir (quando a pessoa não disse o produto).
 - "quero isso todo dia às 18h", "toda semana", "todo mês", "deixa no automático", "me lembra de pedir", "pedido recorrente", "assinatura" = agendar (mesmo no meio de um pedido).
 - Conversa que não é sobre pedido (piada, política, receita, perguntas gerais) = fora_do_escopo.
 - Só "oi", "bom dia", "olá" = saudacao. "obrigado", "valeu" = agradecer.
-- Se não der pra entender = nao_entendi. Nunca invente produto que a pessoa não pediu."""
+- Se não der pra entender = nao_entendi. Nunca invente produto que a pessoa não pediu (fora o sugerir)."""
 
 
 def normalizar(s):
@@ -156,6 +159,17 @@ def regra_rapida(texto):
     return None
 
 
+# "me sugere algo", "algo que complete esse valor": dá pra pegar sem o Gemini. As ambíguas
+# ("tanto faz", "qualquer coisa") ficam com ele: com cards na tela podem ser "qualquer um desses".
+SUGESTAO = re.compile(r'\b(?:sugest|suger|sugir|recomend)\w*'
+                      r'|\bcomplet\w* (?:o |a |esse |essa |este |esta )?(?:valor|pedido|minimo|total)\b'
+                      r'|\b(?:bater|chegar|atingir|fechar) (?:o |no |ao |a )?(?:valor|minimo)\b')
+
+
+def pede_sugestao(texto):
+    return bool(SUGESTAO.search(normalizar(texto)))
+
+
 def igual_a_botao(texto, titulos):
     """A pessoa digitou o texto de um dos botões na tela? Devolve o índice ou None."""
     t = normalizar(texto)
@@ -193,6 +207,9 @@ def contexto_para_llm(estado):
     car = estado.get('carrinho') or {}
     if car.get('itens'):
         linhas.append('Já no pedido: ' + ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens']))
+        falta = (car.get('minimo') or 0) - (car.get('subtotal') or 0)
+        if falta > 0.005:
+            linhas.append(f'Faltam R$ {falta:.2f} pro pedido mínimo da loja.')
     return '\n'.join(linhas)
 
 

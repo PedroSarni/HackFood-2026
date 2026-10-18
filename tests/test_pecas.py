@@ -355,3 +355,12 @@ def test_status_desconhecido_nunca_sai_em_ingles():
     assert 'Order' not in T.status_pedido('ORDER_COMPLETED', 'Order was completed.')
     assert T.status_pedido('CONCLUDED') == T.STATUS['CONCLUDED']
     assert 'iFood' in T.status_pedido('XYZ', 'Something happened')
+
+
+def test_pede_sugestao_sem_gemini():
+    from src.bot.interpretar import pede_sugestao
+    for frase in ('sla porra algo que complete esse valor', 'me sugere algo', 'tem alguma sugestão?',
+                  'o que vc recomenda', 'falta quanto pra bater o minimo'):
+        assert pede_sugestao(frase), frase
+    for frase in ('quero pão', 'leite integral', 'frango completo', 'pedido completo', 'tanto faz'):
+        assert not pede_sugestao(frase), frase

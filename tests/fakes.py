@@ -253,7 +253,7 @@ class LlmFake:
 class Mundo:
     """Tudo montado pra um teste: bot + fakes. `logar()` simula o OAuth concluído."""
 
-    def __init__(self, logado=True, wa='5516999990000'):
+    def __init__(self, logado=True, wa='5516999990000', transcritor=None):
         from src.bot.fluxo import Bot
         self.wa = wa
         self.armazem = Armazem()
@@ -268,7 +268,7 @@ class Mundo:
                             link_login=lambda wid: f'https://exemplo.test/login/{wid}',
                             iniciar_rastreio=lambda wid, pid: self.rastreios.append(pid),
                             recorrencias=Recorrencias(self.recs_dic, agora=lambda: self.agora),
-                            agora=lambda: self.agora)
+                            agora=lambda: self.agora, transcritor=transcritor)
         self.Bot = Bot
         if logado:
             self.logar(avisar=False)
