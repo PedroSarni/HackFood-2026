@@ -124,12 +124,17 @@ class Bot:
         self.wa = wa_id
         self.u = u = self._carregar(wa_id)
         car = u.get('carrinho') or {}
+        recomecou = False
         if car.get('loja_id') and not self.ctx.carrinho_valido(car):
-            # ligaram/desligaram o mock: o carrinho é do outro iFood e prendia a busca numa loja que não existe aqui
+            # ligaram/desligaram o mock (ou o modo palco ligou sozinho): o carrinho é do outro iFood e prendia a
+            # busca numa loja que não existe aqui. 18/10 01h43 (QA B3/U4): sumia calado, e cada toque na lista dele
+            # (e o nome do produto digitado) virava "botão de uma conversa antiga"; agora a pessoa fica sabendo
             print(f'carrinho de outro iFood largado {wa_id}: {car.get("loja")}')
-            u.update(carrinho=None, fila=[], listas={}, lista_atual=None, atual=None, visiveis=[], sugeridos=None)
+            u.update(carrinho=None, fila=[], listas={}, lista_atual=None, atual=None, visiveis=[], sugeridos=None,
+                     pergunta={})
             if u.get('fase') in NO_MEIO_DO_PEDIDO:
                 u['fase'] = 'inicio'
+            recomecou = True
         if msgs and msgs[-1].get('_nome'):
             u['nome'] = msgs[-1]['_nome']
         anterior = u.get('ultima_msg') or 0  # lido antes de sobrescrever (recorrencia.py usa o novo)
@@ -150,6 +155,11 @@ class Bot:
             self._disse = _sem_cpf(' / '.join(e.texto for e in entradas if e.texto))[:300]
             if self._debug_reset(entradas):   # palavra secreta de debug: desloga e zera tudo
                 return
+            if recomecou and all(e.tipo == 'botao' for e in entradas):
+                self.menu(T.PEDIDO_RECOMECADO)    # o toque era na lista do carrinho que caiu
+                return
+            if recomecou:
+                self.dizer(T.PEDIDO_RECOMECADO)   # e segue com o que a pessoa escreveu ou falou
             if self._sessao_ociosa(anterior, entradas):
                 return
             botoes =[e for e in entradas if e.tipo == 'botao']
@@ -875,7 +885,12 @@ class Bot:
             else:
                 self.repetir_pergunta(T.NADA_PRA_MUDAR)
         elif a == 'acompanhar':
-            self.acompanhar(sobre=it.get('sobre'))
+            if (u.get('carrinho') or {}).get('itens') and it.get('sobre') in (None, 'itens', 'total'):
+                # "meu pedido" com um carrinho montando é o carrinho de agora (QA U21: mostrava o pedido antigo);
+                # o status do que já saiu vem pelo "cadê meu pedido"/"já saiu?" e pelo botão Atualizar status
+                self.mostrar_carrinho()
+            else:
+                self.acompanhar(sobre=it.get('sobre'))
         elif a == 'repetir':
             self.repetir()
         elif a == 'endereco':

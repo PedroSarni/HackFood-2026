@@ -170,7 +170,7 @@ COMANDOS = {
     'apagar meus dados': 'apagar_dados', 'apagar dados': 'apagar_dados',
     'excluir meus dados': 'apagar_dados',
     'parar lembrete': 'parar_lembrete', 'parar lembretes': 'parar_lembrete',
-    'meu pedido': 'acompanhar', 'cade meu pedido': 'acompanhar',
+    'meu pedido': 'acompanhar',
     'mudar': 'mudar', 'alterar': 'mudar', 'mudar pedido': 'mudar', 'mudar o pedido': 'mudar',
 }
 # "cancelar o pedido", "quero cancelar", "cancela tudo" (com erro de digitação no fim, "pediod"); "cancela a
@@ -221,6 +221,8 @@ def regra_rapida(texto):
         return None
     if t in COMANDOS:
         return {'acao': COMANDOS[t]}
+    if t in ('cade meu pedido', 'cade o meu pedido', 'cade o pedido'):  # é o que já saiu, não o carrinho (U21)
+        return {'acao': 'acompanhar', 'sobre': 'status'}
     if CANCELAR.match(t):
         return {'acao': 'cancelar'}
     if CODIGO_ENTREGA.search(t):  # importante demais pra depender do Gemini

@@ -180,6 +180,8 @@ def sim_ou_acompanhamento(sugestao):
 
 NADA_PRA_MUDAR = 'Ainda não tem nada no carrinho pra mudar. 🙂'
 CARRINHO_ABANDONADO = 'Esvaziei seu carrinho pra não ficar parado. 🙂 Quando quiser, é só pedir de novo.'
+PEDIDO_RECOMECADO = ('😕 Precisei recomeçar seu pedido: a ligação com o iFood mudou aqui do nosso lado, e o '
+                     'carrinho de antes não vale mais. Desculpa!')
 ENDERECO_FALTA_POUCO = '😊 Falta só isso pra eu salvar o seu endereço:'
 ESCOLHA_ENDERECO = 'Qual destes é o seu endereço? Toque no certo 👇'
 PEDIR_COMPLEMENTO = ('Tem apartamento, bloco ou casa nos fundos?\n'

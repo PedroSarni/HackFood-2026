@@ -92,3 +92,40 @@ def test_ate_agora_separa_os_itens_da_entrega_e_das_taxas():
     assert T.ate_agora(10.58) == '🧺 Seu pedido até agora: *R$ 10,58*'
     assert 'R$ 8,00 por pessoa' in T.ate_agora(48.0, pessoas=6, subtotal=40.0)          # cada um paga a entrega também
     assert T.mais_alguma(47.97, None, 0, 'BK', subtotal=36.99).startswith('🧺 Seu pedido até agora: *R$ 36,99*\n🛵')
+
+
+def _lista_de_leite_na_tela():
+    """2 pães no carrinho e os cards do leite na tela (com os botões "Quero esse" da lista nova)."""
+    m = _com_dois_paes()
+    m.enviar('quero leite')
+    assert any(i.startswith('pick:') for i in m.wpp.todos_ids())
+    return m
+
+
+def test_carrinho_do_outro_ifood_some_com_aviso_e_o_toque_na_lista_dele_volta_pro_menu():
+    m = _lista_de_leite_na_tela()
+    m.armazem['cfg:mock'] = False             # 01h43: o mock desligou com o carrinho de mentira montado (B3)
+    pick = next(i for i in reversed(m.wpp.todos_ids()) if i.startswith('pick:'))
+    m.wpp.limpar()
+    m.enviar(('botao', pick))
+    texto = ' '.join(m.wpp.textos())
+    assert T.PEDIDO_RECOMECADO in texto and T.BOTAO_VELHO not in texto
+    assert m.estado()['fase'] == 'pedido' and not m.estado().get('carrinho')
+    m.enviar(('botao', pick))                 # insistir no card velho agora é só botão velho, uma vez
+    assert T.PEDIDO_RECOMECADO not in m.wpp.textos()[-1]
+
+
+def test_carrinho_do_outro_ifood_avisa_e_segue_com_o_que_a_pessoa_escreveu():
+    m = _com_dois_paes()
+    m.armazem['cfg:mock'] = False
+    m.wpp.limpar()
+    m.enviar('quero leite')
+    assert T.PEDIDO_RECOMECADO in m.wpp.textos()[0] and m.wpp.cards()   # avisou e foi buscar o leite
+
+
+def test_meu_pedido_com_carrinho_montando_mostra_o_carrinho_e_cade_e_do_que_ja_saiu():
+    m = _com_dois_paes()
+    m.wpp.limpar()
+    m.enviar('meu pedido')
+    assert 'Seu pedido:*' in m.wpp.textos()[-1] and '2x' in m.wpp.textos()[-1]   # U21: era o pedido antigo
+    assert interpretar.regra_rapida('cadê meu pedido') == {'acao': 'acompanhar', 'sobre': 'status'}
