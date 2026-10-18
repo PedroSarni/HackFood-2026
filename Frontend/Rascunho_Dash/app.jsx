@@ -4,6 +4,7 @@ import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNaviga
 import { LayoutDashboard, Filter, Sparkles, Send, MessagesSquare, Users, MapPin, Wallet, FileChartColumn, ArrowUpRight, ArrowDownRight, ArrowRight, ChevronRight, ChevronLeft, ChevronDown, Download, ShoppingBag, MessageCircle, TrendingUp, RotateCcw, ShoppingCart, X, Menu, Search, Check, CheckCheck, Play, SlidersHorizontal, Info, Clock3, CircleHelp, ChartNoAxesCombined, Zap, CalendarDays, CircleCheck, ExternalLink, Radio, WifiOff, Database } from 'lucide-react';
 import { REFERENCE_DATE, FIXTURE_DATE, setReferenceDate, STORAGE_KEY, STATUSES, STAGES, RESTAURANTS, money, number, percent, ratio, time, dateTime, dateKey, isSale, readSessions, filterSessions, metrics, groupBy, createPitchSession, advancePitch, PITCH_STEPS, csvExport } from './data.js';
 import './styles.css';
+import './mascote.css';
 import { brandImages } from './brand.js';
 import { downloadAnalyticsPdf } from './report-download.js';
 import { liveAvailable, useLiveSessions } from './live.js';
