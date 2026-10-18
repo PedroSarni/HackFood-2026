@@ -270,8 +270,9 @@ def _marcar(s, etapa, ts, detalhe=''):
                          'at': _iso(ts), 'stage': etapa})
 
 
-def montar_sessoes(eventos, agora=None, demo=False):
-    """Eventos do diário (qualquer ordem) -> sessões no formato do dash, mais nova primeiro."""
+def montar_sessoes(eventos, agora=None, demo=False, rotulos=None):
+    """Eventos do diário (qualquer ordem) -> sessões no formato do dash, mais nova primeiro.
+    `rotulos` (dict, opcional) recebe id(evento) -> id da sessão, pros agregados por conversa."""
     agora = agora or time.time()
     por_pessoa = {}
     for ev in sorted(eventos, key=lambda e: e.get('ts', 0)):
@@ -301,6 +302,8 @@ def montar_sessoes(eventos, agora=None, demo=False):
                                          'label': 'Lembrete de recorrência enviado' if s['origin'] == 'Follow-up' else 'Conversa iniciada',
                                          'at': _iso(ts), 'stage': 1})
                     minhas.append(s)
+            if rotulos is not None:
+                rotulos[id(ev)] = s['id']
             # carrinho parado 30 min e a pessoa voltou: houve abandono (e talvez recuperação)
             if s['_cart_ts'] and s['stage'] < 9 and not s['_abandonou'] and ts - s['_ultimo'] > ABANDONO:
                 s['_abandonou'] = True
@@ -393,3 +396,98 @@ def montar_sessoes(eventos, agora=None, demo=False):
                 del s[k]
             sessoes.append(s)
     return sorted(sessoes, key=lambda s: s['updatedAt'], reverse=True)
+
+
+# --- agregados pro dash: o servidor resume, o navegador só recebe o resumo e a conversa aberta ---
+
+DOC_MCP = 'regras da api/ifood-mcp-developer-portal.json'
+SO_NA_DOC = {'listItemTaxonomy'}   # o servidor tem 23 tools; esta só existe na doc (docs/contexto-evento.md §4)
+MAX_SEQUENCIA = 300
+MAX_CONVERSAS = 200
+_tools_doc = None
+
+
+def tools_da_doc():
+    """[(tool, domínio)] na ordem da doc do iFood. Doc ilegível: lista vazia (o dash só não mostra as nunca chamadas)."""
+    global _tools_doc
+    if _tools_doc is None:
+        import json
+        import pathlib
+        try:
+            doc = json.loads((pathlib.Path(__file__).resolve().parents[2] / DOC_MCP).read_text(encoding='utf-8'))
+            _tools_doc = [(t['nome'], dominio) for dominio, m in doc['mcps'].items() for t in m.get('tools', [])]
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            print(f'painel: lista de tools da doc ilegível: {e!r}')
+            _tools_doc = []
+    return _tools_doc
+
+
+def _recorte(eventos, rotulos, tipos, de=None, conversa=None):
+    """(evento, conversa) dos tipos pedidos, no período e na conversa, em ordem de tempo."""
+    for ev in sorted((e for e in eventos if e.get('tipo') in tipos), key=lambda e: e.get('ts', 0)):
+        if de and ev.get('ts', 0) < de:
+            continue
+        conv = rotulos.get(id(ev))
+        if conversa and conv != conversa:
+            continue
+        yield ev, conv
+
+
+def _pct(parte, todo):
+    return round(100 * parte / todo, 1) if todo else 0.0
+
+
+def _linha_uso(nome, n, erros, ms, conversas, total):
+    return {'chamadas': n, 'pct': _pct(n, total), 'erros': erros, 'pctErro': _pct(erros, n),
+            'msMedio': round(sum(ms) / len(ms)) if ms else None, 'msMax': max(ms) if ms else None,
+            'conversas': len(conversas), **nome}
+
+
+def resumo_mcp(eventos, rotulos, de=None, conversa=None):
+    """Uso do MCP por tool (chamadas, % do total, % de erro, latência, conversas), as tools da doc
+    que nunca foram chamadas no recorte e, com `conversa`, a sequência das chamadas na ordem."""
+    por, convs, total, seq = {}, set(), 0, []
+    for ev, conv in _recorte(eventos, rotulos, ('mcp',), de, conversa):
+        tool = str(ev.get('tool') or '?')
+        t = por.setdefault(tool, {'n': 0, 'erros': 0, 'ms': [], 'conv': set(), 'codigos': {}})
+        t['n'] += 1
+        total += 1
+        if isinstance(ev.get('ms'), (int, float)):
+            t['ms'].append(ev['ms'])
+        if not ev.get('ok'):
+            t['erros'] += 1
+            cod = str(ev.get('erro') or '?')
+            t['codigos'][cod] = t['codigos'].get(cod, 0) + 1
+        if conv:
+            t['conv'].add(conv)
+            convs.add(conv)
+        if conversa and len(seq) < MAX_SEQUENCIA:
+            seq.append({'at': _iso(ev['ts']), 'tool': tool, 'ok': bool(ev.get('ok')), 'ms': ev.get('ms'),
+                        'erro': ev.get('erro')})
+    dominio = dict(tools_da_doc())
+    tools = []
+    for tool, t in sorted(por.items(), key=lambda kv: (-kv[1]['n'], kv[0])):
+        linha = _linha_uso({'tool': tool, 'dominio': dominio.get(tool)}, t['n'], t['erros'], t['ms'], t['conv'], total)
+        linha['erroComum'] = max(t['codigos'], key=t['codigos'].get) if t['codigos'] else None
+        tools.append(linha)
+    nunca = [{'tool': tool, 'dominio': d, 'soNaDoc': tool in SO_NA_DOC} for tool, d in tools_da_doc() if tool not in por]
+    return {'total': total, 'conversas': len(convs), 'tools': tools, 'nunca': nunca,
+            'sequencia': seq if conversa else None}
+
+
+def indice_conversas(eventos, rotulos, sessoes, de=None, limite=MAX_CONVERSAS):
+    """As conversas do recorte pro filtro do dash (mais nova primeiro), com quantas chamadas tiveram."""
+    conta = {}
+    for ev, conv in _recorte(eventos, rotulos, ('entrada', 'saida', 'mcp', 'ia'), de):
+        if conv:
+            c = conta.setdefault(conv, {'mcp': 0, 'ia': 0})
+            if ev['tipo'] in c:
+                c[ev['tipo']] += 1
+    saida = []
+    for s in sessoes:  # já vêm da mais nova pra mais velha
+        if s['id'] in conta:
+            saida.append({'id': s['id'], 'nome': s['name'], 'inicio': s['startedAt'], 'fim': s['updatedAt'],
+                          **conta[s['id']]})
+            if len(saida) >= limite:
+                break
+    return saida

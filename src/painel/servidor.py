@@ -16,6 +16,7 @@ não tem login de admin.
 
 GET /api/sessoes?fonte=real|demo  -> {fonte, estado, agora, sessions}   (foto do momento)
 GET /api/stream?fonte=real|demo   -> text/event-stream                  (a foto de novo a cada mudança)
+GET /api/mcp?fonte=&dias=&conversa= -> uso do MCP por tool, tools nunca chamadas, sequência da conversa
 GET /api/saude
 """
 import argparse
@@ -146,6 +147,8 @@ class Painel:
         self._recalculo = 0
         self._sessoes = None
         self.foto = self._fotografar([])
+        self._base = ([], {}, [], 0)   # (eventos, rótulos, sessões, carimbo): trocado inteiro, as rotas leem sem trava
+        self._cache = {}
 
     def _fotografar(self, sessoes):
         return json.dumps({'fonte': self.fonte.nome, 'estado': self.fonte.estado, 'erro': self.erro,
@@ -170,13 +173,30 @@ class Painel:
             return False
         self.eventos.update(novos)
         self._recalculo = time.time()
-        sessoes = painel.montar_sessoes(self.eventos.values(), demo=self.fonte.nome == 'demo')
+        eventos, rotulos = list(self.eventos.values()), {}
+        sessoes = painel.montar_sessoes(eventos, demo=self.fonte.nome == 'demo', rotulos=rotulos)
         mudou = sessoes != self._sessoes or estado_mudou
         self._sessoes = sessoes
+        self._base = (eventos, rotulos, sessoes, self._recalculo)
         self.foto = self._fotografar(sessoes)
         if mudou:
             self.versao += 1
         return mudou
+
+    def consulta(self, nome, dias=None, conversa=None):
+        """Agregado pronto pro dash (`mcp`), em cache até o próximo recálculo: o navegador nunca
+        recebe o diário inteiro, só o resumo e a conversa aberta."""
+        eventos, rotulos, sessoes, carimbo = self._base
+        chave = (carimbo, nome, dias, conversa)
+        if chave not in self._cache:
+            if len(self._cache) > 64 or any(c[0] != carimbo for c in self._cache):
+                self._cache = {}
+            de = time.time() - float(dias) * 86400 if dias else None
+            dados = {'fonte': self.fonte.nome, 'estado': self.fonte.estado, 'agora': time.time(),
+                     'conversa': conversa, 'conversasLista': painel.indice_conversas(eventos, rotulos, sessoes, de)}
+            dados.update(painel.resumo_mcp(eventos, rotulos, de, conversa))
+            self._cache[chave] = json.dumps(dados, ensure_ascii=False)
+        return self._cache[chave]
 
     def rodar(self):
         while True:
@@ -219,6 +239,13 @@ def criar_api(paineis):
                 await asyncio.sleep(0.3)
         return StreamingResponse(eventos(), media_type='text/event-stream',
                                  headers={'cache-control': 'no-cache', 'x-accel-buffering': 'no'})
+
+    @api.get('/api/mcp')
+    async def mcp(fonte: str = 'real', dias: float | None = None, conversa: str | None = None):
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+        return Response(p.consulta('mcp', dias, conversa or None), media_type='application/json')
 
     @api.get('/api/saude')
     async def saude():

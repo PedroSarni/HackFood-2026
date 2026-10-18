@@ -138,3 +138,17 @@ entrou desde as 21h34 [...] marque B2 como [x] [...] Acrescente [...] H1 [...] H
 testes", então não escrevi "voltar ao modo da demo"). Deploy das 23h00 (bbfd811) já tem foto, kit, voz e os
 fixes; fora dele só 99c2c31 (app.py do follow-up), que está commitado e não "em andamento". Pronto ganhou as
 features da noite, dash/mascote saíram de Em andamento, B2 [x], H1–H4 acrescentados.
+
+## 2026-10-18 01:00 — dash: uso do MCP e rastro dos agentes de IA
+
+**Prompt:** "[...] FASE 1A — USO DO MCP (fazer primeiro; os dados já existem) [...] uma visão 'MCP': por tool,
+número de chamadas, % do total, % de erro, latência média e máxima, quantas conversas usaram. Inclua as tools da
+doc que nunca foram chamadas [...] Filtro por conversa e por período. Por conversa, a sequência das chamadas na
+ordem. FASE 1B — RASTRO DOS AGENTES DE IA: [...] embrulho no mesmo estilo do espiar_mcp [...] evento tipo 'ia'
+[...] Nunca texto livre da pessoa [...] aba 'Agentes' [...] FASE 2 — LIGA/DESLIGA (só depois da fase 1 no ar e
+testada, e me pergunte antes de começar) [...] Cuidado com volume [...] Agregue no servidor [...] Não faça deploy
+sem me perguntar."
+
+**Resposta:** claim dash-agentes-mcp. Fase 1A: `resumo_mcp`/`indice_conversas` em painel.py, rota `/api/mcp`
+no servidor local (agrega no servidor, em cache por recálculo: 31 KB pra 32 mil eventos da demo, em 44 ms) e
+página "Uso do MCP" no dash. O que o espiar_mcp grava não mudou.
