@@ -181,7 +181,8 @@ def test_foto_na_etapa_do_cpf_nem_abre_nem_vai_pra_ia():
     m.armazem[f'u:{m.wa}'] = {**(m.armazem.get(f'u:{m.wa}') or {}), 'fase': 'cpf'}
     antes = m.llm.chamadas
     m.enviar(('foto', 'rg1'))
-    assert m.llm.chamadas == antes and 'não abro fotos' in textos(m)
+    # nem abre, nem vai pra IA, e vale como "sem CPF" (17/10, pedido do Fabio)
+    assert m.llm.chamadas == antes and m.estado().get('cpf') == ''
 
 
 def test_cpf_digitado_junto_com_a_foto_vale_e_a_foto_e_ignorada():

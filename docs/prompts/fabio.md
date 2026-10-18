@@ -261,3 +261,9 @@ dito ("no pix") não é perguntado de novo. Número solto continua igual a tocar
 22h45). Corrigido, com teste. Sem carrinho, a recomendação agora é o que a pessoa costuma levar ou algo da hora
 do dia (pão de manhã, marmita no almoço, pizza à noite), e não "refrigerante" do nada. De carona: o teto de
 resposta do Gemini subiu, porque o 3.5-flash-lite parou em MAX_TOKENS às 22h38.
+
+## 2026-10-18 00:25 — áudio ou foto na hora do CPF vale "sem CPF"
+
+**Prompt:** na hora do cpf mandei um audio dizendo que n precisa de cpf, se for audio pro cpf ou foto, só ignore considere que n quis mandar
+
+**Resposta:** Na etapa do CPF, áudio ou foto não é ouvido nem aberto e vale como "sem CPF" (loja que exige CPF continua pedindo pra escrever). No modo áudio, a fala do CPF agora diz: escreve os números ou, se não quiser, manda um áudio. O teste da foto no CPF (claim bot-photo-group-kit) foi ajustado pra regra nova.

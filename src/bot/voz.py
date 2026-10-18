@@ -220,7 +220,8 @@ reais". Só dinheiro vai por extenso: quantidade, número de casa e minutos fica
 - Nunca leia URL, emoji, asterisco nem símbolo.
 - Termine com a pergunta ou o pedido do que ela faz agora e lembre, variando o jeito, que ela pode \
 responder por áudio ou escrevendo. EXCEÇÃO: na etapa "cpf" o CPF só vale ESCRITO (por segurança): \
-peça pra escrever os números, nunca pra falar.
+peça pra escrever os números, nunca pra falar; e diga que, se não quiser CPF na nota, é só mandar \
+um áudio (qualquer áudio ali vale como "sem CPF").
 - Curto: até 4 frases, no máximo 450 caracteres (até 650 se estiver dizendo opções de produto). \
 Termine sempre a frase: nada de texto cortado.
 - Fale sem marcar o seu gênero (nada de "obrigado/obrigada", "cansado/cansada").
@@ -234,7 +235,8 @@ ESQUEMA = {'type': 'OBJECT', 'properties': {'fala': {'type': 'STRING'}}, 'requir
 MODELOS_ROTEIRO = [('gemini-3.5-flash-lite', 3.0, ''), ('gemini-3.1-flash-lite', 3.0, '')]
 MAX_FALA = 800
 CONVITE = 'Pode me responder mandando um áudio ou escrevendo, tá bom?'
-CONVITE_CPF = 'O CPF, por segurança, me escreve aqui com os números, tá bom?'
+CONVITE_CPF = ('O CPF, por segurança, me escreve aqui com os números. Se não quiser CPF na nota, '
+               'é só me mandar um áudio, tá bom?')
 ROTULOS = {'texto': 'Mensagem', 'botoes': 'Pergunta com respostas prontas',
            'lista': 'Pergunta com lista de respostas', 'opcoes': 'Opções de produto, na ordem',
            'link': 'Link de entrar no iFood (a única coisa que aparece na tela)'}

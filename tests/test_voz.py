@@ -282,7 +282,8 @@ def test_no_cpf_o_audio_pede_pra_escrever():
     if m.estado()['fase'] == 'pagamento':
         m.enviar('pix')
     assert m.estado()['fase'] == 'cpf'
-    assert loc.falas[-1].endswith(voz.CONVITE_CPF) and 'áudio' not in loc.falas[-1]
+    assert loc.falas[-1].endswith(voz.CONVITE_CPF)  # CPF escrito; áudio ali = sem CPF
+    assert 'Sem CPF' not in loc.falas[-1]  # o botão "Sem CPF" não existe pra quem só ouve
 
 
 # --- roteiro -------------------------------------------------------------------------------

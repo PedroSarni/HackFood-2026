@@ -512,11 +512,11 @@ class Bot:
             if texto and (re.search(r'\d', texto) or normalizar(texto) in SEM_CPF):
                 self.receber_cpf(texto)
                 return
-            if fotos:  # foto nessa hora pode ser o documento: nem abre, nem manda pra IA
-                self.dizer(T.FOTO_NO_CPF)
-                return
-            if midias and not texto:
-                self.dizer('Por segurança, escreva o CPF com os números, por favor. 🙂')
+            if midias:
+                # áudio ou foto no CPF nem é ouvido nem aberto (pode ser o documento) e vale como "sem CPF":
+                # quem fala nessa hora quase sempre diz "não precisa" (17/10, pedido do Fabio). Loja que
+                # exige CPF: o sem_cpf pede pra escrever, sem a opção de pular.
+                self.sem_cpf()
                 return
         elif fotos:  # foto em qualquer etapa é pedido: comida, lista de compras ou produto
             self.receber_fotos(fotos, texto, outras=[e for e in midias if e.tipo != 'imagem'])

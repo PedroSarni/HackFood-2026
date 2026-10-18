@@ -1131,7 +1131,7 @@ def test_cpf_falado_nao_vai_pro_scribe():
     m = Mundo(transcritor=lambda mime, dados: ouvidos.append(mime) or '529.982.247-25')
     m.armazem[f'u:{m.wa}'] = {**(m.armazem.get(f'u:{m.wa}') or {}), 'fase': 'cpf'}
     m.enviar(('audio', 'midia1'))
-    assert not ouvidos and 'escreva o CPF' in ' '.join(m.wpp.textos())
+    assert not ouvidos and m.estado().get('cpf') == ''  # nem ouviu: áudio no CPF vale "sem CPF"
 
 
 def test_fora_do_escopo_volta_pro_pedido():

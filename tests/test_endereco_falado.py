@@ -64,3 +64,22 @@ def test_foto_com_gemini_fora_nao_fala_de_audio():
     m.enviar(('foto', 'f1'))
     textos = ' '.join(m.wpp.textos())
     assert T.FOTO_RUIM in textos and 'ouvir' not in textos
+
+
+def test_audio_no_cpf_vale_sem_cpf_e_segue_pro_resumo():
+    """17/10: na hora do CPF mandou áudio dizendo que não precisa. Áudio ou foto ali = sem CPF."""
+    from tests.test_fluxo import endereco_pronto
+    ouvidos = []
+    m = Mundo(transcritor=lambda mime, dados: ouvidos.append(mime) or 'não precisa de cpf')
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.tocar('fim')
+    m.tocar('pag:0')
+    assert m.estado()['fase'] == 'cpf'
+    n = len(ouvidos)
+    m.enviar(('audio', 'a1'))
+    assert len(ouvidos) == n                    # o áudio nem foi transcrito
+    assert m.estado()['fase'] == 'confirmar'    # foi pro resumo, sem CPF
+    m.tocar('ok:')
+    assert not m.mcp.chamadas_de('submitOrder')[-1].get('document')
