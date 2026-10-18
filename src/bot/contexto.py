@@ -11,7 +11,7 @@ import time
 
 from src.bot.ifood import Ifood, PrecisaLogin
 from src.bot.recorrencia import Recorrencias
-from src.shared import geocoder, ifood_mcp, llm, scribe
+from src.shared import geocoder, ifood_mcp, llm, scribe, voz
 
 
 def _cfg(nome):
@@ -33,7 +33,7 @@ def modo_mock(estado=None):
 class Contexto:
     def __init__(self, wpp, armazem, chamador_mcp, gerar_json, link_login, iniciar_rastreio,
                  recorrencias, agora=time.time, revogar=None, dormir=time.sleep, geocoder=None,
-                 agendar_lembrete=None, transcritor=None):
+                 agendar_lembrete=None, transcritor=None, locutor=None):
         self.wpp = wpp
         self.armazem = armazem
         self._chamador = chamador_mcp       # (wa_id) -> função chamar(tool, **args)
@@ -47,6 +47,7 @@ class Contexto:
         self._geocoder = geocoder       # (texto) -> endereço canônico | None (só resolve CEP)
         self._agendar_lembrete = agendar_lembrete  # (wa_id, quando) -> dispara o lembrete nessa hora
         self._transcritor = transcritor  # (mime, bytes) -> texto (Scribe); None = o Gemini ouve o áudio
+        self._locutor = locutor  # texto -> (mime, bytes) da nota de voz (ElevenLabs); None = sem modo áudio
 
     def ifood(self, wa_id):
         return Ifood(self._chamador(wa_id))
@@ -63,8 +64,8 @@ class Contexto:
         from src.shared.mcp_fake import loja_do_mock
         return loja_do_mock(car.get('loja_id')) == modo_mock(self.armazem)
 
-    def llm(self, sistema, partes, esquema):
-        return self._gerar_json(sistema, partes, esquema)
+    def llm(self, sistema, partes, esquema, **kw):
+        return self._gerar_json(sistema, partes, esquema, **kw)
 
     def baixar_midia(self, media_id):
         return self.wpp.baixar_midia(media_id)
@@ -77,6 +78,19 @@ class Contexto:
             return self._transcritor(mime, dados)
         except Exception as e:  # noqa: BLE001 - plano B é o Gemini ouvir
             print(f'scribe falhou: {e!r}')
+            return None
+
+    def pode_falar(self):
+        return bool(self._locutor)
+
+    def falar(self, texto):
+        """Texto -> (mime, bytes) da nota de voz. None = desligado ou falhou: vai por escrito."""
+        if not self._locutor:
+            return None
+        try:
+            return self._locutor(texto)
+        except Exception as e:  # noqa: BLE001 - plano B é mandar escrito
+            print(f'voz falhou: {e!r}')
             return None
 
     def link_login(self, wa_id):
@@ -188,9 +202,10 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
                               tok.get('refresh_token') or tok.get('access_token', ''))
 
     ctx = Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador,
-                    gerar_json=lambda s, p, e: llm.gerar_json(s, p, e),
+                    gerar_json=lambda s, p, e, **kw: llm.gerar_json(s, p, e, **kw),
                     link_login=modulo_app.novo_link_login, iniciar_rastreio=rastrear,
                     recorrencias=rec, revogar=revogar, geocoder=geocoder.normalizar,
-                    agendar_lembrete=lembrar, transcritor=scribe.transcrever if scribe.ligado() else None)
+                    agendar_lembrete=lembrar, transcritor=scribe.transcrever if scribe.ligado() else None,
+                    locutor=voz.falar if voz.ligado() else None)
     ctx.diario = diario
     return ctx

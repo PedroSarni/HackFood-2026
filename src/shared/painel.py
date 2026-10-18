@@ -137,6 +137,11 @@ class EspiaoWhatsApp:
         self._saiu(to, legenda or '📷 Foto', formato='Foto')
         return r
 
+    def audio(self, to, media_id, *a, transcricao=None, **kw):
+        r = self._wpp.audio(to, media_id, *a, transcricao=transcricao, **kw)
+        self._saiu(to, f'🎤 {transcricao}' if transcricao else '🎤 Áudio', formato='Áudio')
+        return r
+
     def template(self, to, nome, *a, **kw):
         r = self._wpp.template(to, nome, *a, **kw)
         self._saiu(to, f'Lembrete enviado fora da janela de 24h (template {nome})', formato='Template')

@@ -232,6 +232,19 @@ class WhatsApp:
             img['caption'] = bloco(legenda, MAX_CORPO)
         return self._mandar(to, {'type': 'image', 'image': img}, pausa=PAUSA_FOTO)
 
+    def subir_midia(self, mime, dados, nome='voz.ogg'):
+        """Sobe um arquivo pra Meta e devolve o media_id. Mais rápido e confiável que mandar
+        por link: a Meta não precisa baixar de um servidor nosso."""
+        r = self.graph('POST', f'{self.phone_id}/media',
+                       data={'messaging_product': 'whatsapp', 'type': mime},
+                       files={'file': (nome, dados, mime)})
+        return r['id']
+
+    def audio(self, to, media_id, voz=True, transcricao=None):
+        """voz=True: chega como nota de voz (play + onda, igual gravada na hora); exige ogg/opus mono.
+        transcricao: o que o áudio diz, só pra quem embrulha anotar (painel); não vai pra Meta."""
+        return self._mandar(to, {'type': 'audio', 'audio': {'id': media_id, **({'voice': True} if voz else {})}})
+
     def template(self, to, nome, idioma='pt_BR', componentes=None):
         """Mensagem fora da janela de 24h: só com template aprovado pela Meta."""
         tpl = {'name': nome, 'language': {'code': idioma}}

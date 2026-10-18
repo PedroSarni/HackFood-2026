@@ -15,7 +15,7 @@ import re
 import time
 import traceback
 
-from src.bot import ranking, relevancia, tutor
+from src.bot import ranking, relevancia, tutor, voz
 from src.bot import textos as T
 from src.bot.combina import complementos
 from src.bot.ifood import PrecisaLogin
@@ -99,6 +99,9 @@ class Bot:
         self._resposta = None
         self._direto = None
         self._disse = ''
+        self._gravador = None   # modo áudio (src/bot/voz.py): guarda o que seria escrito nesta rodada
+        self._voz_recem = False  # ligou nesta mensagem: o resto dela, se for só conversa, não vira "não entendi"
+        self._voz_acaba = False  # a sessão terminou nesta rodada: a última resposta ainda vai em áudio
 
     # ================================================================== entrada
 
@@ -119,6 +122,9 @@ class Bot:
         self._resposta = None   # fala do Gemini pra esta rodada (interpretar preenche)
         self._direto = None     # "Sim, pode pedir" do lembrete: {'teto': total} = fecha sem resumo
         self._disse = ''
+        if u.get('voz') and anterior and self.ctx.agora() - float(anterior) > IDLE_MAX:
+            u['voz'] = None  # o modo áudio vale pra sessão: sumiu, a próxima volta escrita
+        self._gravar()
         try:
             entradas = entradas_de(msgs)
             self._disse = ' / '.join(e.texto for e in entradas if e.texto)[:300]
@@ -143,12 +149,14 @@ class Bot:
             if livres:
                 self._protegido(lambda: self.livre(livres))
         finally:
+            self._falar_rodada()
             self._salvar()
 
     def logou(self, wa_id):
         """Chamado quando o OAuth termina no navegador."""
         self.wa = wa_id
         self.u = u = self._carregar(wa_id)
+        self._gravar()
         try:
             def seguir():
                 nome = (u.get('nome') or '').split(' ')[0]  # nome do perfil de WhatsApp, se já temos
@@ -167,11 +175,82 @@ class Bot:
                     self.perguntar(T.PERGUNTA_PEDIDO, T.MENU, fase='pedido')
             self._protegido(seguir)
         finally:
+            self._falar_rodada()
             self._salvar()
 
     @property
     def wpp(self):
-        return self.ctx.wpp
+        return self._gravador or self.ctx.wpp
+
+    # ================================================================== modo áudio
+
+    def _gravar(self):
+        self._voz_acaba = False
+        self._voz_recem = False
+        self._gravador = voz.Gravador(self.ctx.wpp, lambda: bool(self.u and self.u.get('voz')))
+
+    def _falar_rodada(self):
+        """Fim da rodada no modo áudio: o que seria escrito vira UMA nota de voz, por último.
+        Qualquer falha (Gemini, ElevenLabs, Meta) manda os textos guardados, na ordem."""
+        g, self._gravador = self._gravador, None
+        try:
+            if not g or not g.falas:
+                return
+            enviado = False
+            try:
+                modo = (self.u or {}).get('voz') or {}
+                fala = voz.roteiro(self.ctx.llm, g.falas, self._disse, (self.u or {}).get('fase'),
+                                   antes=modo.get('ultima') or '')
+                nota = self.ctx.falar(fala) if fala else None
+                if nota:
+                    print(f'voz {self.wa}: {fala[:200]}')
+                    self.ctx.wpp.audio(self.wa, self.ctx.wpp.subir_midia(*nota), transcricao=fala)
+                    enviado = True
+                    if modo:
+                        modo['ultima'] = fala[:200]
+            except Exception:  # noqa: BLE001 - sem áudio, vai escrito
+                traceback.print_exc()
+            if not enviado:
+                for to, texto in g.guardados:
+                    try:
+                        self.ctx.wpp.texto(to, texto)
+                    except Exception:  # noqa: BLE001
+                        traceback.print_exc()
+        finally:
+            if self._voz_acaba and self.u:
+                self.u['voz'] = None
+
+    def _pedido_de_voz(self, texto):
+        """Liga ou desliga o modo áudio quando a pessoa PEDE. Devolve (resto, acabou): o resto do
+        texto segue o fluxo normal ("quero pão e me responde por áudio" -> "quero pão");
+        acabou = a mensagem era só o pedido e a rodada já respondeu."""
+        u = self.u
+        if u.get('voz') and voz.pediu_texto(texto):
+            u['voz'] = None
+            resto = voz.resto_do_pedido(texto, voz.PEDE_TEXTO)
+            self.dizer(T.VOZ_DESLIGADA)
+        elif not u.get('voz') and voz.pediu_audio(texto):
+            resto = voz.resto_do_pedido(texto, voz.PEDE_AUDIO)
+            if self.ctx.pode_falar():
+                u['voz'] = {'desde': self.ctx.agora()}
+                self._voz_recem = True
+                self.dizer(T.VOZ_LIGADA)
+            else:
+                self.dizer(T.VOZ_INDISPONIVEL)
+        else:
+            return texto, False
+        if resto:
+            return resto, False
+        self._continuar_de_onde_parou()
+        return '', True
+
+    def _continuar_de_onde_parou(self):
+        """Depois de trocar o jeito de responder: refaz a pergunta aberta (com ou sem botões)."""
+        p = self.u.get('pergunta') or {}
+        if p.get('botoes') or not p.get('texto'):
+            self.repetir_pergunta()
+        else:  # pergunta escrita (endereço, bairro): repete sem jogar a pessoa pro menu
+            self.dizer(p['texto'])
 
     def _carregar(self, wa_id):
         u = estado_novo()
@@ -300,8 +379,12 @@ class Bot:
         if fase:
             self.u['fase'] = fase
 
-    def dizer(self, texto):
-        self.wpp.texto(self.wa, texto)
+    def dizer(self, texto, fica=False):
+        """fica=True: no modo áudio, sai escrito também (número do pedido, código de entrega)."""
+        if self._gravador:
+            self._gravador.texto(self.wa, texto, fica=fica)
+        else:
+            self.ctx.wpp.texto(self.wa, texto)
 
     def repetir_pergunta(self, prefixo=None):
         p = self.u.get('pergunta') or {}
@@ -362,6 +445,10 @@ class Bot:
             entradas = [self._ouvir(e) for e in entradas]
         textos = [e.texto for e in entradas if e.tipo in ('texto', 'localizacao') and e.texto]
         texto = '\n'.join(textos).strip()
+        if texto and fase != 'cpf':  # "me responde por áudio" / "pode escrever"
+            texto, acabou = self._pedido_de_voz(texto)
+            if acabou:
+                return
         midias = [e for e in entradas if e.tipo in ('audio', 'imagem')]
         if not texto and not midias:
             self.repetir_pergunta(T.NAO_ENTENDI)
@@ -465,6 +552,11 @@ class Bot:
         u = self.u
         a = it.get('acao')
         fase = u.get('fase')
+        if self._voz_recem and a in ('nao_entendi', 'fora_do_escopo', 'saudacao', 'agradecer'):
+            # "me responde por áudio, não enxergo bem": o resto era conversa, não pedido
+            self._voz_recem = False
+            self._continuar_de_onde_parou()
+            return
         botoes = (u.get('pergunta') or {}).get('botoes') or []
         if a not in ('sim', 'nao', 'numero', 'escolher', 'quantidade', 'nao_entendi', 'fora_do_escopo',
                      'agradecer', 'saudacao'):
@@ -624,6 +716,7 @@ class Bot:
         self.ctx.sair(self.wa)
         self.u.update({'fase': 'inicio', 'pergunta': {}, 'carrinho': None, 'fila': [], 'escolha': None})
         self.dizer(T.SAIU)
+        self._voz_acaba = True
 
     def apagar(self, _arg=None):
         self.ctx.apagar(self.wa)
@@ -1432,7 +1525,9 @@ class Bot:
                     self.ctx.dormir(1.5)
         u['pedidos'][0]['codigo'] = detalhes.get('codigo')
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
-                                  detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')))
+                                  detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')),
+                   fica=True)  # número e código de entrega ficam escritos pra consultar depois
+        self._voz_acaba = True  # pedido feito = fim da sessão: esta resposta ainda vai em áudio, a próxima não
         self.ctx.iniciar_rastreio(self.wa, feito['id'])
         # lembrete só quando a compra se repete (item ou categoria, de qualquer loja) ou quando a pessoa
         # pediu pra agendar: na 1ª vez de um item ninguém quer ser cobrado de rotina

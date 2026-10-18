@@ -105,6 +105,13 @@ BOTAO_VELHO = 'Esse botão é de uma conversa antiga. Vamos continuar daqui: �
 
 DE_NADA = 'Por nada! 😊 Quando precisar, é só chamar.'
 
+# --- modo áudio (src/bot/voz.py): só pra quem pede ---------------------------------------
+
+VOZ_LIGADA = 'Pode deixar! 🎤 A partir de agora eu te respondo por áudio.'
+VOZ_DESLIGADA = 'Combinado! ✍️ Voltei a responder por escrito.'
+VOZ_INDISPONIVEL = ('Ainda não consigo mandar áudio por aqui. 😕\n'
+                    'Mas pode me mandar os seus, que eu escuto e respondo por escrito.')
+
 # --- endereço ---------------------------------------------------------------------------
 
 PEDIR_ENDERECO = ('🏠 Pra onde eu mando suas compras?\n\n'

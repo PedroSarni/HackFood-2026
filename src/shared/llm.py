@@ -86,16 +86,17 @@ def _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento):
         raise ErroLLM(f'{modelo} devolveu JSON inválido: {txt[:120]!r}') from e
 
 
-def gerar_json(sistema, partes, esquema, http=None):
+def gerar_json(sistema, partes, esquema, http=None, modelos=None):
     """Uma resposta JSON no formato `esquema` (OpenAPI do Gemini: type OBJECT, STRING...).
-    Tenta os modelos em ordem; devolve (dados, modelo_usado, segundos)."""
+    Tenta os modelos em ordem; devolve (dados, modelo_usado, segundos).
+    modelos: fila própria [(modelo, prazo, pensamento)] pra quem tem pressa (roteiro do áudio)."""
     if not _cfg('GEMINI_API_KEY'):
         raise ErroLLM('GEMINI_API_KEY não configurada')
     http = http or httpx.Client()
     parts = _partes(partes)
     erros = []
     t0 = time.monotonic()
-    for modelo, prazo, pensamento in _modelos():
+    for modelo, prazo, pensamento in modelos or _modelos():
         try:
             return _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento), modelo, time.monotonic() - t0
         except (ErroLLM, httpx.HTTPError) as e:

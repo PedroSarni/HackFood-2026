@@ -39,6 +39,8 @@ def erro_meta(p):
         return None if p['image'].get('link', '').startswith('https://') else 'imagem sem https'
     if tipo == 'template':
         return None
+    if tipo == 'audio':
+        return None if p['audio'].get('id') else 'áudio sem media id'
     if tipo != 'interactive':
         return f'tipo desconhecido {tipo}'
     it = p['interactive']
@@ -107,8 +109,15 @@ class WhatsAppFake:
         self.saida = []   # (tipo, dados), já no formato que chegou na "Meta"
         self.recusadas = []
 
+        self.midias = []  # (mime, bytes) subidos pra Meta (nota de voz)
+
         def meta(req):
             import json
+            if req.url.path.endswith('/media'):
+                if b'messaging_product' not in req.content or b'name="file"' not in req.content:
+                    return httpx.Response(400, json={'error': {'message': 'upload sem campos'}})
+                self.midias.append(req.content)
+                return httpx.Response(200, json={'id': f'midia.out{len(self.midias)}'})
             p = json.loads(req.content)
             if p.get('status') == 'read':
                 return httpx.Response(200, json={'success': True})
@@ -140,6 +149,14 @@ class WhatsAppFake:
 
     def template(self, to, nome, idioma='pt_BR', componentes=None):
         return self._real.template(to, nome, idioma, componentes)
+
+    def subir_midia(self, mime, dados, nome='voz.ogg'):
+        return self._real.subir_midia(mime, dados, nome)
+
+    def audio(self, to, media_id, voz=True, transcricao=None):
+        r = self._real.audio(to, media_id, voz)
+        self.saida[-1][1]['fala'] = transcricao  # o teste lê o que o áudio "disse"
+        return r
 
     def digitando(self, mid):
         return True
@@ -193,6 +210,8 @@ def _simplificar(p):
         return 'imagem', {'to': to, 'link': p['image']['link']}
     if p['type'] == 'template':
         return 'template', {'to': to, 'nome': p['template']['name']}
+    if p['type'] == 'audio':
+        return 'audio', {'to': to, 'id': p['audio']['id'], 'voz': p['audio'].get('voice', False)}
     it = p['interactive']
     if it['type'] == 'button':
         return 'botoes', {'to': to, 'texto': it['body']['text'],
@@ -218,7 +237,7 @@ class LlmFake:
         self.falhar = False
         self.resposta = None   # força uma resposta específica
 
-    def __call__(self, sistema, partes, esquema):
+    def __call__(self, sistema, partes, esquema, **kw):
         from src.shared.llm import ErroLLM
         self.chamadas += 1
         if self.falhar:
@@ -253,7 +272,7 @@ class LlmFake:
 class Mundo:
     """Tudo montado pra um teste: bot + fakes. `logar()` simula o OAuth concluído."""
 
-    def __init__(self, logado=True, wa='5516999990000', transcritor=None):
+    def __init__(self, logado=True, wa='5516999990000', transcritor=None, locutor=None):
         from src.bot.fluxo import Bot
         self.wa = wa
         self.armazem = Armazem()
@@ -269,7 +288,7 @@ class Mundo:
                             link_login=lambda wid: f'https://exemplo.test/login/{wid}',
                             iniciar_rastreio=lambda wid, pid: self.rastreios.append(pid),
                             recorrencias=Recorrencias(self.recs_dic, agora=lambda: self.agora),
-                            agora=lambda: self.agora, transcritor=transcritor)
+                            agora=lambda: self.agora, transcritor=transcritor, locutor=locutor)
         self.Bot = Bot
         if logado:
             self.logar(avisar=False)
