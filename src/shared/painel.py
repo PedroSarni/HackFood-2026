@@ -3,6 +3,8 @@
 O fluxo da conversa não sabe que isto existe. Os espiões ficam na borda:
 - `EspiaoWhatsApp` embrulha o cliente do WhatsApp e anota cada mensagem que SAI;
 - `espiar_mcp` embrulha o chamar(tool, **args) e anota cada chamada ao MCP (só um resumo);
+- `espiar_ia` / `espiar_servico` embrulham a IA (Gemini/OpenRouter, Scribe, ElevenLabs) e anotam cada
+  chamada como evento 'ia': qual agente, qual modelo respondeu, tempo, ok/erro e só contagens;
 - `anotar_entrada` anota o lote de mensagens que ENTRA (chamado na rodada, em src/app.py).
 
 Cada evento vira uma chave `ev:<microssegundos>:<sorteio>` num modal.Dict próprio
@@ -195,6 +197,102 @@ def espiar_mcp(chamar, diario, wa_id):
     return chamar_espiando
 
 
+# --- agentes de IA ------------------------------------------------------------------------
+# Quem é quem pelo prompt de sistema de cada módulo: nenhum agente precisa saber que é espiado.
+# A arquitetura que o dash mostra: o entendimento (interpretar) só devolve JSON; quem orquestra,
+# chama os especialistas e o MCP é o código (src/bot/fluxo.py), e os agentes só se falam por ele.
+AGENTES = {'entendimento': 'Entendimento', 'foto': 'Foto', 'grupo': 'Kit em grupo', 'voz': 'Voz',
+           'ouvido': 'Ouvido', 'relevancia': 'Relevância e sugestão', 'tutor': 'Tutor'}
+_sistemas = None
+
+
+def agente_do_sistema(sistema):
+    global _sistemas
+    if _sistemas is None:
+        from src.bot import foto, grupo, interpretar, relevancia, tutor, voz
+        _sistemas = {interpretar.SISTEMA: 'entendimento', foto.SISTEMA: 'foto', grupo.SISTEMA: 'grupo',
+                     relevancia.SISTEMA: 'relevancia', relevancia.SISTEMA_VARIOS: 'relevancia',
+                     tutor.SISTEMA: 'tutor', voz.SISTEMA: 'voz'}
+    return _sistemas.get(sistema, 'outro')
+
+
+def _curto(v):
+    return _mascarar(v)[:40] if isinstance(v, str) else None
+
+
+def _resumo_ia(agente, dados):
+    """Só contagens e valores de enum. Nada do que a pessoa escreveu nem do que a IA respondeu."""
+    if not isinstance(dados, dict):
+        return {}
+    if agente == 'entendimento':
+        return {'acao': _curto(dados.get('acao')), 'itens': len(dados.get('itens') or [])}
+    if agente == 'foto':
+        return {'foto': _curto(dados.get('tipo')), 'itens': len(dados.get('itens') or []),
+                'parecidos': len(dados.get('parecidos') or [])}
+    if agente == 'grupo':
+        return {'itens': len(dados.get('itens') or [])}
+    if agente == 'relevancia':
+        if 'listas' in dados:
+            return {'listas': len(dados.get('listas') or [])}
+        return {'mantidas': len(dados.get('manter') or [])}
+    return {}
+
+
+def _erro_ia(e):
+    s = str(e)
+    m = re.search(r'HTTP (\d{3})', s)
+    if m:
+        return f'HTTP {m.group(1)}'
+    for pista, nome in (('timed out', 'timeout'), ('Timeout', 'timeout'), ('finishReason', 'finishReason'),
+                        ('JSON inválido', 'JSON inválido'), ('não configurada', 'sem key')):
+        if pista in s or pista in type(e).__name__:
+            return nome
+    return type(e).__name__[:40]
+
+
+def espiar_ia(gerar, diario, wa_id, primeiro=None):
+    """gerar(sistema, partes, esquema, **kw) -> (dados, modelo, seg), anotando cada chamada como
+    evento 'ia'. `primeiro(kw)` diz o 1º modelo da fila: outro modelo respondendo = caiu pro reserva."""
+    def gerar_espiando(sistema, partes, esquema, **kw):
+        t0 = time.time()
+        try:
+            agente = agente_do_sistema(sistema)
+        except Exception:  # noqa: BLE001 - registro nunca derruba o bot
+            agente = 'outro'
+        try:
+            r = gerar(sistema, partes, esquema, **kw)
+        except Exception as e:
+            diario.anotar(wa_id, 'ia', agente=agente, ok=False, ms=round((time.time() - t0) * 1000),
+                          erro=_erro_ia(e), tentativas=str(e).count(' | ') + 1)
+            raise
+        try:
+            dados, modelo = r[0], str(r[1])[:60]
+            reserva = bool(primeiro and modelo != primeiro(kw)) or None
+            resumo = _resumo_ia(agente, dados)
+        except Exception:  # noqa: BLE001
+            modelo, reserva, resumo = None, None, {}
+        diario.anotar(wa_id, 'ia', agente=agente, modelo=modelo, reserva=reserva, ok=True,
+                      ms=round((time.time() - t0) * 1000), **resumo)
+        return r
+    return gerar_espiando
+
+
+def espiar_servico(fn, diario, wa_id, agente, modelo):
+    """Mesma coisa pros serviços de voz: Scribe (ouvido, áudio -> texto) e ElevenLabs (voz, texto -> áudio)."""
+    def fn_espiando(*a, **kw):
+        t0 = time.time()
+        try:
+            r = fn(*a, **kw)
+        except Exception as e:
+            diario.anotar(wa_id, 'ia', agente=agente, modelo=modelo, ok=False,
+                          ms=round((time.time() - t0) * 1000), erro=_erro_ia(e))
+            raise
+        diario.anotar(wa_id, 'ia', agente=agente, modelo=modelo, ok=r is not None,
+                      ms=round((time.time() - t0) * 1000), erro=None if r is not None else 'sem resposta')
+        return r
+    return fn_espiando
+
+
 _FORMATO = {'texto': 'Texto', 'botao': 'Botão', 'audio': 'Áudio', 'imagem': 'Foto',
             'localizacao': 'Localização', 'outro': 'Outro'}
 
@@ -283,6 +381,10 @@ def montar_sessoes(eventos, agora=None, demo=False, rotulos=None):
         minhas, nome, cidade = [], None, None
         for ev in evs:
             ts, tipo = ev['ts'], ev['tipo']
+            if tipo == 'ia':  # rastro dos agentes: só ganha o rótulo da conversa, a sessão não muda
+                if rotulos is not None and minhas:
+                    rotulos[id(ev)] = minhas[-1]['id']
+                continue
             s = None
             if tipo == 'mcp' and ev.get('tool') == 'trackOrder' and ev.get('pedido'):
                 # rastreio pode chegar depois de a pessoa já ter puxado outra conversa
@@ -491,3 +593,92 @@ def indice_conversas(eventos, rotulos, sessoes, de=None, limite=MAX_CONVERSAS):
             if len(saida) >= limite:
                 break
     return saida
+
+
+# regras sem IA que o dash mostra ao lado dos agentes, reconhecidas pela mensagem que mandaram
+REGRAS = {'followup': 'Follow-up', 'recorrencia': 'Recorrência', 'vitrine': 'Vitrine'}
+RAJADA = 30   # s: as mensagens de um mesmo disparo da regra contam uma vez só
+
+
+def regra_da_saida(ev):
+    from src.bot.textos import VITRINE_TOPO
+    if ev.get('origem') == 'followup':
+        return 'followup'
+    if ev.get('origem') == 'lembrete':
+        return 'recorrencia'
+    if ev.get('formato') == 'Cards' and str(ev.get('texto') or '').startswith(VITRINE_TOPO):
+        return 'vitrine'
+    return None
+
+
+_RESUMO_IA = ('acao', 'itens', 'foto', 'parecidos', 'mantidas', 'listas', 'tentativas')
+
+
+def _passo(ev, regra=None):
+    """Um passo da linha do tempo, sem texto nenhum da conversa."""
+    base = {'at': _iso(ev['ts'])}
+    if ev['tipo'] == 'entrada':
+        return {**base, 'tipo': 'mensagem', 'formato': ev.get('formato') or 'Texto', 'botao': bool(ev.get('botao'))}
+    if ev['tipo'] == 'ia':
+        agente = ev.get('agente') or 'outro'
+        return {**base, 'tipo': 'ia', 'agente': agente, 'nome': AGENTES.get(agente, 'Outro'), 'modelo': ev.get('modelo'),
+                'reserva': bool(ev.get('reserva')), 'ms': ev.get('ms'), 'ok': bool(ev.get('ok')), 'erro': ev.get('erro'),
+                'resumo': {k: ev[k] for k in _RESUMO_IA if ev.get(k) is not None}}
+    if ev['tipo'] == 'mcp':
+        return {**base, 'tipo': 'mcp', 'tool': ev.get('tool'), 'ok': bool(ev.get('ok')), 'ms': ev.get('ms'), 'erro': ev.get('erro')}
+    if regra:
+        return {**base, 'tipo': 'regra', 'agente': regra, 'nome': REGRAS[regra]}
+    return {**base, 'tipo': 'resposta', 'formato': ev.get('formato') or 'Texto', 'origem': ev.get('origem')}
+
+
+def resumo_agentes(eventos, rotulos, de=None, conversa=None):
+    """Uso de cada agente de IA (chamadas, % do total, erros, latência, modelos e quantas vezes caiu
+    pro reserva), os disparos das regras sem IA e, com `conversa`, a linha do tempo dela:
+    mensagem -> entendimento -> especialistas e MCP (pelo código) -> resposta."""
+    ia, regras, ultimo, total = {}, {}, {}, 0
+    linha = [] if conversa else None
+    for ev, conv in _recorte(eventos, rotulos, ('entrada', 'saida', 'mcp', 'ia'), de, conversa):
+        regra = None
+        if ev['tipo'] == 'ia':
+            a = ia.setdefault(ev.get('agente') or 'outro', {'n': 0, 'erros': 0, 'ms': [], 'conv': set(), 'modelos': {}, 'reserva': 0})
+            a['n'] += 1
+            total += 1
+            if isinstance(ev.get('ms'), (int, float)):
+                a['ms'].append(ev['ms'])
+            if not ev.get('ok'):
+                a['erros'] += 1
+            if ev.get('modelo'):
+                a['modelos'][ev['modelo']] = a['modelos'].get(ev['modelo'], 0) + 1
+            if ev.get('reserva'):
+                a['reserva'] += 1
+            if conv:
+                a['conv'].add(conv)
+        elif ev['tipo'] == 'saida':
+            regra = regra_da_saida(ev)
+            if regra:
+                chave = (ev.get('wa'), regra)
+                novo = ev['ts'] - ultimo.get(chave, float('-inf')) > RAJADA
+                ultimo[chave] = ev['ts']
+                if novo:
+                    r = regras.setdefault(regra, {'n': 0, 'conv': set()})
+                    r['n'] += 1
+                    if conv:
+                        r['conv'].add(conv)
+                else:
+                    regra = None
+        if linha is not None and len(linha) < MAX_SEQUENCIA:
+            if regra:
+                linha.append(_passo(ev, regra))
+            linha.append(_passo(ev))
+    agentes = []
+    for agente in list(AGENTES) + sorted(set(ia) - set(AGENTES)):
+        a = ia.get(agente, {'n': 0, 'erros': 0, 'ms': [], 'conv': set(), 'modelos': {}, 'reserva': 0})
+        linha_uso = _linha_uso({'agente': agente, 'nome': AGENTES.get(agente, 'Outro'), 'tipo': 'ia'},
+                               a['n'], a['erros'], a['ms'], a['conv'], total)
+        linha_uso['modelos'] = [{'modelo': m, 'n': n} for m, n in sorted(a['modelos'].items(), key=lambda kv: -kv[1])]
+        linha_uso['reserva'] = a['reserva']
+        agentes.append(linha_uso)
+    agentes.sort(key=lambda a: -a['chamadas'])
+    lista_regras = [{'agente': r, 'nome': nome, 'tipo': 'regra', 'disparos': regras.get(r, {}).get('n', 0),
+                     'conversas': len(regras.get(r, {}).get('conv', ()))} for r, nome in REGRAS.items()]
+    return {'total': total, 'agentes': agentes, 'regras': lista_regras, 'linha': linha}

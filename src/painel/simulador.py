@@ -37,6 +37,11 @@ class MundoAnotado(Mundo):
         self.ctx.wpp = painel.EspiaoWhatsApp(self.wpp, self.diario)
         mcp = self.mcp
         self.ctx._chamador = lambda wid: painel.espiar_mcp(mcp.chamar, self.diario, wid)
+        self.ctx._gerar_json = painel.espiar_ia(self.llm, self.diario, self.wa)
+        if self.ctx._transcritor:
+            self.ctx._transcritor = painel.espiar_servico(self.ctx._transcritor, self.diario, self.wa, 'ouvido', 'fake')
+        if self.ctx._locutor:
+            self.ctx._locutor = painel.espiar_servico(self.ctx._locutor, self.diario, self.wa, 'voz', 'fake')
         Bot, mundo = self.Bot, self
 
         class BotAnotado(Bot):

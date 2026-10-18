@@ -180,3 +180,180 @@ def test_jornada_de_verdade_chega_na_visao_mcp_e_servidor_responde_so_o_resumo()
     seq = [s['tool'] for s in aberta['sequencia']]
     assert 'submitOrder' in seq and seq.index('searchOffers') < seq.index('submitOrder')
     assert p.consulta('mcp') is p.consulta('mcp')    # em cache até o próximo recálculo
+
+
+# --- rastro dos agentes de IA -------------------------------------------------------------
+
+def _ia(m):
+    return [e for e in m.eventos() if e['tipo'] == 'ia']
+
+
+def test_cada_modulo_de_ia_vira_o_agente_certo_pelo_prompt_de_sistema():
+    from src.bot import foto, grupo, interpretar, relevancia, tutor, voz
+    assert [painel.agente_do_sistema(s) for s in (interpretar.SISTEMA, foto.SISTEMA, grupo.SISTEMA, relevancia.SISTEMA,
+                                                    relevancia.SISTEMA_VARIOS, tutor.SISTEMA, voz.SISTEMA, 'outro prompt')] == \
+        ['entendimento', 'foto', 'grupo', 'relevancia', 'relevancia', 'tutor', 'voz', 'outro']
+
+
+def test_entendimento_vira_evento_ia_sem_texto_da_pessoa():
+    m = MundoAnotado()
+    from tests.test_fluxo import endereco_pronto
+    endereco_pronto(m)
+    m.enviar('quero leite pra minha vó na rua das flores 529.982.247-25')
+    ia = [e for e in _ia(m) if e['agente'] == 'entendimento'][-1]
+    assert ia['ok'] and ia['modelo'] == 'fake' and isinstance(ia['ms'], int)
+    assert ia['acao'] == 'comprar' and ia['itens'] >= 1
+    tudo = repr(_ia(m))
+    for proibido in ('leite', 'flores', '529', 'vó'):
+        assert proibido not in tudo
+
+
+def test_foto_vira_evento_do_agente_foto_com_o_tipo():
+    m = MundoAnotado()
+    from tests.test_fluxo import endereco_pronto
+    endereco_pronto(m)
+    m.enviar(('foto', 'midia1', 'quero esse'))
+    foto = [e for e in _ia(m) if e['agente'] == 'foto']
+    assert foto and foto[0]['foto'] == 'comida' and foto[0]['parecidos'] == 2
+    assert 'quero esse' not in repr(_ia(m)) and 'bacon' not in repr(_ia(m))
+
+
+def test_ia_fora_do_ar_vira_erro_no_rastro_e_o_bot_segue():
+    m = MundoAnotado()
+    from tests.test_fluxo import endereco_pronto
+    endereco_pronto(m)
+    m.llm.falhar = True
+    antes = len(m.wpp.saida)
+    m.enviar('quero leite')
+    assert len(m.wpp.saida) > antes                    # o bot respondeu do mesmo jeito
+    erro = [e for e in _ia(m) if not e['ok']]
+    assert erro and erro[0]['agente'] == 'entendimento' and erro[0]['erro'] == 'ErroLLM'
+
+
+def test_rastro_quebrado_nao_derruba_o_bot(monkeypatch):
+    class DictQuebrado(dict):
+        def update(self, *a, **kw):
+            raise RuntimeError('modal fora do ar')
+    m = MundoAnotado()
+    m.diario.dic = DictQuebrado()
+    m.enviar('quero leite')
+    assert m.wpp.saida
+
+    def pifou(sistema):
+        raise RuntimeError('mapa de agentes pifou')
+    monkeypatch.setattr(painel, 'agente_do_sistema', pifou)
+    dic = {}
+    gerar = painel.espiar_ia(lambda s, p, e, **kw: ([1, 2], 'm', 0.1), painel.Diario(dic, intervalo=None), '1')
+    assert gerar('x', [], {}) == ([1, 2], 'm', 0.1)   # resposta estranha e agente desconhecido: passa igual
+    [ev] = [v for k, v in dic.items() if k.startswith('ev:')]
+    assert ev['agente'] == 'outro' and ev['ok']
+
+
+def test_modelo_reserva_e_openrouter_aparecem():
+    dic = {}
+    d = painel.Diario(dic, intervalo=None)
+    primeiro = lambda kw: 'gemini-3.5-flash-lite'  # noqa: E731
+    painel.espiar_ia(lambda s, p, e, **kw: ({}, 'gemini-3.5-flash-lite', 1), d, '1', primeiro)('x', [], {})
+    painel.espiar_ia(lambda s, p, e, **kw: ({}, 'gemini-3.1-flash-lite', 1), d, '1', primeiro)('x', [], {})
+    painel.espiar_ia(lambda s, p, e, **kw: ({}, 'openrouter:anthropic/claude-haiku-5.5', 1), d, '1', primeiro)('x', [], {})
+    evs = sorted((v for k, v in dic.items() if k.startswith('ev:')), key=lambda e: e['ts'])
+    assert [e.get('reserva') for e in evs] == [None, True, True]
+    assert evs[2]['modelo'] == 'openrouter:anthropic/claude-haiku-5.5'
+
+    def tudo_caiu(s, p, e, **kw):
+        from src.shared.llm import ErroLLM
+        raise ErroLLM("gemini-3.5-flash-lite: ErroLLM('x HTTP 503: alta demanda') | openrouter a: ErroLLM('y')")
+    try:
+        painel.espiar_ia(tudo_caiu, d, '1', primeiro)('x', [], {})
+    except Exception:  # noqa: BLE001 - o erro sobe igual pro fluxo
+        pass
+    ultimo = max((v for k, v in dic.items() if k.startswith('ev:')), key=lambda e: e['ts'])
+    assert ultimo['ok'] is False and ultimo['erro'] == 'HTTP 503' and ultimo['tentativas'] == 2
+
+
+def test_primeiro_modelo_da_fila(monkeypatch):
+    from src.bot.contexto import _primeiro_modelo
+    from src.shared import llm
+    monkeypatch.setenv('GEMINI_API_KEY', 'k')
+    monkeypatch.delenv('BOT_GEMINI_MODELOS', raising=False)
+    monkeypatch.delenv('BOT_LLM', raising=False)
+    assert _primeiro_modelo({}) == llm.MODELOS[0][0]
+    assert _primeiro_modelo({'modelos': [('gemini-x', 3.0, '')]}) == 'gemini-x'
+    monkeypatch.setenv('GEMINI_API_KEY', '')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'k')
+    monkeypatch.delenv('OPENROUTER_MODELOS', raising=False)
+    assert _primeiro_modelo({}) == f'openrouter:{llm.OPENROUTER_MODELOS[0]}'
+
+
+def test_ouvido_e_voz_viram_agentes():
+    m = MundoAnotado(transcritor=lambda mime, dados: 'quero leite', locutor=lambda texto: None)
+    from tests.test_fluxo import endereco_pronto
+    endereco_pronto(m)
+    m.enviar(('audio', 'a1'))
+    ouvido = [e for e in _ia(m) if e['agente'] == 'ouvido']
+    assert ouvido and ouvido[0]['ok'] and ouvido[0]['modelo'] == 'fake'
+    assert 'leite' not in repr(ouvido)
+    d = painel.Diario({}, intervalo=None)
+    falar = painel.espiar_servico(lambda texto: None, d, '1', 'voz', 'elevenlabs:x')
+    assert falar('oi') is None    # sem áudio: o fluxo manda escrito, o rastro marca que não veio
+    [ev] = [v for k, v in d.dic.items() if k.startswith('ev:')]
+    assert ev['agente'] == 'voz' and ev['ok'] is False and ev['erro'] == 'sem resposta'
+
+
+def test_eventos_ia_nao_mudam_as_sessoes():
+    m = pedido_ate_o_resumo(MundoAnotado())
+    m.tocar('ok:')
+    com = m.eventos()
+    sem = [e for e in com if e['tipo'] != 'ia']
+    assert len(sem) < len(com)
+    assert painel.montar_sessoes(com, agora=m.agora) == painel.montar_sessoes(sem, agora=m.agora)
+
+
+def test_resumo_agentes_uso_regras_e_linha_do_tempo():
+    from src.bot.textos import VITRINE_TOPO
+    eventos = [{'ts': 1, 'wa': '1', 'tipo': 'entrada', 'texto': 'oi', 'formato': 'Texto'},
+               {'ts': 2, 'wa': '1', 'tipo': 'saida', 'texto': VITRINE_TOPO, 'formato': 'Cards'},
+               {'ts': 10, 'wa': '1', 'tipo': 'entrada', 'texto': 'quero pizza', 'formato': 'Texto'},
+               {'ts': 11, 'wa': '1', 'tipo': 'ia', 'agente': 'entendimento', 'modelo': 'g1', 'ok': True, 'ms': 800, 'acao': 'comprar', 'itens': 1},
+               {'ts': 12, 'wa': '1', 'tipo': 'mcp', 'tool': 'searchOffers', 'ok': True, 'ms': 300},
+               {'ts': 13, 'wa': '1', 'tipo': 'ia', 'agente': 'relevancia', 'modelo': 'g2', 'reserva': True, 'ok': True, 'ms': 1200, 'mantidas': 3},
+               {'ts': 14, 'wa': '1', 'tipo': 'ia', 'agente': 'relevancia', 'ok': False, 'ms': 4000, 'erro': 'timeout'},
+               {'ts': 15, 'wa': '1', 'tipo': 'saida', 'texto': 'Achei estas', 'formato': 'Cards'},
+               {'ts': 200, 'wa': '1', 'tipo': 'saida', 'texto': 'Ainda está por aí?', 'formato': 'Botões', 'origem': 'followup'},
+               {'ts': 201, 'wa': '1', 'tipo': 'saida', 'texto': 'Qual?', 'formato': 'Botões', 'origem': 'followup'},
+               {'ts': 900, 'wa': '1', 'tipo': 'saida', 'texto': 'Esvaziei', 'formato': 'Botões', 'origem': 'followup'}]
+    rotulos = {}
+    [s] = painel.montar_sessoes(eventos, agora=1000, rotulos=rotulos)
+    r = painel.resumo_agentes(eventos, rotulos)
+    assert r['total'] == 3
+    por = {a['agente']: a for a in r['agentes']}
+    assert set(painel.AGENTES) <= set(por)              # todos aparecem, mesmo sem chamada
+    assert por['relevancia']['chamadas'] == 2 and por['relevancia']['pct'] == 66.7
+    assert por['relevancia']['erros'] == 1 and por['relevancia']['msMax'] == 4000 and por['relevancia']['reserva'] == 1
+    assert por['entendimento']['modelos'] == [{'modelo': 'g1', 'n': 1}] and por['foto']['chamadas'] == 0
+    regras = {x['agente']: x['disparos'] for x in r['regras']}
+    assert regras == {'followup': 2, 'recorrencia': 0, 'vitrine': 1}   # 200 e 201 são o mesmo disparo
+    assert r['linha'] is None
+    aberta = painel.resumo_agentes(eventos, rotulos, conversa=s['id'])
+    assert [p['tipo'] for p in aberta['linha'][:9]] == ['mensagem', 'regra', 'resposta', 'mensagem', 'ia', 'mcp', 'ia', 'ia', 'resposta']
+    assert aberta['linha'][4]['resumo'] == {'acao': 'comprar', 'itens': 1}
+    assert 'quero pizza' not in repr(aberta) and 'Achei estas' not in repr(aberta)
+
+
+def test_servidor_responde_agentes_da_jornada_de_verdade():
+    from src.painel.servidor import DictTravado, Painel
+    import json
+    m = pedido_ate_o_resumo(MundoAnotado(diario_dic=DictTravado()))
+
+    class Fonte:
+        nome, estado = 'demo', 'pronto'
+
+        def novos(self, vistos):
+            return m.painel.novos(vistos)
+    p = Painel(Fonte())
+    p.girar()
+    r = json.loads(p.consulta('agentes'))
+    assert r['total'] == len(_ia(m)) > 0 and r['conversasLista'][0]['ia'] == r['total']
+    aberta = json.loads(p.consulta('agentes', conversa=r['conversasLista'][0]['id']))
+    tipos = [x['tipo'] for x in aberta['linha']]
+    assert tipos[0] == 'mensagem' and 'ia' in tipos and 'mcp' in tipos and tipos[-1] == 'resposta'

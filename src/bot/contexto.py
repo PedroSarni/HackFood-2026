@@ -172,6 +172,14 @@ def chamador_real(armazem, wa_id):
     return chamar
 
 
+def _primeiro_modelo(kw):
+    """1º da fila do llm.gerar_json: se outro modelo respondeu, a fila caiu pro reserva."""
+    if not llm._cfg('GEMINI_API_KEY') or llm._cfg('BOT_LLM') == 'openrouter':
+        fila = llm._fila_openrouter()
+        return f'openrouter:{fila[0]}' if fila else None
+    return (kw.get('modelos') or llm._modelos())[0][0]
+
+
 def contexto_producao(estado, wpp, wa_id=None, origem=None):
     """`origem` marca as mensagens no diário do painel ('rastreio' = aviso de status do pedido)."""
     import modal
@@ -201,11 +209,22 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
             ifood_mcp.revogar(_cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET'),
                               tok.get('refresh_token') or tok.get('access_token', ''))
 
-    ctx = Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador,
-                    gerar_json=lambda s, p, e, **kw: llm.gerar_json(s, p, e, **kw),
+    def gerar(s, p, e, **kw):
+        return llm.gerar_json(s, p, e, **kw)
+
+    transcritor = scribe.transcrever if scribe.ligado() else None
+    locutor = voz.falar if voz.ligado() else None
+    if wa_id:  # rastro dos agentes no painel: quem pensou, com qual modelo, quanto demorou
+        gerar = painel.espiar_ia(gerar, diario, wa_id, primeiro=_primeiro_modelo)
+        if transcritor:
+            transcritor = painel.espiar_servico(transcritor, diario, wa_id, 'ouvido',
+                                                'elevenlabs:' + scribe._cfg('SCRIBE_MODELO', 'scribe_v2'))
+        if locutor:
+            locutor = painel.espiar_servico(locutor, diario, wa_id, 'voz',
+                                            'elevenlabs:' + voz._cfg('VOZ_MODELO', voz.MODELO_PADRAO))
+    ctx = Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador, gerar_json=gerar,
                     link_login=modulo_app.novo_link_login, iniciar_rastreio=rastrear,
                     recorrencias=rec, revogar=revogar, geocoder=geocoder.normalizar,
-                    agendar_lembrete=lembrar, transcritor=scribe.transcrever if scribe.ligado() else None,
-                    locutor=voz.falar if voz.ligado() else None)
+                    agendar_lembrete=lembrar, transcritor=transcritor, locutor=locutor)
     ctx.diario = diario
     return ctx

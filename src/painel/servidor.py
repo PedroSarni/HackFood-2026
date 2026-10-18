@@ -17,6 +17,7 @@ não tem login de admin.
 GET /api/sessoes?fonte=real|demo  -> {fonte, estado, agora, sessions}   (foto do momento)
 GET /api/stream?fonte=real|demo   -> text/event-stream                  (a foto de novo a cada mudança)
 GET /api/mcp?fonte=&dias=&conversa= -> uso do MCP por tool, tools nunca chamadas, sequência da conversa
+GET /api/agentes?fonte=&dias=&conversa= -> uso dos agentes de IA e das regras, linha do tempo da conversa
 GET /api/saude
 """
 import argparse
@@ -31,7 +32,7 @@ from src.shared import painel
 
 RECALCULO = 20       # s: status muda com o relógio (carrinho vira abandonado após 30 min) mesmo sem evento novo
 ENVIO_MIN = 1.5      # s entre fotos no SSE: a demo tem MBs e muda toda hora
-DEMO = {'dias': 30, 'conversas': 900, 'semente': 17, 'versao': 2}
+DEMO = {'dias': 30, 'conversas': 900, 'semente': 17, 'versao': 3}  # 3: a demo ganhou o rastro dos agentes
 CACHE_DEMO = os.path.join(tempfile.gettempdir(), 'hackfood-painel-demo-v{versao}-{dias}d-{conversas}-{semente}.json'.format(**DEMO))
 
 
@@ -184,7 +185,7 @@ class Painel:
         return mudou
 
     def consulta(self, nome, dias=None, conversa=None):
-        """Agregado pronto pro dash (`mcp`), em cache até o próximo recálculo: o navegador nunca
+        """Agregado pronto pro dash (`mcp` ou `agentes`), em cache até o próximo recálculo: o navegador nunca
         recebe o diário inteiro, só o resumo e a conversa aberta."""
         eventos, rotulos, sessoes, carimbo = self._base
         chave = (carimbo, nome, dias, conversa)
@@ -194,7 +195,8 @@ class Painel:
             de = time.time() - float(dias) * 86400 if dias else None
             dados = {'fonte': self.fonte.nome, 'estado': self.fonte.estado, 'agora': time.time(),
                      'conversa': conversa, 'conversasLista': painel.indice_conversas(eventos, rotulos, sessoes, de)}
-            dados.update(painel.resumo_mcp(eventos, rotulos, de, conversa))
+            resumo = painel.resumo_agentes if nome == 'agentes' else painel.resumo_mcp
+            dados.update(resumo(eventos, rotulos, de, conversa))
             self._cache[chave] = json.dumps(dados, ensure_ascii=False)
         return self._cache[chave]
 
@@ -246,6 +248,13 @@ def criar_api(paineis):
         if not p:
             return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
         return Response(p.consulta('mcp', dias, conversa or None), media_type='application/json')
+
+    @api.get('/api/agentes')
+    async def agentes(fonte: str = 'real', dias: float | None = None, conversa: str | None = None):
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+        return Response(p.consulta('agentes', dias, conversa or None), media_type='application/json')
 
     @api.get('/api/saude')
     async def saude():
