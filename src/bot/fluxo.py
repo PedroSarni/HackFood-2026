@@ -2541,7 +2541,15 @@ class Bot:
         u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None, 'grupo': None,
                   'kit': None, 'grupo_pendente': None, 'foto': None, 'plano': None, 'troca_de': None,
                   'listas': {}, 'lista_atual': None, 'visiveis': [], 'sugeridos': None})
+        # 18/10 10h36 (Fabio): "1 kg de carne toda semana" cancelado às 08h18 ficou como modelo do automático e,
+        # 2 h depois, o kit churrasco do Beto virou recorrência semanal sem ninguém pedir. Cancelar cancela tudo.
+        self._esquecer_agendamento()
         self.menu(T.CANCELADO if tinha else 'Tudo bem! 🙂')
+
+    def _esquecer_agendamento(self):
+        """Joga fora o "todo dia às 7h" que ainda não virou lembrete (modelo, agendar-depois e hora)."""
+        for k in ('agendar_modelo', 'agendar_depois', 'agendar_hora'):
+            self.u.pop(k, None)
 
     # ================================================================== depois do pedido
 
@@ -2945,6 +2953,7 @@ class Bot:
         if pessoas == 1:  # "pra mim só": pedido normal
             self.iniciar_compra([tema] + extras)
             return
+        self._esquecer_agendamento()  # kit pra galera nunca é o "todo dia às 7h" de antes
         self._montar_kit(pessoas, tema, extras, ajuste, teto=teto)
 
     def grupo_pessoas(self, arg):
@@ -3034,6 +3043,7 @@ class Bot:
             return
         if not self.garantir_endereco({'acao': 'botao', 'botao': f'kit:ok:{k.get("id")}'}):
             return
+        self._esquecer_agendamento()  # o kit aceito é compra de hoje, não modelo de recorrência
         car = u.get('carrinho') or {}
         linhas = [{'item_id': lin['item_id'], 'qtd': lin['qtd'], 'opcoes': lin['opcoes'], 'obs': None}
                   for lin in k['linhas']]

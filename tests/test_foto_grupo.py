@@ -556,3 +556,33 @@ def test_foto_sem_relacao_no_meio_dos_cards_limpa_os_restos():
     m.wpp.limpar()
     m.enviar('sim')
     assert 'Qual deles' not in textos(m)  # o "sim" não cai nos cards antigos
+
+
+def test_automatico_cancelado_nao_gruda_no_kit_de_depois():
+    """18/10 10h36 (Fabio): "1 kg de carne toda semana" -> cancelar -> 2 h depois "churrasco pra 13": o kit aceito
+    virou recorrência semanal ("toda semana eu te chamo...") sem ninguém pedir, porque o modelo do automático
+    sobrevivia ao cancelar. Cancelar esquece o agendamento, e o kit aceito é compra de hoje."""
+    m = pronto(Mundo())
+    m.enviar('todo dia as 7h quero pao')
+    assert m.estado().get('agendar_modelo')
+    m.enviar('cancelar')
+    assert not m.estado().get('agendar_modelo') and not m.estado().get('agendar_hora')
+    m.wpp.limpar()
+    m.enviar('quero lanchar em 5 pessoas hamburguer')
+    kit_na_tela(m)
+    m.tocar('kit:ok')
+    m.tocar('fim')
+    assert not m.recs_dic.get(m.wa)                      # nenhum lembrete criado
+    assert 'eu te chamo' not in textos(m) and m.estado()['carrinho']  # o carrinho segue pro fechamento normal
+
+
+def test_kit_novo_esquece_automatico_pendente_mesmo_sem_cancelar():
+    m = pronto(Mundo())
+    m.enviar('todo dia as 7h quero pao')
+    assert m.estado().get('agendar_modelo')
+    m.wpp.limpar()
+    m.enviar('quero lanchar em 5 pessoas hamburguer')
+    kit_na_tela(m)
+    m.tocar('kit:ok')
+    m.tocar('fim')
+    assert not m.recs_dic.get(m.wa) and 'eu te chamo' not in textos(m)
