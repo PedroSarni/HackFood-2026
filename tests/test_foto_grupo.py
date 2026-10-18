@@ -403,7 +403,7 @@ def test_comida_que_nao_tem_perto_explica_e_pergunta_outra():
 
 def test_pessoas_conta_quem_esta_escrevendo():
     casos = {'quero lanchar em 5 pessoas hamburguer': 5, 'eu e mais 3 vamos pedir pizza': 4,
-             'pizza com 4 amigos': 5, 'eu e 2 amigos': 3, 'pizza pra 4': 4, 'somos 6 aqui': 6,
+             'pizza com 4 amigos': 4, 'com mais 4 amigos': 5, 'estou com 13 amigos': 13, 'eu e 2 amigos': 3, 'pizza pra 4': 4, 'somos 6 aqui': 6,
              'eu e minha esposa': 2, 'um casal': 2, 'familia de 4': 4, 'cinco pessoas': 5,
              'quero 2 desse pra mim e mais 3 amigos': 4, 'quero 2 pizzas': None, 'pão e leite': None}
     for texto, n in casos.items():

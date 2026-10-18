@@ -269,7 +269,7 @@ diz o que ela é:
 ## 9.2 Dividir com os amigos: o kit em grupo (src/bot/grupo.py)
 
 "Quero lanchar em 5 pessoas hambúrguer", "pizza pra 4 dividindo", "eu e mais 3 vamos rachar uma pizza" =
-`acao=grupo`. O número de pessoas conta quem escreve ("com 4 amigos" = 5). Falta algo? O bot pergunta só o
+`acao=grupo`. O número dito é o grupo ("com 13 amigos" = 13; 18/10 09h21 virava 14); só "eu e mais 3" soma quem fala. Falta algo? O bot pergunta só o
 que falta (quantas pessoas, com botões 2/4/6 ou o número escrito; ou o que querem comer). Mais de 30 pessoas
 pede outro número; 1 pessoa vira pedido normal.
 

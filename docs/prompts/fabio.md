@@ -773,3 +773,13 @@ bandeja. Agora `textos.na_embalagem` lê quantas unidades vêm na embalagem ("D�
 "Caixa com 10 comprimidos") e `em_embalagens` converte o que a pessoa disse: 12 ovos numa dúzia = 1, 30 ovos em
 bandeja de 12 = 3; se ela já falou em bandeja/caixa/pacote, fica como disse. A mensagem avisa: "Coloquei *1 dúzia
 de Ovos...* (dá os 12 que você pediu)". Teste em `tests/test_pecas.py`; deploy.
+
+## 2026-10-18 ~09h25 — "com 13 amigos" virou kit pra 14
+
+**Prompt:** "[print: áudio e 'Montando um kit de carne pra 14 pessoas'] MANO EU PEDI UM KIT PRA 13 PESSOAS ELE ACHOU
+QUE ERA 14, DE ONDE?"
+
+**Resposta:** O áudio foi "eu estou com 13 amigos e a gente tem R$ 300 pra churrasco". A regra (prompt da Lia e
+`pessoas_em`) somava quem fala em "com N amigos" (= N+1), igual ao "eu e mais 3". Agora o número dito é o grupo:
+"com 13 amigos" = 13; só "eu e mais 3" / "com mais 3 amigos" somam quem fala (quem quiser corrige com "agora
+somos 14"). Prompt, regra, testes, script de validação e docs atualizados; deploy.

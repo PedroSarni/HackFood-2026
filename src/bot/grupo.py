@@ -62,11 +62,13 @@ GRUPO = re.compile(r'\b(dividir|divide|rachar|racha|galera|pessoas|amig\w*|turma
                    r'por pessoa|pra cada|convidad\w*|pessoal)\b')
 
 _N = r'(\d{1,2}|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|quinze|vinte)'
-# a ordem importa: "eu e mais 3" e "com 4 amigos" contam quem está escrevendo
+# a ordem importa. O número dito é o grupo: "com 13 amigos" = 13 (18/10 09h21: virava 14, e quem fala corrige
+# com "agora somos 14" se quiser). Só "eu e mais 3" / "com mais 3 amigos" somam quem está falando.
 _PESSOAS = [
     (re.compile(rf'\beu e mais {_N}\b'), 1),
     (re.compile(rf'\b(?:eu|mim|nos) e (?:mais )?{_N} (?:amig|colega|pesso|filh|net|prim|parent|irma)'), 1),
-    (re.compile(rf'\bcom (?:mais )?{_N} (?:amig|colega|pesso|filh|net|prim|parent|irma|convidad)'), 1),
+    (re.compile(rf'\bcom mais {_N} (?:amig|colega|pesso|filh|net|prim|parent|irma|convidad)'), 1),
+    (re.compile(rf'\bcom {_N} (?:amig|colega|pesso|filh|net|prim|parent|irma|convidad)'), 0),
     (re.compile(rf'\b{_N} (?:pessoas?|amig\w*|convidad\w*|adultos?|cabecas)\b'), 0),
     (re.compile(rf'\b(?:somos|seremos|estamos em|vamos ser|em|pra|para|familia de|entre) {_N}\b'), 0),
 ]
