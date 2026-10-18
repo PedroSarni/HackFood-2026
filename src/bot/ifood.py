@@ -195,12 +195,15 @@ class Ifood:
                 # taxa da loja na busca: o kit em grupo (src/bot/grupo.py) já mostra o total com entrega
                 'taxa_entrega': _num(_campo(entrega, 'promotionalFee', 'fee'))}
 
-    def buscar(self, termo, endereco, tipo_loja, loja_id=None, pagina=None):
+    def buscar(self, termo, endereco, tipo_loja, loja_id=None, pagina=None, preco_max=None):
         """searchOffers só com o termo descritivo; vertical no merchantType e o resto em
-        refinements (regra da doc). Devolve (ofertas, token_da_proxima_pagina)."""
+        refinements (regra da doc: "barato" nunca vai na query, vai no maxItemPrice).
+        Devolve (ofertas, token_da_proxima_pagina)."""
         refin = {'onlyOpen': True, 'requiredDeliveryMethod': 'DELIVERY'}
         if loja_id:
             refin['merchantId'] = loja_id
+        if preco_max:
+            refin['maxItemPrice'] = float(preco_max)
         d = self._chamar('searchOffers', query=termo, resultKind='ITEM', userLocation=self._local(endereco),
                          merchantType=TIPO_LOJA.get(tipo_loja, 'GROCERIES'), refinements=refin,
                          pageSize=TAMANHO_PAGINA, nextPageToken=pagina)

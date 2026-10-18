@@ -17,7 +17,7 @@ import traceback
 
 from src.bot import foto as leitor_foto
 from src.bot import grupo as kit_grupo
-from src.bot import ranking, relevancia, tutor, voz
+from src.bot import ranking, relevancia, tutor, vitrine, voz
 from src.bot import textos as T
 from src.bot.combina import complementos
 from src.bot.ifood import PrecisaLogin
@@ -192,6 +192,7 @@ class Bot:
                     self.botao(pend['botao']) if pend.get('acao') == 'botao' else self.intencao(pend)
                 else:
                     self.perguntar(T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
+                    self._mostrar_vitrine()
             self._protegido(seguir)
         finally:
             self._falar_rodada()
@@ -482,6 +483,68 @@ class Bot:
         if prefixo:
             texto += '\n\n' + T.PERGUNTA_PEDIDO
         self.perguntar(texto, self._menu(), fase='pedido')
+        if not prefixo:  # o "oi": boas-vindas curtinha e a vitrine do gosto da pessoa logo embaixo
+            self._mostrar_vitrine()
+
+    # ================================================================== vitrine (src/bot/vitrine.py)
+
+    def _mostrar_vitrine(self):
+        """Carrossel de ideias montado pelos agentes. Nunca atrapalha o menu: sem endereço com
+        coordenada, sem produto ou com erro, simplesmente não aparece."""
+        u = self.u
+        try:
+            vit = u.get('vitrine') or {}
+            if not vit.get('cards') or self.ctx.agora() - float(vit.get('quando') or 0) > vitrine.VALIDADE:
+                end = self._endereco_pra_vitrine()
+                if not end:
+                    return
+                api = self.ctx.ifood(self.wa)
+                try:
+                    recentes = [] if self.ctx.armazem.get(f'hist:{self.wa}') else api.pedidos_recentes(end)
+                except ErroMCP:
+                    recentes = []
+                cards = vitrine.montar(api, end, self.ctx.armazem.get(f'hist:{self.wa}'), recentes,
+                                       self.ctx.agora(), FOTO_PADRAO)
+                vit = {'cards': cards, 'quando': self.ctx.agora()}
+                u['vitrine'] = vit
+            cards = vit['cards']
+            if len(cards) < 2:
+                return
+            self.wpp.carrossel(self.wa, T.VITRINE_TOPO,
+                               [(c['imagem'], T.card_vitrine(c), [(f'vit:{i}', c['botao'])]) for i, c in enumerate(cards)])
+        except ErroWhatsApp as e:
+            print(f'vitrine recusada: {e}')
+            return
+        except Exception:  # noqa: BLE001 - vitrine é bônus: o menu já foi
+            traceback.print_exc()
+            return
+        # "lanches", "o de descontos", "até 35" falado ou escrito também escolhe o card
+        p = u.get('pergunta') or {}
+        p['botoes'] = (p.get('botoes') or []) + [[f'vit:{i}', c['titulo']] for i, c in enumerate(cards)]
+        p['titulos'] = (p.get('titulos') or []) + [c['titulo'] for c in cards]
+        u['pergunta'] = p
+
+    def _endereco_pra_vitrine(self):
+        """O endereço em uso; senão o salvo no iFood que já tem coordenada (só pra mostrar ideias,
+        sem perguntar nada: a escolha de verdade continua no garantir_endereco)."""
+        end = self.u.get('endereco')
+        if end and end.get('lat') is not None:
+            return end
+        try:
+            ends = self.ctx.ifood(self.wa).enderecos()
+        except ErroMCP:
+            return None
+        return next((e for e in ends if e.get('ultimo') and e.get('lat') is not None),
+                    next((e for e in ends if e.get('lat') is not None), None))
+
+    def escolher_vitrine(self, arg):
+        try:
+            card = (self.u.get('vitrine') or {}).get('cards', [])[int(arg)]
+        except (ValueError, IndexError, TypeError):
+            self.repetir_pergunta(T.BOTAO_VELHO)
+            return
+        self.u['ultima_acao'] = ['botao', f'vit:{arg}']
+        self.iniciar_compra([dict(card['pedido'])])
 
     def _menu(self):
         """Botões do menu: "Fazer pedido" sempre; os atalhos só quando levam a algo."""
@@ -516,6 +579,7 @@ class Bot:
             'lem': self.responder_lembrete, 'pular': self.pular_item, 'reped': self.repetir_pedido,
             'apagar_sim': self.apagar, 'apagar_nao': self.menu, 'login': self.reenviar_login,
             'tentar': self.tentar_de_novo, 'sugerir': self.sugerir, 'nada': lambda _a=None: None,
+            'vit': self.escolher_vitrine,
             'foto': self.responder_foto, 'kit': self.responder_kit, 'grupo_n': self.grupo_pessoas,
         }
         fn = rotas.get(acao)
@@ -1254,7 +1318,10 @@ class Bot:
         ofertas, proxima = [], None
         for consulta in dict.fromkeys(x for x in (pedido.get('busca'), pedido['termo']) if x):
             achadas, proxima = self.ctx.ifood(self.wa).buscar(
-                consulta, self.u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
+                consulta, self.u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id,
+                preco_max=pedido.get('preco_max'))
+            if pedido.get('so_promo'):  # card "Descontos pra você": só o que está com preço baixado
+                achadas = [o for o in achadas if o.get('preco_antigo') and o['preco_antigo'] > (o.get('preco') or 0)]
             ofertas = ranking.ordenar(relevancia.filtrar(self.ctx.llm, achadas, pedido), pedido)
             if pedido.get('sugestao'):
                 ofertas = _sugeridas(ofertas, pedido['sugestao'])
@@ -1339,7 +1406,8 @@ class Bot:
             if lst.get('proxima'):  # acabou o que já veio: aí sim busca a página seguinte
                 novas, prox = self.ctx.ifood(self.wa).buscar(
                     (lst.get('pedido') or {}).get('consulta_usada') or lst['termo'], u['endereco'], lst.get('tipo_loja') or 'MERCADO',
-                    loja_id=lst.get('loja_id'), pagina=lst['proxima'])
+                    loja_id=lst.get('loja_id'), pagina=lst['proxima'],
+                    preco_max=(lst.get('pedido') or {}).get('preco_max'))  # "até R$ 35" vale na página 2
                 ja = {o['item_id'] for o in lst['ofertas']}
                 novas = relevancia.filtrar(self.ctx.llm, novas, lst.get('pedido') or {'termo': lst['termo']})
                 lst['ofertas'] += [o for o in ranking.ordenar(novas, lst.get('pedido') or {}) if o['item_id'] not in ja]

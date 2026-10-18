@@ -307,3 +307,9 @@ está e etc"
 pedir de novo. Agora vem o status inteiro: onde está, quando chega em horário ("entre 23h46 e 23h56"), loja,
 número, código de entrega, o que vem e o total, com o botão *Atualizar status*. Quem já pediu vê *Fazer novo
 pedido* no lugar de *Fazer pedido*.
+
+## 2026-10-18 01:20 — primeira mensagem simplesinha com vitrine do gosto da pessoa
+
+**Prompt:** pra primeira mensagem deixe ela bem simplesinha e ja meta umas recomendacoes pra chamar atencao do cliente de acordo com os gostos dele, algo assim [prints do Ailo do iFood: carrossel "Tô afim de Lanches", "Quero pratos até R$ 45", "Descontos pra você"] faça essas categorias de recomendação feitas com agentes internos nossos
+
+**Resposta:** Claim `bot-welcome-showcase`. O "oi" agora é "Oi, Fabio! 😊 O que você quer pedir hoje? Pode escrever ou mandar áudio." e logo embaixo um carrossel montado por agentes internos (`src/bot/vitrine.py`): gosto (histórico nosso ou pedidos do app), hora do dia, precinho (maxItemPrice) e descontos (preço promocional real). Foto de produto real em cada card, no máximo 3 buscas por vitrine, guardada 20 min. Tocar ou falar o card busca aquilo com o mesmo teto/filtro. No modo áudio vira fotos numeradas + áudio.

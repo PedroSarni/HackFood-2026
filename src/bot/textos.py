@@ -60,9 +60,17 @@ MENU = [B_PEDIR, B_REPETIR, B_MEU_PEDIDO]
 
 
 def boas_vindas(nome):
-    oi = f'Olá, {nome}! 👋' if nome else 'Olá! 👋'
-    return (f'{oi}\nEu faço suas compras do iFood aqui pelo WhatsApp: mercado, farmácia, '
-            'restaurante...\n\nÉ só me escrever o que você precisa. ✍️')
+    """Bem simplesinha (17/10, pedido do Fabio): as ideias vêm logo embaixo, na vitrine."""
+    oi = f'Oi, {nome}! 😊' if nome else 'Oi! 😊'
+    return f'{oi}\nO que você quer pedir hoje? Pode escrever ou mandar áudio.'
+
+
+VITRINE_TOPO = 'Separei umas ideias pra você 👇'
+
+
+def card_vitrine(card):
+    """Card da vitrine (src/bot/vitrine.py): título em negrito e uma linha; 160 caracteres, 2 quebras."""
+    return f'*{card["titulo"]}*\n{card["texto"]}'
 
 
 LOGIN = ('🔐 Primeiro, preciso que você entre na sua conta do iFood.\n\n'
