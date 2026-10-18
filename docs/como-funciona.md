@@ -417,6 +417,21 @@ o bot cutuca uma vez ("Ainda está por aí?" + a pergunta da etapa); aos 5 min (
 No ar: `https://fabio-araujo-silva--hackfood-bot.us-east.modal.run` (`/saude`, `/termos`,
 `/privacidade`, `/whatsapp` é o webhook).
 
+### 13.1 O painel (dash do time)
+
+O bot anota um diário (`src/shared/painel.py`, modal.Dict `hackfood-painel`) com espiões na borda; o fluxo
+não sabe que existe e o registro nunca derruba o bot. Tipos de evento: `entrada`, `saida`, `mcp` (tool,
+ok, ms, erro, resumo) e `ia` (agente, modelo que respondeu, se caiu pro reserva, ms, ok/erro e só contagens:
+a ação entendida, o tipo da foto, quantos itens). Texto da pessoa, endereço, telefone e CPF não entram no `ia`.
+Agentes de IA: entendimento, foto, kit em grupo, relevância/sugestão, tutor, voz (roteiro + ElevenLabs) e
+ouvido (Scribe). Follow-up, recorrência e vitrine são **regras** sem IA, reconhecidas pela mensagem que mandaram.
+
+O servidor local (`python -m src.painel.servidor`, só em 127.0.0.1) lê o diário e **agrega lá**: o navegador
+recebe só o resumo e a conversa aberta (`/api/mcp`, `/api/agentes`). No dash (`Frontend/Rascunho_Dash`,
+`npm run dev`): "Uso do MCP" (por tool, tools da doc nunca chamadas, sequência por conversa) e "Agentes"
+(uso por agente, regras, linha do tempo mensagem → entendimento → código chamando especialistas e iFood →
+resposta). A fonte "Demonstração" é simulada e vem sempre com esse rótulo.
+
 ---
 
 ## 14. Limitações conhecidas (entram no entregável 06)

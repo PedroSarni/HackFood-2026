@@ -26,8 +26,16 @@ fluxo da conversa, compra, CPF, confirmação ou login, e o que o `espiar_mcp` g
 
 ## Peças compartilháveis que vou criar
 
-- `src/shared/painel.py` — `espiar_ia(gerar, diario, wa_id)`, `espiar_servico(fn, diario, wa_id, agente, modelo)`, `resumo_mcp(...)`, `resumo_agentes(...)` — em implementação
+- `src/shared/painel.py` — `espiar_ia(gerar, diario, wa_id, primeiro=None)`, `espiar_servico(fn, diario, wa_id, agente, modelo)`, `resumo_mcp(eventos, rotulos, de, conversa)`, `resumo_agentes(...)`, `indice_conversas(...)` — pronto
 
 ## Onde está (preencher ao terminar)
 
-- 
+Fase 1 (1A + 1B) pronta; fase 2 (liga/desliga) só quando o Davi pedir, por isso o claim segue ativo.
+
+- `src/shared/painel.py` — `espiar_ia`, `espiar_servico`, `agente_do_sistema`, `AGENTES`, `REGRAS`, `regra_da_saida`,
+  `resumo_mcp`, `resumo_agentes`, `indice_conversas`, `tools_da_doc`; `montar_sessoes(..., rotulos=None)`
+- `src/bot/contexto.py` — `contexto_producao` liga o espião de IA (Gemini/OpenRouter, Scribe, ElevenLabs); `_primeiro_modelo`
+- `src/painel/servidor.py` — `GET /api/mcp`, `GET /api/agentes`, `Painel.consulta()` (cache por recálculo)
+- `src/painel/simulador.py` — a demo também espiona a IA de mentira
+- `Frontend/Rascunho_Dash/agentes.jsx` — `<McpPage />`, `<AgentsPage />`; `telemetria.js` — `useSummary()`, `summaryUrl()`
+- `tests/test_painel.py`, `Frontend/Rascunho_Dash/tests/agentes.test.jsx`

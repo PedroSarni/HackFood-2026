@@ -151,4 +151,7 @@ sem me perguntar."
 
 **Resposta:** claim dash-agentes-mcp. Fase 1A: `resumo_mcp`/`indice_conversas` em painel.py, rota `/api/mcp`
 no servidor local (agrega no servidor, em cache por recálculo: 31 KB pra 32 mil eventos da demo, em 44 ms) e
-página "Uso do MCP" no dash. O que o espiar_mcp grava não mudou.
+página "Uso do MCP" no dash. O que o espiar_mcp grava não mudou. Fase 1B: `espiar_ia`/`espiar_servico`
+ligados em `contexto_producao` (agente reconhecido pelo prompt de sistema, sem tocar no fluxo), evento `ia`
+só com contagens, rota `/api/agentes` e aba "Agentes". Seção 13.1 em como-funciona.md. Sem deploy; fase 2
+espera o Davi.
