@@ -1,7 +1,7 @@
 ---
 slug: docs-vivos
 owner: Davi de Alcantara Lima
-status: active
+status: done
 started: 2026-10-17 16:55
 ---
 
@@ -34,4 +34,9 @@ O Fabio também edita docs/estado.md: mudança mínima, commit só daquilo, pull
 
 ## Onde está (preencher ao terminar)
 
-- 
+- `docs/estado.md` e `docs/decisoes.md` — estado e diário do time, atualizados até 18/10 11h30
+- `docs/contexto-evento.md` — regras do evento e §8 de bugs do MCP (alimenta o 06)
+- `docs/entregaveis/01-proposta-de-negocio.md` a `06-feedback-mcp.md` — os seis entregáveis
+- `docs/entregaveis/entrega-unica.md` — os seis juntos mais os anexos A (cronologia) e B (limitações); `docs/entregaveis/prints/` — prints do dash
+- `docs/qa-18-10.md` — QA manual de 18/10; `docs/prompts/davi.md` — diário de prompts
+- Pendente fora deste claim: prints A1 a A9, formato final da entrega, pitch (ver `docs/estado.md`)

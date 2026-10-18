@@ -382,3 +382,13 @@ antes de commitar."
 
 **Resposta:** B1 a B5 substituídos no 04 e no entrega-unica.md; B7 entrou sob o B1 (texto fala de prompt) e B6 sob o
 B3 (texto fala de funil). B8 e B9 sem lugar natural. Nota [PREENCHER] sob o B4. A1 a A9 seguem pendentes.
+
+## 2026-10-18 11:30 — estado.md fiel ao repo e claim docs-vivos fechado
+
+**Prompt:** "Tarefa: atualizar docs/estado.md para refletir o estado REAL do projeto agora (18/10, manhã), usando só o
+que está no repositório [...] O que não conseguir confirmar vai numa seção "Não confirmado" [...] Feche o claim
+docs-vivos [...] Não edite nada fora de docs/estado.md e do claim docs-vivos [...] me liste (sem editar): outros docs
+que ainda citam informação desatualizada."
+
+**Resposta:** estado.md ganhou "Mudou desde as 05h10" (com commits), "Não confirmado", itens D7 a D10, E4 e H13; D1 a
+D6 marcados. Claim docs-vivos virou done. Lista de docs desatualizados no chat. Sem deploy.
