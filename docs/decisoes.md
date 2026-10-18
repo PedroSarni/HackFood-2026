@@ -3,6 +3,8 @@
 > Formato: - [HH:MM] Decisão — motivo — quem decidiu. Mais novo no topo.
 > Registrar na hora, não depois.
 
+- [23h14] O abandono só esquece o carrinho local, não chama o iFood — Fabio (registrado por Davi)
+- [23h14] Carrinho abandonado esquece aos 5 min, após follow-up aos 3; substitui a regra de que o resumo não expira — Fabio (registrado por Davi)
 - [21h15] Pendente: o botão "Tentar de novo" após 2 falhas reenvia o mesmo endereço; sugerido trocar por "Cadastrar outro" — decisão do Fabio
 - [21h15] Botões antigos não expiram: toque é resposta explícita e segue o caminho normal — Davi (4797590)
 - [21h15] CPF digitado depois de expirar é descartado e volta só o menu — CPF nunca vai pra IA — Davi (4797590)

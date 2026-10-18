@@ -347,6 +347,10 @@ A etapa atual (`u['fase']`) é o que o fluxo usa pra saber o que fazer com a pr�
 `inicio`, `pedido`, `endereco`, `escolhendo`, `quantidade`, `opcao`, `mais`, `pagamento`, `cpf`,
 `confirmar`, `acompanhando`, `recorrencia`, etc.
 
+Quem cala: rodada que termina com pergunta aberta ou itens no carrinho dispara `pessoa_calada` (`src/app.py`). Aos 3 min (`FOLLOWUP_SEG`)
+o bot cutuca uma vez ("Ainda está por aí?" + a pergunta da etapa); aos 5 min (`ABANDONO_SEG`), ainda calada e com itens, esquece o carrinho
+(só o local, sem chamar o iFood) e volta ao menu, até no resumo. Nada disso muda `u['ultima_msg']`: a volta depois de 30 min (`IDLE_MAX`) segue igual.
+
 ---
 
 ## 12. Credenciais e modos
