@@ -3,7 +3,8 @@ fica pra cada um.
 
 Como o kit é montado (`montar`), sempre na MESMA loja, porque o iFood fecha um pedido por loja:
 1. busca o prato principal e agrupa as ofertas por loja, na ordem do iFood (fica guardado pro
-   "Outra loja", que não busca de novo);
+   "Outra loja", que não busca de novo); as lojas que têm tudo o que a pessoa pediu junto ("com coca")
+   vêm primeiro, da mais barata pra mais cara (src/bot/melhor_loja.py);
 2. na loja escolhida, abre os principais (getItem) e já escolhe as opções obrigatórias pelo código
    (pizza pra 3+ pessoas vai grande): o modelo vê "Pizza de calabresa (Grande (8 fatias))" e só pensa
    em quantas;
@@ -21,7 +22,7 @@ em diante é o pedido de sempre, com o "por pessoa" no total e no resumo.
 import math
 import re
 
-from src.bot import ranking, relevancia
+from src.bot import melhor_loja, ranking, relevancia
 from src.bot.combina import complementos
 from src.bot.interpretar import normalizar, numero_em
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
@@ -132,8 +133,10 @@ def fontes(api, llm, endereco, tema):
 
 def escolher_loja(lista, vistas=()):
     """A 1ª loja ainda não vista; entre as 3 primeiras, prefere a que tem 2+ opções do principal
-    (kit pra grupo fica melhor variando o sabor)."""
+    (kit pra grupo fica melhor variando o sabor). Se alguma tem tudo o que pediram junto ("com coca",
+    `melhor_loja.com_tudo_primeiro`), escolhe só entre essas."""
     livres = [f for f in lista if f['loja_id'] not in vistas]
+    livres = [f for f in livres if f.get('tem_tudo')] or livres
     if not livres:
         return None
     return next((f for f in livres[:3] if len(f['principais']) >= 2), livres[0])
@@ -397,9 +400,15 @@ def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=N
     lista = anterior['fontes'] if mesma_busca else fontes(api, llm, endereco, tema)
     if not lista:
         return None, 'sem_principal'
+    novos_extras = extras and not (mesma_busca and _termos(extras) == _termos(anterior.get('extras')))
+    if not mesma_busca or novos_extras:
+        # a loja do kit: a que tem o que pediram junto ("com coca", 17/10 23h22) e sai mais em conta
+        lista = melhor_loja.com_tudo_primeiro(api, llm, endereco, lista, extras)
     vistas = list(anterior.get('vistas') or []) if mesma_busca else []
     if mesma_busca and not outra_loja:
         fonte = next((f for f in lista if f['loja_id'] == anterior['loja_id']), None) or escolher_loja(lista)
+        if novos_extras and not fonte.get('tem_tudo'):  # a loja do kit não tem o que pediram agora: troca
+            fonte = escolher_loja(lista) or fonte
     else:
         fonte = escolher_loja(lista, vistas)
     if not fonte:

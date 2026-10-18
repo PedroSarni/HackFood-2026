@@ -311,7 +311,8 @@ def test_sem_comida_pergunta_o_que_comer_e_pizza_pra_4_vai_grande():
     assert m.estado()['fase'] == 'grupo_tema' and 'O que vocês querem comer' in textos(m)
     m.enviar('pizza')
     k = kit_na_tela(m)
-    assert k['pessoas'] == 4 and k['loja'] == 'Pizzaria Bella Napoli'
+    # a pizzaria mais em conta (src/bot/melhor_loja.py): Forno a Lenha, R$ 39,90 + R$ 3,90 de entrega
+    assert k['pessoas'] == 4 and k['loja'] == 'Pizzaria Forno a Lenha'
     pizzas = [lin for lin in k['linhas'] if lin['papel'] == 'principal']
     assert pizzas and all('Grande (8 fatias)' in lin['nome'] for lin in pizzas)  # pra 4 vai a grande
     m.tocar('kit:ok')  # o mock valida as opções obrigatórias (tamanho) no formato do carrinho

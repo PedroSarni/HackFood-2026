@@ -17,7 +17,7 @@ import traceback
 
 from src.bot import foto as leitor_foto
 from src.bot import grupo as kit_grupo
-from src.bot import ranking, relevancia, tutor, vitrine, voz
+from src.bot import melhor_loja, ranking, relevancia, tutor, vitrine, voz
 from src.bot import textos as T
 from src.bot.combina import complementos
 from src.bot.ifood import PrecisaLogin
@@ -41,7 +41,7 @@ TRIVIAIS = {'saudacao', 'agradecer', 'sim'}
 # etapas em que um "oi" no meio não deve jogar o pedido fora: reapresenta a pergunta
 NO_MEIO_DO_PEDIDO = {'escolhendo', 'quantidade', 'opcao', 'mais', 'tirar', 'pagamento', 'cpf', 'confirmar',
                      'mudar', 'endereco', 'endereco_escolha', 'endereco_lista', 'complemento', 'bairro',
-                     'foto', 'kit', 'grupo_pessoas'}
+                     'foto', 'kit', 'grupo_pessoas', 'trocar_loja'}
 # sumiu mais que isso no meio de uma pergunta aberta: o "oi" da volta não é resposta daquela etapa
 IDLE_MAX = 1800
 FASES_QUE_EXPIRAM = {'endereco', 'complemento', 'bairro', 'cpf', 'endereco_escolha', 'quantidade', 'opcao',
@@ -579,7 +579,7 @@ class Bot:
             'lem': self.responder_lembrete, 'pular': self.pular_item, 'reped': self.repetir_pedido,
             'apagar_sim': self.apagar, 'apagar_nao': self.menu, 'login': self.reenviar_login,
             'tentar': self.tentar_de_novo, 'sugerir': self.sugerir, 'nada': lambda _a=None: None,
-            'vit': self.escolher_vitrine,
+            'vit': self.escolher_vitrine, 'loja': self.trocar_loja, 'loja_fica': self.ficar_na_loja,
             'foto': self.responder_foto, 'kit': self.responder_kit, 'grupo_n': self.grupo_pessoas,
         }
         fn = rotas.get(acao)
@@ -587,7 +587,7 @@ class Bot:
             self.repetir_pergunta(T.BOTAO_VELHO)
             return
         if acao in ('pick', 'mais', 'qtd', 'opt', 'fim', 'ok', 'reped', 'rem', 'ent', 'pag', 'cand',
-                    'end') and not self.exigir_login(['botao', bid]):
+                    'end', 'loja') and not self.exigir_login(['botao', bid]):
             return
         fn(arg) if acao not in ('inicio', 'apagar_nao') else fn()
 
@@ -802,6 +802,8 @@ class Bot:
                 self.definir_recorrencia('0')
             elif fase in ('foto', 'kit'):
                 self.botao(f'{fase}:nao')
+            elif fase == 'trocar_loja':
+                self.ficar_na_loja()
             elif fase == 'apagar':
                 self.menu()
             else:
@@ -812,6 +814,11 @@ class Bot:
                 self.grupo({'acao': 'grupo', 'itens': it['itens']})
             else:
                 self.iniciar_compra(it.get('itens') or [])
+        elif a == 'trocar_loja':  # "tem outro mercado?", "troca de loja"; com o kit na tela é o "Outra loja" dele
+            if fase == 'kit':
+                self.responder_kit('outra')
+            else:
+                self.trocar_loja()
         elif a == 'grupo':
             self.grupo(it)
         elif a == 'sugerir':
@@ -1037,10 +1044,36 @@ class Bot:
             return
         if not self.garantir_endereco({'acao': 'comprar', 'itens': itens}):
             return
-        u['fila'] = list(itens[1:])
-        if len(itens) > 1:
+        sem_carrinho = not (u.get('carrinho') or {}).get('itens')
+        if sem_carrinho:
+            u['plano'] = None
+        if len(itens) > 1 and sem_carrinho:
+            # lista nova: a loja é a que tem TUDO e sai mais em conta, escolhida antes do 1º item
+            # (src/bot/melhor_loja.py); antes era a do 1º item escolhido e o resto ficava pelo caminho
+            itens = self._planejar(itens)
+        elif len(itens) > 1:
             self.dizer(T.lista_de_compras([i['termo'] for i in itens]))
+        u['fila'] = list(itens[1:])
         self.buscar(itens[0])
+
+    def _planejar(self, itens):
+        """Escolhe a loja da lista e conta qual é, quanto sai e o que fica de fora. Devolve a lista na ordem
+        de procurar: o que a loja tem primeiro e o que ela não tem por último (ainda tenta nela, e aí dá pra
+        pular ou trocar de loja). Sem loja nenhuma perto, segue item a item como antes."""
+        u = self.u
+        tipos = [i.get('tipo_loja') or 'MERCADO' for i in itens]
+        tipo = max(tipos, key=tipos.count)
+        self.dizer(T.procurando_loja([i['termo'] for i in itens], tipo))
+        plano = melhor_loja.planejar(self.ctx.ifood(self.wa), self.ctx.llm, u['endereco'], itens)
+        if not plano['lojas']:
+            return itens
+        melhor = plano['lojas'][0]
+        plano.update(escolhida=melhor['loja_id'], tipo=tipo)
+        u['plano'] = plano
+        ordem = ([i for k, i in enumerate(itens) if k in melhor['tem']]
+                 + [i for k, i in enumerate(itens) if k not in melhor['tem']])
+        self.dizer(T.loja_da_lista(melhor, plano['itens'], tipo, len(plano['lojas']) > 1, ordem[0]['termo']))
+        return ordem
 
     # ================================================================== endereço
 
@@ -1297,14 +1330,18 @@ class Bot:
         devolve False calada, pra quem chamou tentar o próximo termo."""
         u = self.u
         car = u.get('carrinho') or {}
-        loja_id = car.get('loja_id') if car.get('itens') else None
+        # carrinho com item manda (o iFood fecha um pedido por loja); lista nova vai na loja do plano
+        loja_id = car.get('loja_id') if car.get('itens') else (u.get('plano') or {}).get('escolhida')
         ofertas, proxima = self._coletar(pedido, loja_id)
         u['atual'] = pedido
         if not ofertas:
             if pedido.get('sugestao'):
                 return False
-            botoes = [T.B_PULAR, T.B_ESCREVER] if u.get('fila') else [T.B_ESCREVER, T.B_INICIO]
-            self.perguntar(T.nao_achei(pedido['termo'], car.get('loja') if loja_id else None), botoes,
+            # com carrinho também dá pra pular: volta pro "quer mais alguma coisa?" em vez de travar aqui
+            botoes = [T.B_PULAR, T.B_ESCREVER] if u.get('fila') or car.get('itens') else [T.B_ESCREVER, T.B_INICIO]
+            if self._tem_outra_loja():  # a loja da lista não tem esse: dá pra levar tudo pra outra
+                botoes.insert(1, T.B_TROCAR_LOJA)
+            self.perguntar(T.nao_achei(pedido['termo'], self._nome_da_loja(loja_id) if loja_id else None), botoes,
                            fase='pedido')
             return False
         self._mostrar_lista(pedido, ofertas, proxima, loja_id, antes=antes)
@@ -1381,7 +1418,8 @@ class Bot:
         lst = u['listas'].get(lid) if lid else None
         tem_mais = bool(lst and (lst['pos'] < len(lst['ofertas']) or lst.get('proxima')))
         texto = (prefixo + '\n\n' if prefixo else '') + T.rodape_opcoes(tem_mais)
-        botoes = ([(f'mais:{lid}', T.B_MAIS)] if tem_mais else []) + [T.B_OUTRA]
+        outra = T.B_TROCAR_LOJA if self._tem_outra_loja() else T.B_OUTRA  # lista: troca a loja, não o produto
+        botoes = ([(f'mais:{lid}', T.B_MAIS)] if tem_mais else []) + [outra]
         if u.get('fila'):
             botoes.append(T.B_PULAR)
         self.wpp.botoes(self.wa, texto, botoes)
@@ -1421,6 +1459,146 @@ class Bot:
     def pular_item(self, _arg=None):
         self._proximo_da_fila(pulou=True)
 
+    # ================================================================== a loja da lista
+
+    def _tem_outra_loja(self):
+        """Lista com plano e mais de uma loja: dá pra trocar de loja no meio."""
+        return len((self.u.get('plano') or {}).get('lojas') or []) > 1
+
+    def _nome_da_loja(self, loja_id):
+        car = self.u.get('carrinho') or {}
+        if car.get('loja_id') == loja_id and car.get('loja'):
+            return car['loja']
+        return next((lj['loja'] for lj in (self.u.get('plano') or {}).get('lojas') or [] if lj['loja_id'] == loja_id),
+                    None)
+
+    def trocar_loja(self, arg=None):
+        """"Trocar de loja" no meio da lista: mostra as outras lojas (quem tem tudo primeiro, quanto sai e o
+        tempo) e, escolhida uma, leva junto o que já está no carrinho, pelo equivalente da loja nova."""
+        u = self.u
+        plano = u.get('plano')
+        if arg in (None, ''):
+            car = u.get('carrinho') or {}
+            if not plano and not car.get('itens') and not u.get('fila'):
+                self.repetir_pergunta(T.SEM_LISTA_PRA_TROCAR)
+                return
+            termo = (u.get('atual') or {}).get('termo')
+            if not plano or (termo and termo not in plano['itens']):
+                plano = self._replanejar()  # item pedido depois da lista, ou carrinho que não veio de lista
+            self._mostrar_lojas(plano)
+            return
+        try:
+            nova = plano['lojas'][int(arg)]
+        except (TypeError, ValueError, IndexError):
+            self.repetir_pergunta(T.BOTAO_VELHO)
+            return
+        self._mudar_de_loja(plano, nova)
+
+    def _mostrar_lojas(self, plano):
+        u = self.u
+        plano = plano or {}
+        outras = [(k, lj) for k, lj in enumerate(plano.get('lojas') or [])
+                  if lj['loja_id'] != plano.get('escolhida')][:9]
+        if not outras:
+            self.repetir_pergunta(T.SEM_OUTRA_LOJA)
+            return
+        if u.get('fase') != 'trocar_loja':  # pra voltar pro mesmo ponto, na troca e no "Continuar aqui"
+            u['troca_de'] = {'fase': u.get('fase'), 'pergunta': u.get('pergunta')}
+        n = len(plano['itens'])
+        self.perguntar(T.qual_loja([lj for _, lj in outras], n),
+                       [(f'loja:{k}', lj['loja'], T.linha_loja(lj, n)) for k, lj in outras] + [T.B_FICAR_NA_LOJA],
+                       fase='trocar_loja', rotulo='Ver lojas')
+
+    def ficar_na_loja(self, _arg=None):
+        """"Continuar aqui" (ou "não") na escolha de loja: volta pra pergunta de onde veio."""
+        u = self.u
+        volta = u.pop('troca_de', None) or {}
+        if volta.get('pergunta'):
+            u['fase'], u['pergunta'] = volta.get('fase'), volta['pergunta']
+            self.repetir_pergunta('Beleza, seguimos aqui. 🙂')
+        else:
+            self._proximo_da_fila()
+
+    def _mudar_de_loja(self, plano, nova):
+        """Leva a lista pra outra loja: o carrinho vai junto (o equivalente de cada item lá, mesma quantidade
+        e opções) e a lista segue de onde estava, agora na loja nova."""
+        u = self.u
+        api = self.ctx.ifood(self.wa)
+        car = u.get('carrinho') or {}
+        levados, ficaram = [], []
+        if car.get('itens'):
+            linhas, ficaram = self._equivalentes(api, car['itens'], nova['loja_id'])
+            novo = api.criar_carrinho(nova['loja_id'], u['endereco']['id'], linhas) if linhas else None
+            if novo:
+                novo['loja'] = novo.get('loja') or nova['loja']
+                pelo_item = {lin['item_id']: lin for lin in linhas}
+                for i in novo.get('itens') or []:  # as nossas anotações de cada linha vão junto
+                    lin = pelo_item.get(i.get('item_id')) or {}
+                    i['opcoes'], i['obs'] = lin.get('opcoes') or [], lin.get('obs')
+                    i['termo'], i['tipo_loja'] = lin.get('termo'), lin.get('tipo_loja')
+                levados = novo.get('itens') or []
+            u['carrinho'] = novo
+        plano['escolhida'] = nova['loja_id']
+        u['plano'] = plano
+        u['escolha'] = None
+        self.dizer(T.troquei_de_loja(nova['loja'], levados, ficaram))
+        de = (u.pop('troca_de', None) or {}).get('fase')
+        if u.get('atual') and de in ('escolhendo', 'pedido', 'quantidade', 'opcao'):
+            self.buscar(u['atual'])  # o item da vez de novo, agora na loja nova
+        else:
+            self._proximo_da_fila()
+
+    def _equivalentes(self, api, itens, loja_id):
+        """As linhas do carrinho na loja nova: o mesmo produto pelo nome ("Arroz branco tipo 1"), senão o mais
+        parecido do que a pessoa pediu ("arroz"); mesma quantidade, e as mesmas opções quando a loja tem
+        (senão as padrão dela). Uma busca por linha e um filtro do Gemini pra todas.
+        Devolve (linhas pro carrinho novo, nomes do que a loja nova não tem)."""
+        tipo = (self.u.get('plano') or {}).get('tipo') or 'MERCADO'
+        pedidos = [{'termo': it.get('termo') or it['nome'], 'busca': it['nome'],
+                    'tipo_loja': it.get('tipo_loja') or tipo} for it in itens]
+        achados = melhor_loja.ofertas_de_varios(api, self.ctx.llm, self.u['endereco'], pedidos, [loja_id] * len(itens))
+        linhas, ficaram = [], []
+        for it, pedido, ofertas in zip(itens, pedidos, achados):
+            opcoes = None
+            if ofertas:
+                of = melhor_loja.mais_parecida(ofertas, it['nome'])
+                try:
+                    item = api.item(of['item_id'], loja_id, self.u['endereco'])
+                    opcoes = kit_grupo.opcoes_automaticas(item, 1, ' '.join(o.get('nome') or ''
+                                                                            for o in it.get('opcoes') or []))
+                except ErroMCP as e:
+                    if melhor_loja.infra(e):
+                        raise
+                    print(f'trocar de loja: {it.get("nome")!r} sem equivalente ({e!r})')
+            if opcoes is None:
+                ficaram.append(it['nome'])
+                continue
+            linhas.append({'item_id': of['item_id'], 'qtd': it['qtd'], 'opcoes': opcoes, 'obs': it.get('obs'),
+                           'termo': pedido['termo'], 'tipo_loja': pedido['tipo_loja']})
+        return linhas, ficaram
+
+    def _replanejar(self):
+        """Plano de novo com o que está no carrinho + o item da vez + a fila: troca de loja com item fora do
+        plano (pedido depois da lista) ou com carrinho que não veio de lista (pedido de novo, kit)."""
+        u = self.u
+        car = u.get('carrinho') or {}
+        tipo = (u.get('atual') or {}).get('tipo_loja') or (u.get('plano') or {}).get('tipo') or 'MERCADO'
+        itens = [{'termo': i.get('termo') or i['nome'], 'busca': None if i.get('termo') else i['nome'],
+                  'quantidade': i.get('qtd'), 'tipo_loja': i.get('tipo_loja') or tipo, 'observacao': None}
+                 for i in car.get('itens') or []]
+        vistos = {normalizar(i['termo']) for i in itens}
+        for p in [u.get('atual')] + list(u.get('fila') or []):
+            if p and normalizar(p['termo']) not in vistos:
+                vistos.add(normalizar(p['termo']))
+                itens.append(p)
+        if not itens:
+            return None
+        self.dizer(T.PROCURANDO_OUTRAS)
+        plano = melhor_loja.planejar(self.ctx.ifood(self.wa), self.ctx.llm, u['endereco'], itens)
+        plano.update(escolhida=car.get('loja_id') or (u.get('plano') or {}).get('escolhida'), tipo=tipo)
+        u['plano'] = plano
+        return plano
+
     # ================================================================== escolha do item
 
     def _escolha_por_fala(self, it):
@@ -1450,14 +1628,16 @@ class Bot:
                 nomes[pid] = normalizar(self.u['listas'][lid]['ofertas'][int(idx)]['nome'])
             except (KeyError, IndexError, ValueError):
                 continue
+        # o mesmo produto em 2 lojas na tela ("Pizza de calabresa" na Bella Napoli e na Forno a Lenha) não é
+        # dúvida: fica o 1º da tela. Nomes diferentes empatados, aí sim, "Qual deles?"
         inteiros = [pid for pid, nome in nomes.items() if nome and nome in falado]
-        if len(inteiros) == 1:
+        if inteiros and len({nomes[pid] for pid in inteiros}) == 1:
             return inteiros[0]
         palavras = {w for w in falado.split() if len(w) > 2}
         pontos = {pid: len(palavras & set(nome.split())) for pid, nome in nomes.items()}
         melhor = max(pontos.values(), default=0)
         empate = [pid for pid, p in pontos.items() if p == melhor]
-        return empate[0] if melhor and len(empate) == 1 else None
+        return empate[0] if melhor and len({nomes[pid] for pid in empate}) == 1 else None
 
     def _opcoes_faladas(self, g, texto, esc, so_ditas=False):
         """Grupo de opções pela fala: as que a pessoa disse ("grande", "catupiry"). Obrigatório não dito: as
@@ -1503,7 +1683,8 @@ class Bot:
         item['nome'] = item.get('nome') or of['nome']
         pedido = (u['listas'][lid].get('pedido') or u.get('atual') or {})
         u['escolha'] = {'oferta': of, 'item': item, 'qtd': pedido.get('quantidade'),
-                        'obs': pedido.get('observacao'), 'opcoes': [], 'grupo': 0, 'feitas': 0}
+                        'obs': pedido.get('observacao'), 'opcoes': [], 'grupo': 0, 'feitas': 0,
+                        'termo': pedido.get('termo'), 'tipo_loja': pedido.get('tipo_loja')}
         self._proximo_passo_da_escolha()
 
     def _proximo_passo_da_escolha(self):
@@ -1596,8 +1777,11 @@ class Bot:
             velho = antes.get(it['cart_item_id'])
             if velho:
                 it['opcoes'], it['obs'] = velho.get('opcoes'), velho.get('obs')
+                it['termo'], it['tipo_loja'] = velho.get('termo'), velho.get('tipo_loja')
             elif it.get('item_id') == of['item_id']:
                 it['opcoes'], it['obs'] = esc['opcoes'], esc.get('obs')
+                # o que a pessoa pediu ("arroz"): no "Trocar de loja" é o que se procura na loja nova
+                it['termo'], it['tipo_loja'] = esc.get('termo'), esc.get('tipo_loja')
         u['carrinho'] = novo
         u['escolha'] = None
         nome = esc['item'].get('nome') or of['nome']
@@ -1755,9 +1939,11 @@ class Bot:
         car = self.u['carrinho']
         if not novo:
             return car
-        guardadas = {i.get('cart_item_id'): (i.get('opcoes'), i.get('obs')) for i in car.get('itens') or []}
+        guardadas = {i.get('cart_item_id'): (i.get('opcoes'), i.get('obs'), i.get('termo'), i.get('tipo_loja'))
+                     for i in car.get('itens') or []}
         for i in novo.get('itens') or []:
-            i['opcoes'], i['obs'] = guardadas.get(i.get('cart_item_id'), ([], None))
+            i['opcoes'], i['obs'], i['termo'], i['tipo_loja'] = guardadas.get(i.get('cart_item_id'),
+                                                                              ([], None, None, None))
         for k in ('itens', 'subtotal', 'taxa_entrega', 'taxas', 'desconto', 'total', 'minimo'):
             if novo.get(k) is not None:
                 car[k] = novo[k]
@@ -1882,6 +2068,7 @@ class Bot:
         u['grupo'] = None
         u['fila'] = []
         u['escolha'] = None
+        u['plano'] = None
         detalhes = {}
         for tentativa in range(2):  # getOrder logo depois do checkout pode dar NOT_FOUND (consistência eventual)
             try:
@@ -1989,7 +2176,7 @@ class Bot:
         u = self.u
         tinha = bool((u.get('carrinho') or {}).get('itens'))
         u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None, 'grupo': None,
-                  'kit': None, 'grupo_pendente': None, 'foto': None})
+                  'kit': None, 'grupo_pendente': None, 'foto': None, 'plano': None, 'troca_de': None})
         self.menu(T.CANCELADO if tinha else 'Tudo bem! 🙂')
 
     # ================================================================== depois do pedido

@@ -41,6 +41,7 @@ LOJAS = {
     'r3': ('Esfiharia do Líbano', 'RESTAURANT', {'min': 25, 'max': 40}, 4.90, 4.6, 1.5, 20.0),
     'c1': ('Cafeteria Grão Bom', 'RESTAURANT', {'min': 15, 'max': 25}, 2.99, 4.8, 0.7, 15.0),
     'l2': ('Burger House', 'RESTAURANT', {'min': 30, 'max': 45}, 5.90, 4.8, 2.4, 35.0),
+    'r4': ('Pizzaria Forno a Lenha', 'RESTAURANT', {'min': 30, 'max': 45}, 3.90, 4.6, 1.4, 30.0),
 }
 
 # grupo: (nome, minSelections, maxSelections, [(opção, preço adicional)])
@@ -183,6 +184,40 @@ CATALOGO = [
     ('l2', 'Coca-Cola 2 litros', 'Garrafa 2 litros', 15.90, None, None),
     ('l2', 'Refrigerante lata 350 ml', 'Coca-Cola, Guaraná ou Sprite', 6.90, None, None),
     ('l2', 'Milkshake de chocolate', 'Copo 400 ml', 18.90, None, None),
+    # 17/10 23h50: mundo coerente pra escolher a loja da lista (src/bot/melhor_loja.py): os dois mercados
+    # grandes têm o básico todo, com preços diferentes (o Central com entrega grátis e mais lento), e pizzaria
+    # vende Coca. Só acrescenta: o id do item é a posição no catálogo.
+    ('m1', 'Água sanitária', 'Frasco 2 litros', 5.49, None, None),
+    ('m1', 'Feijão carioca', 'Pacote 1 kg', 8.79, 8.49, None),
+    ('m1', 'Suco de laranja integral', 'Garrafa 1 litro', 8.99, 7.99, None),
+    ('m1', 'Coca-Cola Zero 2 litros', 'Garrafa 2 litros', 10.99, 9.79, None),
+    ('m1', 'Açúcar refinado', 'Pacote 1 kg', 4.79, None, None),
+    ('m1', 'Ovos brancos', 'Bandeja com 12', 10.99, 9.99, None),
+    ('m1', 'Macarrão espaguete', 'Pacote 500 g', 4.59, None, None),
+    ('m1', 'Peito de frango', 'Bandeja 1 kg', 20.90, 18.90, None),
+    ('m1', 'Papel higiênico', 'Pacote com 12 rolos', 19.90, 17.90, None),
+    ('m1', 'Sabão em pó', 'Caixa 1,6 kg', 22.90, None, None),
+    ('m1', 'Batata', 'Kg', 6.29, None, None),
+    ('m2', 'Tomate', 'Kg', 7.99, None, None),
+    ('m2', 'Carne moída (patinho)', 'Bandeja 500 g', 23.90, 21.90, None),
+    ('m2', 'Suco de laranja integral', 'Garrafa 1 litro', 8.49, None, None),
+    ('m2', 'Coca-Cola Zero 2 litros', 'Garrafa 2 litros', 10.49, None, None),
+    ('m2', 'Detergente', 'Frasco 500 ml', 2.29, None, None),
+    ('m2', 'Cebola', 'Kg', 5.49, None, None),
+    ('m2', 'Óleo de soja', 'Garrafa 900 ml', 6.79, None, None),
+    ('m2', 'Molho de tomate', 'Sachê 340 g', 3.19, None, None),
+    ('m2', 'Banana prata', 'Kg', 6.49, None, None),
+    ('m2', 'Creme dental', 'Tubo 90 g', 4.79, None, None),
+    ('r1', 'Coca-Cola 2 litros', 'Garrafa 2 litros', 14.90, None, None),
+    ('r1', 'Guaraná Antarctica 2 litros', 'Garrafa 2 litros', 12.90, None, None),
+    ('r4', 'Pizza de calabresa', 'Calabresa, cebola e azeitona', 44.90, None, _PIZZA),
+    ('r4', 'Pizza de muçarela', 'Muçarela, tomate e orégano', 41.90, 39.90, _PIZZA),
+    ('r4', 'Pizza margherita', 'Muçarela, tomate e manjericão', 45.90, None, _PIZZA),
+    ('r4', 'Pizza portuguesa', 'Presunto, ovo, cebola e ervilha', 49.90, None, _PIZZA),
+    ('r4', 'Pizza de frango com catupiry', 'Frango desfiado e catupiry', 46.90, None, _PIZZA),
+    ('r4', 'Coca-Cola 2 litros', 'Garrafa 2 litros', 13.90, None, None),
+    ('r4', 'Guaraná Antarctica 2 litros', 'Garrafa 2 litros', 11.90, None, None),
+    ('r4', 'Refrigerante lata 350 ml', 'Lata', 5.90, None, None),
 ]
 SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
              'remedio': ['dipirona', 'paracetamol'], 'racao': ['racao'], 'almoco': ['marmita', 'sopa'],

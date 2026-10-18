@@ -256,6 +256,12 @@ class LlmFake:
                 'resposta': '[fala] Que delícia, hambúrguer com bacon! 😋'}, 'fake', 0.01
         if 'explicacao' in esquema['properties']:  # o kit em grupo (src/bot/grupo.py)
             return (self.kit if self.kit is not None else _kit_fake(partes[0][1])), 'fake', 0.01
+        if 'listas' in esquema['properties']:  # relevância em lote (a loja da lista): mantém tudo, na ordem
+            import re
+            blocos = re.split(r'\n\n(?=Lista \d+\. )', partes[0][1])
+            return {'listas': [{'lista': int(re.match(r'Lista (\d+)\.', b).group(1)),
+                                'manter': list(range(sum(1 for linha in b.split('\n') if linha[:1].isdigit())))}
+                               for b in blocos]}, 'fake', 0.01
         if 'manter' in esquema['properties']:  # filtro de relevância: mantém tudo, na ordem
             n = sum(1 for linha in partes[0][1].split('\n') if linha[:1].isdigit())
             return {'manter': list(range(n))}, 'fake', 0.01

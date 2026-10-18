@@ -26,6 +26,8 @@ B_REPETIR = ('repetir', '🔁 Pedir de novo')
 B_MEU_PEDIDO = ('meu_pedido', '📦 Meu pedido')
 B_INICIO = ('inicio', '🏠 Início')
 B_OUTRA = ('outra', '🔎 Procurar outra')
+B_TROCAR_LOJA = ('loja', '🏪 Trocar de loja')     # lista com plano (src/bot/melhor_loja.py)
+B_FICAR_NA_LOJA = ('loja_fica', '↩️ Continuar aqui')
 B_FINALIZAR = ('fim', '✅ Finalizar pedido')
 B_MAIS_COISAS = ('add', '➕ Quero mais coisas')
 B_SUGERIR = ('sugerir', '💡 Me sugere algo')
@@ -621,4 +623,58 @@ def como_esta(codigo, descricao, pedido, previsao=None, sobre=None):
         linhas.append(f'🔑 Código de entrega: *{pedido["codigo_entrega"]}* (fale pro entregador)')
     if pedido.get('resumo'):
         linhas.append(f'🧾 {pedido["resumo"]}' + (f' — {reais(pedido["total"])}' if pedido.get('total') else ''))
+    return '\n'.join(linhas)
+
+
+# --- a loja da lista (src/bot/melhor_loja.py) -------------------------------------------------------
+
+LOJA_DO_TIPO = {'MERCADO': 'mercado', 'RESTAURANTE': 'restaurante', 'FARMACIA': 'farmácia'}
+NENHUMA_DO_TIPO = {'MERCADO': 'Nenhum mercado', 'RESTAURANTE': 'Nenhum restaurante', 'FARMACIA': 'Nenhuma farmácia'}
+SEM_OUTRA_LOJA = 'Não achei outra loja perto que tenha esses itens. 😕'
+SEM_LISTA_PRA_TROCAR = 'Ainda não tem pedido pra trocar de loja. Me diga o que você quer pedir. 🙂'
+PROCURANDO_OUTRAS = '🔎 Vendo quais outras lojas têm tudo isso... ⏳'
+
+
+def procurando_loja(termos, tipo_loja):
+    linhas = '\n'.join(f'{i}. {t}' for i, t in enumerate(termos, 1))
+    return (f'📝 Anotei sua lista:\n{linhas}\n\n'
+            f'🔎 Vendo qual {LOJA_DO_TIPO.get(tipo_loja, "loja")} tem tudo e sai mais em conta... ⏳')
+
+
+def loja_da_lista(loja, termos, tipo_loja, outras, primeiro):
+    """A loja que vai levar a lista: tem tudo (ou o máximo), é a mais em conta, e o que fica de fora."""
+    conta = f'a partir de *{reais(loja["custo"])}* com a entrega' + (f', chega em {loja["tempo"]}'
+                                                                     if loja.get('tempo') else '')
+    faltam = [t for i, t in enumerate(termos) if i not in loja['tem']]
+    if not faltam:
+        linhas = [f'🛒 *{loja["loja"]}* tem tudo da sua lista e é onde sai mais em conta: {conta}.']
+    else:
+        linhas = [f'🛒 {NENHUMA_DO_TIPO.get(tipo_loja, "Nenhuma loja")} perto tem tudo junto. *{loja["loja"]}* '
+                  f'tem {len(termos) - len(faltam)} dos {len(termos)} itens e sai {conta}.',
+                  'Fica de fora: ' + ', '.join(f'*{t}*' for t in faltam) + '.']
+    linhas.append(f'\nVou te mostrar item por item, começando por *{primeiro}*. 👇')
+    if outras:
+        linhas.append('Prefere outra loja? Toque em *Trocar de loja* quando quiser.')
+    return '\n'.join(linhas)
+
+
+def linha_loja(loja, n):
+    """'tem tudo · a partir de R$ 91,20 · 40-55 min' (cabe na descrição da lista: 72)."""
+    tem = 'tem tudo' if len(loja['tem']) == n else f'tem {len(loja["tem"])} de {n}'
+    return ' · '.join(x for x in (tem, f'a partir de {reais(loja["custo"])}', loja.get('tempo')) if x)
+
+
+def qual_loja(lojas, n):
+    linhas = [f'• *{lj["loja"]}*: {linha_loja(lj, n)}' for lj in lojas]
+    return '🏪 Qual loja você prefere? Já com a entrega, pelos mais baratos de cada item:\n\n' + '\n'.join(linhas)
+
+
+def troquei_de_loja(loja, levados, ficaram):
+    linhas = [f'🔁 Pronto, agora é no *{loja}*.']
+    if levados:
+        linhas.append('O que você já tinha escolhido veio junto:')
+        linhas += [f'• {i["qtd"]}x {i["nome"]}' + (f' — {reais(i["preco_total"])}' if i.get('preco_total') else '')
+                   for i in levados]
+    if ficaram:
+        linhas.append('Não tem lá: ' + ', '.join(f'*{n}*' for n in ficaram) + '.')
     return '\n'.join(linhas)

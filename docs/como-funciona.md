@@ -322,6 +322,15 @@ Validação contra o Gemini de verdade (só Gemini, nada de iFood): `modal run s
   está, quando chega em horário ("entre 23h46 e 23h56", da hora do pedido + o tempo da loja), loja,
   número, código de entrega, o que vem e o total, com *Atualizar status*. Quem já pediu vê *Fazer novo
   pedido* no lugar de *Fazer pedido*.
+- **A lista vai pra loja que tem tudo.** Pedido com 2+ itens (lista escrita, falada ou de foto, e também
+  "uma pizza e uma coca") busca tudo antes (uma busca por item e UM filtro do Gemini pra lista toda: um por
+  item estourava a cota por minuto da chave) e escolhe a loja que tem TODOS os itens; entre essas, a de menor
+  conta (o mais barato de cada item x a quantidade + a entrega; empate vai pela nota e pelo tempo). Nenhuma
+  com tudo: a que tem mais, dizendo o que fica de fora (isso vai pro fim da lista). O iFood fecha um pedido
+  por loja, então a loja é escolhida antes do 1º item (`src/bot/melhor_loja.py`). *Trocar de loja* (botão
+  nos cards ou "tem outro mercado?") mostra as outras com quanto sai e leva o carrinho junto, pelo
+  equivalente da loja nova; *Continuar aqui* volta. O kit em grupo usa a mesma conta: "pizza pra 10 com
+  coca" vai pra pizzaria que tem Coca, a mais em conta.
 - **Uma loja por pedido.**
 - **Pedido mínimo não trava ninguém.** O aviso de mínimo (e o "O que mais você quer?" abaixo dele)
   vem com **💡 Me sugere algo**: na loja do carrinho, o bot oferece 1º o que acompanha o pedido

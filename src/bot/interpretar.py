@@ -14,7 +14,7 @@ import unicodedata
 ACOES = ['comprar', 'mais_opcoes', 'escolher', 'sim', 'nao', 'quantidade', 'endereco',
          'ver_pedido', 'finalizar', 'tirar_item', 'cancelar', 'acompanhar', 'repetir',
          'ajuda', 'saudacao', 'agradecer', 'sair', 'apagar_dados', 'parar_lembrete',
-         'agendar', 'sugerir', 'grupo', 'fora_do_escopo', 'nao_entendi']
+         'agendar', 'sugerir', 'grupo', 'trocar_loja', 'fora_do_escopo', 'nao_entendi']
 LOJAS = ['MERCADO', 'RESTAURANTE', 'FARMACIA', 'BEBIDAS', 'PET', 'LOJA']
 
 ESQUEMA = {
@@ -58,7 +58,7 @@ meio de outra coisa): a ação é o que ela quer agora, não a etapa que está n
 Responda só o JSON do esquema. Campos:
 - acao: uma de comprar, sugerir, mais_opcoes, escolher, sim, nao, quantidade, endereco, ver_pedido, \
 finalizar, tirar_item, cancelar, acompanhar, repetir, ajuda, saudacao, agradecer, sair, \
-apagar_dados, parar_lembrete, agendar, grupo, fora_do_escopo, nao_entendi.
+apagar_dados, parar_lembrete, agendar, grupo, trocar_loja, fora_do_escopo, nao_entendi.
 - itens: quando acao=comprar (ou agendar, se a pessoa disse o que quer no automático), cada produto \
 pedido, na ordem. termo curto e no singular ("pão francês", "leite integral", "carne moída", \
 "dipirona"), sem a quantidade. Sabor, tamanho \
@@ -102,6 +102,8 @@ iFood está instável). Nunca diga que fez algo que não fez. O assistente SABE 
 Regras:
 - Lista de compras (escrita, falada ou foto de papel) vira acao=comprar com todos os itens.
 - "quero mais", "tem outro", "mostra mais", "outras" com opções na tela = mais_opcoes.
+- "tem outro mercado?", "troca de loja", "quero de outra pizzaria", "esse mercado não" = trocar_loja (é a \
+LOJA que ela quer trocar, não o produto).
 - "quero esse", "essa tá boa", "pode ser essa", "esse mesmo", "vou querer o X-Salada", com opções na tela \
 = escolher, e numero = a opção que ela indicou (se falou o nome, o número dele na lista; se só tem uma \
 na tela, 1). Se ela disse quantidade, vai em itens.
@@ -164,6 +166,9 @@ COMANDOS = {
 }
 # "cancelar o pedido", "quero cancelar", "cancela tudo" (com erro de digitação no fim, "pediod"); "cancela a
 # coca" NÃO casa: tirar um item fica com o Gemini
+# "troca de mercado", "quero outro mercado", "muda de loja", "tem outra pizzaria?" (o produto, "outra pizza", não)
+TROCAR_LOJA = re.compile(r'\b(?:troca\w*|muda\w*|outr[oa]s?)\b(?: \w+){0,2} (?:mercado|supermercado|loja|restaurante|'
+                         r'pizzaria|lanchonete|farmacia|padaria)s?\b')
 # "qual é o código de entrega?", "a senha do entregador", "código pro motoboy"
 CODIGO_ENTREGA = re.compile(r'\b(?:codigo|senha|cod)\b(?: \w+){0,3} (?:entrega|entregador|motoboy|confirmacao)\b')
 CANCELAR = re.compile(r'^(?:quero |pode |por favor )?cancel(?:a|ar)(?: (?:o|a|meu|minha|esse|essa))?'
@@ -211,6 +216,8 @@ def regra_rapida(texto):
         return {'acao': 'cancelar'}
     if CODIGO_ENTREGA.search(t):  # importante demais pra depender do Gemini
         return {'acao': 'acompanhar', 'sobre': 'codigo_entrega'}
+    if TROCAR_LOJA.search(t):
+        return {'acao': 'trocar_loja'}
     if t in SIM:
         return {'acao': 'sim'}
     if t in NAO:
