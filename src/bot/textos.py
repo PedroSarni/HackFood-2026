@@ -6,6 +6,8 @@ Regra de escrita (o público é quem tem dificuldade com o celular):
 - toda mensagem termina dizendo o que fazer ("toque em...", "pode escrever"); áudio fica fora das dicas por enquanto;
 - botão com até 20 caracteres (limite da Meta), verbo ou resposta direta.
 """
+import re
+
 from src.bot.grupo import MAX_PESSOAS, por_pessoa
 from src.shared.whatsapp import tamanho
 
@@ -452,11 +454,25 @@ def recorrencia_ok(dias, hora=None):
             f'o pedido sai na hora. 🛵\nPra parar, é só escrever *parar lembrete*.')
 
 
+# "Tá com fome de quê?" só cabe em comida: na Drogaria Saúde, com dipirona e paracetamol, soava estranho (18/10)
+_FARMACIA = re.compile(r'drogaria|farm[aá]cia|droga|\bmg\b|dipirona|paracetamol|rem[eé]dio|comprimido', re.I)
+_COMPRAS = re.compile(r'mercad|atacad|hortifruti|sacol[aã]o|empor|\bpet\b|ra[cç][aã]o|adega|bebida|dep[oó]sito', re.I)
+
+
+def _abertura_lembrete(rec):
+    onde = f'{rec.get("loja") or ""} {rec.get("resumo") or ""}'
+    if _FARMACIA.search(onde):
+        return 'Hora de repor seus itens da farmácia. 💊'
+    if _COMPRAS.search(rec.get('loja') or ''):
+        return 'Hora de repor as compras. 🛒'
+    return 'Tá com fome de quê? A gente já sabe. 😋'
+
+
 def lembrete(rec, endereco=None):
     """No dia: pergunta se pode pedir, mostrando tudo que vai ser cobrado. O "sim" é a confirmação."""
     if isinstance(rec, str):
         rec = {'resumo': rec}
-    linhas = ['🔔 Chegou o dia! Tá com fome de quê? A gente já sabe. 😋', '', f'🧾 {rec.get("resumo") or ""}']
+    linhas = [f'🔔 Chegou o dia! {_abertura_lembrete(rec)}', '', f'🧾 {rec.get("resumo") or ""}']
     if rec.get('loja'):
         linhas.append(f'🏪 {rec["loja"]}')
     if endereco:

@@ -560,3 +560,11 @@ def test_interruptor_de_fechadas_mostra_loja_fechada_depois_das_abertas():
     assert chamadas[0]['refinements']['onlyOpen'] is False
     assert [o['loja_id'] for o in ofertas] == ['aberto', 'fechado']
     assert all(o['disponivel'] for o in ofertas)  # o ranking não joga fora
+
+
+def test_lembrete_so_fala_de_fome_quando_e_comida():
+    from src.bot import textos as T
+    farm = T.lembrete({'resumo': '1x Dipirona 500 mg, 1x Paracetamol 750 mg', 'loja': 'Drogaria Saúde'})
+    assert 'fome' not in farm and 'farmácia' in farm
+    assert 'compras' in T.lembrete({'resumo': '2x Leite integral', 'loja': 'Supermercado Central'})
+    assert 'fome' in T.lembrete({'resumo': '1x X-Burger', 'loja': 'Burger House'})
