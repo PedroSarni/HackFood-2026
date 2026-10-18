@@ -86,3 +86,44 @@ def test_bot_segue_com_o_entendimento_desligado():
     m.enviar('leite')            # texto curto: vira busca direta, sem IA
     assert m.wpp.saida
     assert not any(p[0] == agentes.POR_ID['entendimento'].prompts()[0] for p in m.llm.prompts[antes:])
+
+
+def test_dash_desliga_agente_na_demo_e_o_passo_aparece_ao_vivo():
+    import json
+    import time as _t
+
+    from fastapi.testclient import TestClient
+
+    from src.painel.servidor import DictTravado, Painel, criar_api
+    from src.painel.simulador import MundoAnotado
+
+    m = MundoAnotado(diario_dic=DictTravado())
+    m.agora = _t.time()
+
+    class Fonte:
+        nome, estado = 'demo', 'pronto'
+
+        def novos(self, vistos):
+            return m.painel.novos(vistos)
+
+        def armazem(self):
+            return m.painel
+    p = Painel(Fonte())
+    cli = TestClient(criar_api({'demo': p}))
+    r = cli.post('/api/equipe/entendimento?fonte=demo', json={'ligado': False}).json()
+    lia = next(a for a in r['agentes'] if a['id'] == 'entendimento')
+    assert lia['ligado'] is False and lia['nome'] == 'Lia' and lia['prompts']
+    assert cli.post('/api/equipe/foto?fonte=demo', json={'modelo': 'qualquer-um'}).status_code == 400
+    assert cli.post('/api/equipe/foto?fonte=demo', content='ligado=0',
+                    headers={'content-type': 'application/x-www-form-urlencoded'}).status_code == 415
+    assert cli.post('/api/equipe/foto?fonte=demo', json={'ligado': False},
+                    headers={'origin': 'https://site-malvado.test'}).status_code == 403
+
+    endereco_pronto(m)
+    m.enviar('quero leite integral bem gelado pra hoje')   # frase longa: a Lia seria chamada, mas está desligada
+    p.girar()
+    passos = json.loads(cli.get('/api/ao-vivo?fonte=demo&desde=0').text)['passos']
+    pulo = [x for x in passos if x['tipo'] == 'ia' and x.get('erro') == 'desligado']
+    assert pulo and pulo[0]['agente'] == 'entendimento'
+    assert 'leite' not in json.dumps(passos)   # sem texto de ninguém
+    assert json.loads(cli.get('/api/equipe?fonte=demo').text)['agentes'][0]['ligado'] is False

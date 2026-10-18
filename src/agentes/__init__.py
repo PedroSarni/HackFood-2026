@@ -133,10 +133,12 @@ def fila(agente, cfg=None, pedida=None, env=os.environ):
 
 
 def roteador(gerar, cfg, ao_pular=None):
-    """gerar(sistema, partes, esquema, **kw) com a ficha valendo: desligado não chama a IA; ligado usa a fila dele."""
+    """gerar(sistema, partes, esquema, **kw) com a ficha valendo: desligado não chama a IA; ligado usa a fila dele.
+    `cfg`: a config (produção lê uma vez por mensagem) ou uma função que a lê a cada chamada (demo do dash)."""
     def gerar_roteado(sistema, partes, esquema, **kw):
+        cfg_agora = cfg() if callable(cfg) else cfg
         agente = do_sistema(sistema)
-        if agente in POR_ID and not ligado(cfg, agente):
+        if agente in POR_ID and not ligado(cfg_agora, agente):
             if ao_pular:
                 try:
                     ao_pular(agente)
@@ -144,7 +146,7 @@ def roteador(gerar, cfg, ao_pular=None):
                     pass
             raise Desligado(f'{agente} desligado no painel')
         if agente in POR_ID and POR_ID[agente].tipo == 'ia':
-            kw['modelos'] = fila(agente, cfg, kw.get('modelos'))
+            kw['modelos'] = fila(agente, cfg_agora, kw.get('modelos'))
         return gerar(sistema, partes, esquema, **kw)
     return gerar_roteado
 
@@ -217,3 +219,12 @@ def fichas(cfg=None, ar=None):
             'prompts': prompts, 'versaoPrompt': versao_prompt(prompts), 'versaoNoAr': do_ar.get('prompt'),
         })
     return {'agentes': saida, 'conhecidos': conhecidos(), 'arQuando': (ar or {}).get('quando')}
+
+
+def so_se_ligado(fn, agente_id, cfg):
+    """Serviço (voz/ouvido) com interruptor lido a cada uso: desligado levanta, e o Contexto cai no plano B."""
+    def fn_ligado(*a, **kw):
+        if not ligado(cfg() if callable(cfg) else cfg, agente_id):
+            raise Desligado(f'{agente_id} desligado no painel')
+        return fn(*a, **kw)
+    return fn_ligado

@@ -13,6 +13,7 @@ import random
 import threading
 import time
 
+from src import agentes
 from src.shared import painel
 from tests.fakes import Armazem, Mundo
 
@@ -37,11 +38,16 @@ class MundoAnotado(Mundo):
         self.ctx.wpp = painel.EspiaoWhatsApp(self.wpp, self.diario)
         mcp = self.mcp
         self.ctx._chamador = lambda wid: painel.espiar_mcp(mcp.chamar, self.diario, wid)
-        self.ctx._gerar_json = painel.espiar_ia(self.llm, self.diario, self.wa)
+        # o interruptor do dash vale na demo também: a config mora no próprio dict da demo (cfg:agentes)
+        cfg = lambda: agentes.config(self.painel)  # noqa: E731
+        pular = lambda ag: self.diario.anotar(self.wa, 'ia', agente=ag, ok=False, ms=0, erro='desligado')  # noqa: E731
+        self.ctx._gerar_json = agentes.roteador(painel.espiar_ia(self.llm, self.diario, self.wa), cfg, pular)
         if self.ctx._transcritor:
-            self.ctx._transcritor = painel.espiar_servico(self.ctx._transcritor, self.diario, self.wa, 'ouvido', 'fake')
+            self.ctx._transcritor = agentes.so_se_ligado(
+                painel.espiar_servico(self.ctx._transcritor, self.diario, self.wa, 'ouvido', 'fake'), 'ouvido', cfg)
         if self.ctx._locutor:
-            self.ctx._locutor = painel.espiar_servico(self.ctx._locutor, self.diario, self.wa, 'voz', 'fake')
+            self.ctx._locutor = agentes.so_se_ligado(
+                painel.espiar_servico(self.ctx._locutor, self.diario, self.wa, 'voz', 'fake'), 'voz', cfg)
         Bot, mundo = self.Bot, self
 
         class BotAnotado(Bot):
