@@ -514,10 +514,12 @@ CANCELADO = 'Tudo bem, cancelei. Nada foi comprado. 🙂'
 ENVIANDO = 'Já estou fazendo seu pedido, só um instante... ⏳'
 
 
-def pedido_feito(numero=None, tempo=None, codigo_entrega=None, tipo_pagamento=None, total=None, pessoas=None):
+def pedido_feito(numero=None, tempo=None, codigo_entrega=None, tipo_pagamento=None, total=None, pessoas=None, resumo=None):
     linhas = ['🎉 *Pedido feito!*']
     if numero:
         linhas.append(f'Número do pedido: *{numero}*')
+    if resumo:  # fechou direto ("já pode passar no pix"), sem resumo antes: diz o que foi e quanto deu
+        linhas.append(f'🧾 {resumo}' + (f' — *{reais(total)}*' if total else ''))
     if tempo:
         linhas.append(f'🛵 Chega em {tempo}.')
     if codigo_entrega:

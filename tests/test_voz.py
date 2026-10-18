@@ -156,9 +156,7 @@ def test_pedido_inteiro_so_falando():
     m.enviar('529.982.247-25')
     assert m.estado()['fase'] == 'confirmar'
     m.wpp.limpar()
-    m.enviar('sim')                                          # o resumo também ofereceu um acompanhamento
-    assert not m.mcp.chamadas_de('submitOrder')              # "sim" pra quê? pergunta de novo, falando
-    m.enviar('fazer pedido assim')                           # a opção dita (no modo áudio não tem botão)
+    m.enviar('sim')                                          # o resumo ofereceu um acompanhamento; "sim" é pro pedido (18/10)
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
     assert so_audio(m)                                       # até o "pedido feito" é só áudio
     assert 'Pedido feito' in loc.falas[-1] or 'pedido feito' in loc.falas[-1].lower()

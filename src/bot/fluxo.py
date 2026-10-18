@@ -144,6 +144,7 @@ class Bot:
         try:
             entradas = entradas_de(msgs)
             self._disse = _sem_cpf(' / '.join(e.texto for e in entradas if e.texto))[:300]
+            self._esquecer_sugestao(entradas)
             if self._debug_reset(entradas):   # palavra secreta de debug: desloga e zera tudo
                 return
             if outro_ifood:
@@ -172,6 +173,21 @@ class Bot:
         finally:
             self._falar_rodada()
             self._salvar()
+
+    def _esquecer_sugestao(self, entradas):
+        """A sugestão do resumo ("quer manteiga?") vale UMA mensagem: se a resposta não fala dela, some pra sempre
+        neste pedido e nenhuma outra entra no lugar (18/10: "sim pra quê, o café ou o pedido?" era chatice). "Sim"
+        volta a ser sim pro pedido e "não" abre o mudar."""
+        u = self.u
+        sug = u.get('sugestao_resumo')
+        if not sug or u.get('fase') != 'confirmar':
+            return
+        dito = set(normalizar(' '.join(e.texto or '' for e in entradas)).split())
+        if any(str(e.botao or '').startswith('acomp') for e in entradas if e.tipo == 'botao'):
+            return
+        if any(p in dito for p in normalizar(sug).split() if len(p) >= 3):
+            return
+        u['sugestao_resumo'] = None
 
     def logou(self, wa_id):
         """Chamado quando o OAuth termina no navegador."""
@@ -876,12 +892,13 @@ class Bot:
             else:
                 self.repetir_pergunta(T.NAO_ENTENDI)
                 return
-        self._anotar_pagamento(intent.get('pagamento'), texto)
+        pagamento_dito = self._anotar_pagamento(intent.get('pagamento'), texto)
         # fala de verdade (passou pelo Gemini; número solto e botão não): escolha sem travar em quantidade
         # nem opção, e "pode fechar" vai direto pro fim do checkout
         self._falado = {'texto': normalizar(texto),
                         'qtd': next((i['quantidade'] for i in intent.get('itens') or [] if i.get('quantidade')), None),
-                        'fechar': bool(intent.get('fechar')) or bool(FECHAR.search(normalizar(texto)))}
+                        'fechar': bool(intent.get('fechar')) or bool(FECHAR.search(normalizar(texto))),
+                        'pagamento': pagamento_dito}
         if intent.get('transcricao'):
             print(f'transcrição {self.wa}: {intent["transcricao"][:200]}')
         self.intencao(intent)
@@ -1009,6 +1026,8 @@ class Bot:
                 # caía no "toque em Confirmar pedido" e quem pede por áudio nunca conseguia fechar
                 self.confirmar(str((u.get('carrinho') or {}).get('id') or '')[:12])
             else:
+                if self._anotar_pagamento(it.get('pagamento'), self._disse):  # "pode fechar no pix"
+                    self._fechar_direto()
                 self.finalizar()
         elif a == 'ver_pedido':
             self.mostrar_carrinho()
@@ -1862,6 +1881,13 @@ class Bot:
         tipo = PAGAMENTO_DITO.get(dito) or next((tp for r, tp in PAGAMENTO_NO_TEXTO if r.search(t)), None)
         if tipo:
             self.u['pagamento_preferido'] = {'tipo': tipo, 'nome': NOME_PAGAMENTO_DITO[tipo]}
+        return tipo
+
+    def _fechar_direto(self):
+        """"Já pode passar no pix": a pessoa mandou fechar e disse como paga. Quem orienta a etapa é ela: nada de
+        perguntar pagamento, pedir CPF nem mostrar o resumo pra confirmar (18/10). O pedido sai e o "Pedido feito"
+        traz o que foi pedido e o valor."""
+        self._direto = {'campo': 'total', 'teto': None, 'motivo': 'pessoa'}
 
     def escolher_oferta(self, arg):
         u = self.u
@@ -2017,7 +2043,10 @@ class Bot:
         if not car.get('itens'):
             self.perguntar_pedido()
             return
-        if (getattr(self, '_falado', None) or {}).get('fechar'):  # "quero esse e pode fechar": direto pro fim
+        falado = getattr(self, '_falado', None) or {}
+        if falado.get('fechar'):  # "quero esse e pode fechar": direto pro fim
+            if falado.get('pagamento'):  # "...e pode fechar no pix": sem resumo
+                self._fechar_direto()
             self.finalizar()
             return
         self.perguntar(T.mais_alguma(car.get('total') or car.get('subtotal'), self._pessoas(),
@@ -2152,6 +2181,8 @@ class Bot:
                 cpf = None
             if cpf:
                 u['cpf'] = cpf
+            elif self._direto is not None:  # "já pode passar no pix": sem CPF na nota, a pessoa mandou fechar
+                u['cpf'] = ''
             else:
                 # no modo áudio não tem botão pra ler em voz: "mudar" falado já vale (é comando)
                 self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF] + ([] if u.get('voz') else [T.B_MUDAR_CURTO]), fase='cpf')
@@ -2258,6 +2289,10 @@ class Bot:
         mais = [m for m in complementos([i.get('nome') or '' for i in car.get('itens') or []],
                                         (u.get('atual') or {}).get('tipo_loja') or 'MERCADO')
                 if m != u.get('sugestao_sem_estoque')]
+        if u.get('sugestao_mostrada') == car.get('id'):  # uma sugestão por pedido: aceita ou ignorada, não volta outra
+            mais = []
+        elif mais:
+            u['sugestao_mostrada'] = car.get('id')
         # com sugestão, o resumo faz duas perguntas: "sim"/"não" digitados viram uma pergunta de volta
         u['sugestao_resumo'] = mais[0] if mais else None
         u['resumo_de'] = _marca_resumo(car)
@@ -2272,7 +2307,8 @@ class Bot:
             teto = direto.get('teto')
             if not teto or (car.get(direto.get('campo') or 'total') or 0) <= teto * 1.10:
                 u['fase'] = 'confirmar'
-                u['via_lembrete'] = direto.get('rid') or True
+                u['via_lembrete'] = direto.get('rid') or direto.get('motivo') != 'pessoa'
+                u['fechou_direto'] = direto.get('motivo') == 'pessoa'  # o "Pedido feito" diz o que foi, já que não houve resumo
                 self.confirmar(car['id'][:12])
                 return
             texto = T.PRECO_SUBIU + '\n\n' + texto
@@ -2366,7 +2402,8 @@ class Bot:
                                tempo=(car.get('entrega') or {}).get('tempo'))
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
                                   detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo'),
-                                  total=car.get('total'), pessoas=pessoas))
+                                  total=car.get('total'), pessoas=pessoas,
+                                  resumo=T.lista_itens(car['itens']) if u.pop('fechou_direto', None) else None))
         if u.get('voz'):  # tudo áudio: os avisos do pedido a caminho também (fim = pedido entregue)
             u['voz']['rastreando'] = feito['id']
         self._salvar()  # o rastreio roda em outro processo e lê o modo áudio do armazém
@@ -2828,7 +2865,8 @@ class Bot:
                            and not any(_mesmo_termo(i, e) for e in extras)]
             dito = ' '.join(x for x in (ajuste, self._disse) if x)  # "por até 200": o valor pode não vir no ajuste
             teto = kit_grupo.teto_em(dito, pessoas or kit['pessoas']) or kit.get('teto')
-            self._montar_kit(pessoas or kit['pessoas'], tema, extras, ajuste or kit.get('ajuste'), anterior=anterior,
+            # só o ajuste NOVO: o que já foi pedido antes vai dentro do kit (ajustes/restricoes, src/bot/grupo.py)
+            self._montar_kit(pessoas or kit['pessoas'], tema, extras, ajuste, anterior=anterior,
                              teto=teto)
             return
         car = u.get('carrinho') or {}
@@ -2937,7 +2975,7 @@ class Bot:
         elif not k or not k.get('linhas'):
             self.repetir_pergunta(T.BOTAO_VELHO) if self.u.get('fase') != 'kit' else self.perguntar_pedido()
         elif arg == 'outra':
-            self._montar_kit(k['pessoas'], k['tema'], k.get('extras'), k.get('ajuste'), anterior=k, outra_loja=True,
+            self._montar_kit(k['pessoas'], k['tema'], k.get('extras'), None, anterior=k, outra_loja=True,
                              teto=k.get('teto'))
         else:
             self.kit_ok()

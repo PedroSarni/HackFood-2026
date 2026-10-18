@@ -608,13 +608,11 @@ def test_toque_duplo_em_confirmar_nao_faz_dois_pedidos():
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
-def test_sim_no_resumo_com_sugestao_pergunta_uma_vez_e_o_sim_seguinte_fecha():
+def test_sim_no_resumo_com_sugestao_fecha_o_pedido():
+    """18/10 (Fabio): a sugestão vale uma mensagem. "Sim" é sim pro pedido, sem "sim pra quê?"."""
     m = pedido_ate_o_resumo(Mundo())
     assert 'pra acompanhar' in m.estado()['pergunta']['texto']   # o resumo também oferece a manteiga
     m.enviar('pode sim')
-    assert not m.mcp.chamadas_de('submitOrder')                  # sim pra manteiga ou pro pedido?
-    assert [t for _, t in m.wpp.ultimos_botoes()] == ['✅ Fazer pedido assim', '➕ Colocar manteiga', '✏️ Mudar']
-    m.enviar('sim')   # 18/10: quem pede por áudio não toca em botão; antes perguntava de novo pra sempre
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
@@ -1166,8 +1164,9 @@ def test_pagamento_dito_pula_a_pergunta_e_o_resumo_sugere_o_que_acompanha():
     m.enviar('quero dois desse, pode fechar, vou pagar no pix')
     m.llm.resposta = None
     ids = m.wpp.todos_ids()
-    assert not any(i.startswith('pag:') for i in ids) and any(i.startswith('ok:') for i in ids)
-    assert 'pra acompanhar' in ' '.join(m.wpp.textos())
+    # 18/10: disse como paga e mandou fechar: sem pergunta de pagamento, sem resumo pra confirmar, pedido feito
+    assert not any(i.startswith('pag:') for i in ids) and not any(i.startswith('ok:') for i in ids)
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1 and 'Pedido feito' in ' '.join(m.wpp.textos())
 
 
 def test_a_de_calabresa_grande_escolhe_pelo_nome_e_pelo_tamanho_falados():
@@ -1573,27 +1572,21 @@ def _resumo_sem_sugestao(m, monkeypatch):
     return m
 
 
-def test_sim_com_sugestao_mostra_os_3_botoes_e_o_sim_seguinte_fecha():
+def test_sim_com_sugestao_fecha_na_hora_e_a_sugestao_some():
     m = pedido_ate_o_resumo(Mundo())
     m.wpp.limpar()
     m.enviar('sim')
-    assert not m.mcp.chamadas_de('submitOrder')
-    assert m.estado()['fase'] == 'confirmar'
-    botoes = m.wpp.ultimos_botoes()
-    assert [i for i, _ in botoes][1:] == ['acomp', 'mudar'] and botoes[0][0].startswith('ok:')
-    assert all(len(t) <= 20 for _, t in botoes)
-    m.enviar('sim')                              # já não é ambíguo: fecha (por áudio também, sem toque)
-    assert len(m.mcp.chamadas_de('submitOrder')) == 1
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1 and m.estado().get('sugestao_resumo') is None
 
 
-def test_nao_com_sugestao_nao_abre_o_mudar_direto():
+def test_nao_com_sugestao_abre_o_mudar_e_a_sugestao_nunca_mais_volta():
     m = pedido_ate_o_resumo(Mundo())
     m.enviar('não')
-    assert m.estado()['fase'] == 'confirmar'
-    assert 'mud:itens' not in [i for i, _ in m.wpp.ultimos_botoes()]
-    assert [i for i, _ in m.wpp.ultimos_botoes()][1:] == ['acomp', 'mudar']
-    assert not m.mcp.chamadas_de('submitOrder')
-    m.enviar('sim')                              # respondeu a pergunta de volta: fecha, sem perguntar de novo
+    assert m.estado()['fase'] == 'mudar' and not m.mcp.chamadas_de('submitOrder')
+    assert m.estado().get('sugestao_resumo') is None
+    m.enviar('pode fechar')                      # o resumo de novo: sem sugestão nenhuma (uma por pedido)
+    assert m.estado()['fase'] == 'confirmar' and 'pra acompanhar' not in m.estado()['pergunta']['texto']
+    m.enviar('sim')
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
@@ -1609,27 +1602,34 @@ def test_nao_sem_sugestao_continua_abrindo_o_mudar(monkeypatch):
     assert m.estado()['fase'] == 'mudar'
 
 
-def test_colocar_sugestao_adiciona_o_item_e_mostra_o_resumo_de_novo():
+def test_falar_da_sugestao_coloca_o_item_e_o_resumo_volta_sem_outra_sugestao():
     m = pedido_ate_o_resumo(Mundo())
-    m.enviar('sim')
     antes = len(m.estado()['carrinho']['itens'])
-    m.tocar('acomp')
+    m.llm.resposta = {'acao': 'comprar', 'itens': [{'termo': 'manteiga', 'busca': 'manteiga', 'quantidade': 1,
+                                                   'tipo_loja': 'MERCADO', 'observacao': None}]}
+    m.enviar('coloca a manteiga')                # falou dela: entra no pedido
+    m.llm.resposta = None
+    if m.estado()['fase'] == 'escolhendo':
+        m.tocar('pick:')
     car = m.estado()['carrinho']
     assert len(car['itens']) == antes + 1 and any('Manteiga' in i['nome'] for i in car['itens'])
-    assert m.mcp.chamadas_de('addItemToCart')
-    assert m.estado()['fase'] == 'confirmar' and 'Confira seu pedido' in m.estado()['pergunta']['texto']
-    assert car.get('entrega') and car.get('pagamento')   # entrega e pagamento refeitos pro resumo novo
     assert not m.mcp.chamadas_de('submitOrder')
+    m.tocar('fim')
+    assert m.estado()['fase'] == 'confirmar' and 'pra acompanhar' not in m.estado()['pergunta']['texto']  # uma por pedido
     m.tocar('ok:')
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
 def test_sugestao_que_a_loja_nao_tem_volta_pro_resumo_sem_ela(monkeypatch):
     m = pedido_ate_o_resumo(Mundo())
-    m.enviar('sim')
     monkeypatch.setattr('src.bot.fluxo.Bot._coletar', lambda self, pedido, loja_id: ([], None))
-    m.tocar('acomp')
-    assert m.estado()['fase'] == 'confirmar' and not m.mcp.chamadas_de('submitOrder')
+    m.llm.resposta = {'acao': 'comprar', 'itens': [{'termo': 'manteiga', 'busca': 'manteiga', 'quantidade': 1,
+                                                   'tipo_loja': 'MERCADO', 'observacao': None}]}
+    m.enviar('quero a manteiga')                 # a loja não tem
+    m.llm.resposta = None
+    assert not m.mcp.chamadas_de('submitOrder')
+    m.enviar('pode fechar')
+    assert m.estado()['fase'] == 'confirmar'
     assert 'manteiga' not in m.estado()['pergunta']['texto'].split('Total')[-1]   # não oferece de novo
 
 
@@ -1726,8 +1726,9 @@ def test_lembrete_com_itens_iguais_e_entrega_nao_diz_que_o_preco_mudou(monkeypat
     assert not any('preço mudou' in t for t in m.wpp.textos())
     assert len(m.mcp.chamadas_de('submitOrder')) == 1  # o "sim" do lembrete fechou o pedido
     rec = m.recs_dic[m.wa][0]
-    assert rec['total'] == round(sub + 4.99, 2)  # o próximo lembrete já mostra o que a pessoa pagou
-    assert f'Da última vez: {T.reais(sub + 4.99)}' in T.lembrete(rec)
+    cupom = 5.0 if sub >= 30 else 0.0  # o mock dá R$ 5 de cupom acima de R$ 30 (o catálogo embutido cresce)
+    assert rec['total'] == round(sub + 4.99 - cupom, 2)  # o próximo lembrete já mostra o que a pessoa pagou
+    assert f'Da última vez: {T.reais(sub + 4.99 - cupom)}' in T.lembrete(rec)
 
 
 def test_lembrete_com_itens_mais_caros_diz_que_o_preco_mudou(monkeypatch):

@@ -385,3 +385,23 @@ def test_aviso_do_rastreio_diz_qual_pedido_e():
     assert len(avisos) == 3 and all(a.startswith(T.STATUS[c]) for a, c in zip(avisos, ('CONFIRMED', 'DISPATCHED', 'DELIVERED')))
     assert all('Pedido *B1013* · *Supermercado Dona Lurdes*' in a and 'Picanha' in a and 'R$ 157,70' in a for a in avisos), avisos
     assert 'Pizzaria' not in avisos[1]
+
+
+def test_ja_pode_passar_no_pix_fecha_direto_sem_resumo_nem_cpf():
+    """18/10: quem manda é a pessoa. "Já pode passar no pix" = PIX escolhido, sem pedir CPF, sem "Confira seu
+    pedido": o pedido sai na hora e o "Pedido feito" diz o que foi e quanto deu."""
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:2')
+    m.wpp.limpar()
+    m.enviar('já pode passar no pix')
+    textos = ' '.join(m.wpp.textos())
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1
+    assert 'Confira seu pedido' not in textos and 'CPF' not in textos and 'Como você quer pagar' not in textos
+    assert 'Pedido feito' in textos and 'PIX' in textos
+    pag = m.mcp.chamadas_de('setCartPayment')[-1]['paymentMethodId']
+    assert 'PIX' in str(m.mcp.armazem[f'mock:{m.wa}']['carrinhos'][next(iter(m.mcp.armazem[f'mock:{m.wa}']['carrinhos']))]['paymentMethod']['kind']) and pag
+    assert m.estado()['pedidos'][0]['total'] and m.estado()['carrinho'] is None
+    assert interpretar.regra_rapida('já pode passar no pix') == {'acao': 'finalizar', 'pagamento': 'PIX'}
+

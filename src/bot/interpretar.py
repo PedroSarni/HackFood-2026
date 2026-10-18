@@ -219,6 +219,11 @@ FINALIZAR = re.compile(r'(?:ja |agora )?(?:pode |quero |vou )?(?:fechar|finaliza
                        r'|(?:e )?so isso(?: mesmo)?|terminei|acabou|(?:pode )?fechar ai|ja fecha|fecha ai')
 
 
+# "já pode passar no pix", "fecha no pix", "pode pagar com pix": fechar E como paga, sem passar pela IA
+FECHAR_NO_PIX = re.compile(r'(?:ja |agora )?(?:pode |quero |vou |e so )?(?:passar|fechar|finalizar|pagar|fecha|paga|manda|mandar|deixa|deixar)'
+                           r'(?: o pedido| tudo| ai| isso| esse)?(?: no| em| com| pelo| por| via)?(?: o)? pix(?: mesmo| ai| entao)?')
+
+
 def regra_rapida(texto):
     """Intenção sem LLM, ou None. Devolve dict no mesmo formato do ESQUEMA."""
     t = normalizar(texto)
@@ -234,6 +239,8 @@ def regra_rapida(texto):
         return {'acao': 'acompanhar', 'sobre': 'codigo_entrega'}
     if TROCAR_LOJA.search(t):
         return {'acao': 'trocar_loja'}
+    if FECHAR_NO_PIX.fullmatch(t):
+        return {'acao': 'finalizar', 'pagamento': 'PIX'}
     if FINALIZAR.fullmatch(t):  # "finalizar pedido", "pode fechar", "só isso" ditos: sem depender do botão nem da IA
         return {'acao': 'finalizar'}
     if t in SIM:
