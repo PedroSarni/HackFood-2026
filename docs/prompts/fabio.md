@@ -730,3 +730,15 @@ buscas do que acompanha vão em paralelo e UM filtro do modelo cobre todas as bu
 `src/bot/grupo.py`); o freio do iFood segura o ritmo. Opções sem código, pra decidir no dash: pôr o
 `gemini-3.5-flash-lite` na frente da fila da Vina (roteiro da voz) e da Duda (relevância), que respondem em ~1,2 s
 contra 2,5–5 s do Sonnet; e baixar o `ESPERA_AUDIO` (1,8 s) do buffer.
+
+## 2026-10-18 ~08h50 — Haiku na Vina e na Duda, e subir tudo
+
+**Prompt:** "na vina e duda deixe o haiku entao, que é mais rapido né" / "dps disso pode fazer os pull com todas as
+correcoes certinho"
+
+**Resposta:** Medido com as keys do Modal (3 amostras em prompts reais): Duda — Haiku 0,8–1,4 s contra Sonnet
+1,2–4,7 s; Vina (roteiro) — Haiku 1,4–1,7 s contra Sonnet 1,9–2,0 s. Pegadinha: o Haiku 5.5 recusa o
+`thinking: between_tools` que o bot manda pro Sonnet 5.5 (HTTP 400; o bot cairia na reserva e ficaria MAIS lento),
+então pra ele vai `thinking: disabled` (`_chamar_claude`, com teste). Fila da Duda (`src/agentes/relevancia.py`) e
+`MODELOS_ROTEIRO` da Vina com o Haiku na frente e o Sonnet de reserva; `claude-haiku-5-5` entrou nas opções do dash.
+Commit + push e deploy no Modal com tudo: Beto consistente, kit em paralelo e Haiku.

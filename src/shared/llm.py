@@ -28,6 +28,7 @@ import httpx
 
 GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
 CLAUDE = 'claude-sonnet-5-5'
+CLAUDE_RAPIDO = 'claude-haiku-5-5'  # 18/10 08h40: quem tem pressa (roteiro da voz, filtro de relevância) vai de Haiku
 # 17/10 23h: o 3.1-lite passou a estourar 6 s seguidos e o 3.5-lite responde em ~1,2 s: o 3.5 vai na frente
 MODELOS = [(CLAUDE, 8.0, ''), ('gemini-3.5-flash-lite', 6.0, ''), ('gemini-3.1-flash-lite', 4.0, ''),
            ('gemini-3.8-flash', 9.0, 'low')]
@@ -182,7 +183,9 @@ def _chamar_claude(modelo, sistema, conteudo, esquema, prazo, pensamento):
               'output_config': {'effort': pensamento or 'low',
                                 'format': {'type': 'json_schema', 'schema': _esquema_claude(esquema)}}}
     if not pensamento:
-        pedido['thinking'] = {'type': 'between_tools'}
+        # sem pensar: o Sonnet 5.5 só aceita "between_tools" (disabled dá 400); o Haiku 5.5 é o contrário
+        # (between_tools dá 400, 18/10 08h50; desligado ele aceita e respondeu em ~1 s nos prompts da Duda)
+        pedido['thinking'] = {'type': 'disabled'} if 'haiku' in modelo else {'type': 'between_tools'}
     try:
         r = _cliente_claude().with_options(timeout=prazo).messages.create(**pedido)
     except anthropic.APIStatusError as e:

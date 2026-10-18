@@ -199,7 +199,7 @@ def publicar_ar(armazem, agora):
 def conhecidos():
     """Modelos que dá pra escolher como principal no dash (os que já rodam no bot)."""
     from src.shared import llm
-    nomes = [m[0] for m in llm.MODELOS] + [f'openrouter:{m}' for m in llm.OPENROUTER_MODELOS]
+    nomes = [m[0] for m in llm.MODELOS] + [llm.CLAUDE_RAPIDO] + [f'openrouter:{m}' for m in llm.OPENROUTER_MODELOS]
     return list(dict.fromkeys(nomes))
 
 

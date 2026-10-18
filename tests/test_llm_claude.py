@@ -163,3 +163,17 @@ def test_rotas_do_sino_listam_e_marcam_como_lidas():
     assert cli.post('/api/alertas/lidas', headers={'origin': 'https://exemplo.com'}).status_code == 403
     assert cli.post('/api/alertas/lidas').json()['naoLidas'] == 0
     assert cli.get('/api/alertas?fonte=demo').status_code == 404
+
+
+def test_haiku_desliga_o_pensamento_do_jeito_dele(claude):
+    # 18/10 08h50: o Haiku 5.5 recusa thinking "between_tools" (HTTP 400, e o bot cairia na reserva, mais lento);
+    # desligado ele aceita, e respondeu em ~1 s nos prompts da Duda. O Sonnet continua com between_tools.
+    falso = claude(ClaudeFalso())
+    http, gemini = gemini_ok()
+    dados, modelo, _ = llm.gerar_json('sis', [('texto', 'pode')], ESQUEMA, http=http,
+                                      modelos=[(llm.CLAUDE_RAPIDO, 6.0, ''), (llm.CLAUDE, 8.0, '')])
+    assert dados == {'acao': 'sim'} and modelo == 'claude-haiku-5-5' and not gemini
+    p = falso.pedidos[0]
+    assert p['model'] == 'claude-haiku-5-5' and p['thinking'] == {'type': 'disabled'}
+    assert p['output_config']['effort'] == 'low' and p['output_config']['format']['type'] == 'json_schema'
+    assert falso.prazos == [6.0]
