@@ -1766,9 +1766,10 @@ def test_combinado_e_lembrete_do_automatico_somam_o_mesmo_produto():
     m.armazem[f'u:{m.wa}'] = u
     m.tocar('fim')
     nome = linha['nome']
-    assert f'4x {nome}' in m.wpp.textos()[-1] and f'3x {nome}' not in m.wpp.textos()[-1]  # o "Combinado!"
+    # o pão sírio do mock vende em pacote: a linha junta as duas e diz a unidade ("4 pacotes de", não "4x")
+    assert f'4 pacotes de {nome}' in m.wpp.textos()[-1] and f'3 pacotes de {nome}' not in m.wpp.textos()[-1]  # o "Combinado!"
     rec = m.recs_dic[m.wa][0]
-    assert f'🧾 4x {nome}' in T.lembrete(rec)
+    assert f'🧾 4 pacotes de {nome}' in T.lembrete(rec)
 
 
 # --- U28: "Hoje não" diz quando volta -----------------------------------------------------------

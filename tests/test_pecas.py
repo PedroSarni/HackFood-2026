@@ -231,8 +231,8 @@ def test_cpf_valida_digitos():
 
 
 def test_igual_a_botao_aceita_o_texto_do_botao_digitado():
-    assert I.igual_a_botao('finalizar pedido', ['✅ Finalizar pedido', '➕ Quero mais coisas']) == 0
-    assert I.igual_a_botao('banana', ['✅ Finalizar pedido']) is None
+    assert I.igual_a_botao('revisar pedido', ['🧾 Revisar pedido', '➕ Quero mais coisas']) == 0
+    assert I.igual_a_botao('banana', ['🧾 Revisar pedido']) is None
 
 
 def test_interpretar_limpa_saida_ruim_do_modelo():
@@ -573,3 +573,44 @@ def test_lembrete_so_fala_de_fome_quando_e_comida():
     assert 'fome' not in farm and 'farmácia' in farm
     assert 'compras' in T.lembrete({'resumo': '2x Leite integral', 'loja': 'Supermercado Central'})
     assert 'fome' in T.lembrete({'resumo': '1x X-Burger', 'loja': 'Burger House'})
+
+
+def test_unidade_de_venda_quilo_embalagem_ou_unidade():
+    """18/10: "Quantas unidades de Banana Nanica?" parecia uma banana, e era 1 kg."""
+    from src.bot import textos as T
+    assert T.unidade('Banana Nanica', '')['tipo'] == 'kg'                     # hortifruti sem nada escrito: quilo
+    assert T.unidade('Banana prata', 'Kg')['tipo'] == 'kg'
+    assert T.unidade('Patinho Bovino Bife Congelado', '')['tipo'] == 'kg'
+    emb = T.unidade('Carne moída de patinho Friboi', 'Bandeja 1 kg. Moída na hora.')
+    assert emb['tipo'] == 'emb' and emb['sing'] == 'bandeja' and emb['detalhe'] == '1 kg' and emb['fem']
+    pac = T.unidade('Arroz branco Tio João tipo 1', 'Pacote 5 kg.')
+    assert pac['tipo'] == 'emb' and pac['plu'] == 'pacotes' and pac['detalhe'] == '5 kg'
+    assert T.unidade('Leite integral Italac', 'Caixa 1 litro.')['sing'] == 'caixa'
+    assert T.unidade('X-Burger', 'Pão, hambúrguer 120 g e queijo')['tipo'] == 'un'   # "120 g" no recheio não vira embalagem
+    assert T.unidade('Dipirona 500 mg', 'Caixa com 10 comprimidos')['sing'] == 'caixa'
+    # a pergunta, os botões e o "coloquei" seguem a unidade
+    assert T.quantos('Banana Nanica', T.unidade('Banana Nanica')) .startswith('Quantos quilos de *Banana Nanica*')
+    assert [b[1] for b in T.botoes_qtd(T.unidade('Banana Nanica'))] == ['1 kg', '2 kg', '3 kg']
+    assert T.quantos('Carne moída', emb).startswith('Quantas bandejas de 1 kg de *Carne moída*')
+    assert T.quantos('Leite', T.unidade('Leite', 'Caixa 1 litro')).startswith('Quantas caixas de 1 litro de *Leite*')
+    assert T.colocado(2, 'Banana Nanica', T.unidade('Banana Nanica')) == '✅ Coloquei *2 kg de Banana Nanica* no seu pedido.'
+    assert T.colocado(1, 'Carne moída', emb) == '✅ Coloquei *1 bandeja (1 kg) de Carne moída* no seu pedido.'
+    assert T.colocado(3, 'Leite', None) == '✅ Coloquei *3x Leite* no seu pedido.'
+    assert T.linha_item({'qtd': 2, 'nome': 'Banana', 'unidade': {'tipo': 'kg'}}) == '2 kg de Banana'
+
+
+def test_banana_no_fluxo_pergunta_quilos_e_o_carrinho_mostra_kg():
+    from src.bot import textos as T
+    from tests.fakes import Mundo
+    from tests.test_fluxo import endereco_pronto
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('quero banana')
+    m.tocar('pick:')
+    pergunta = m.wpp.saida[-1][1]['texto']
+    assert 'unidades' not in pergunta and ('quilos' in pergunta or 'cachos' in pergunta), pergunta
+    m.tocar('qtd:2')
+    textos = ' '.join(d.get('texto', '') for _, d in m.wpp.saida)
+    assert 'Coloquei *2 kg de Banana' in textos or 'Coloquei *2 cachos (1 kg) de Banana' in textos, textos[-300:]
+    assert '2x Banana' not in textos
+    assert m.estado()['carrinho']['itens'][-1]['unidade']['tipo'] in ('kg', 'emb')

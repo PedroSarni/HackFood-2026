@@ -1778,7 +1778,8 @@ class Bot:
         if not esc.get('qtd'):
             if not falado:
                 nome = esc['item'].get('nome') or esc['oferta']['nome']
-                self.perguntar(T.quantos(nome), [('qtd:1', '1'), ('qtd:2', '2'), ('qtd:3', '3')], fase='quantidade')
+                un = T.unidade(nome, esc['item'].get('descricao'), esc.get('tipo_loja'))  # quilo, pacote... (18/10: banana era 1 kg)
+                self.perguntar(T.quantos(nome, un), T.botoes_qtd(un), fase='quantidade')
                 return
             esc['qtd'] = falado.get('qtd') or 1
         self.adicionar()
@@ -1819,8 +1820,8 @@ class Bot:
             return
         n = numero_em(arg) if not str(arg).isdigit() else int(arg)
         if not n or n < 1 or n > 50:
-            self.perguntar('Me diga um número de 1 a 50. 🙂', [('qtd:1', '1'), ('qtd:2', '2'), ('qtd:3', '3')],
-                           fase='quantidade')
+            un = T.unidade(esc['item'].get('nome') or esc['oferta']['nome'], esc['item'].get('descricao'), esc.get('tipo_loja'))
+            self.perguntar('Me diga um número de 1 a 50. 🙂', T.botoes_qtd(un), fase='quantidade')
             return
         esc['qtd'] = n
         self.adicionar()
@@ -1841,21 +1842,22 @@ class Bot:
         novo['loja'] = novo.get('loja') or (car or {}).get('loja') or of.get('loja')
         # guardamos as opções escolhidas de cada linha pra conseguir refazer o carrinho depois
         # (mudança de endereço); a linha nova é o cartItemId que não existia antes
+        un = T.unidade(esc['item'].get('nome') or of['nome'], esc['item'].get('descricao'), esc.get('tipo_loja'))  # quilo, pacote...
         for it in novo.get('itens') or []:
             velho = antes.get(it['cart_item_id'])
             if velho:
                 it['opcoes'], it['obs'] = velho.get('opcoes'), velho.get('obs')
-                it['termo'], it['tipo_loja'] = velho.get('termo'), velho.get('tipo_loja')
+                it['termo'], it['tipo_loja'], it['unidade'] = velho.get('termo'), velho.get('tipo_loja'), velho.get('unidade')
             elif it.get('item_id') == of['item_id']:
                 it['opcoes'], it['obs'] = esc['opcoes'], esc.get('obs')
                 # o que a pessoa pediu ("arroz"): no "Trocar de loja" é o que se procura na loja nova
-                it['termo'], it['tipo_loja'] = esc.get('termo'), esc.get('tipo_loja')
+                it['termo'], it['tipo_loja'], it['unidade'] = esc.get('termo'), esc.get('tipo_loja'), un
         u['carrinho'] = novo
         u['escolha'] = None
         nome = esc['item'].get('nome') or of['nome']
         if esc['opcoes']:
             nome += ' (' + ', '.join(o['nome'] for o in esc['opcoes']) + ')'
-        self.dizer(T.colocado(esc['qtd'], nome))
+        self.dizer(T.colocado(esc['qtd'], nome, un))
         self._proximo_da_fila()
 
     def _proximo_da_fila(self, pulou=False):
@@ -1884,7 +1886,7 @@ class Bot:
         if not car.get('itens'):  # 18/10: "mostra o meu carrinho" vazio só perguntava o que pedir, sem dizer que estava vazio
             self.perguntar(T.CARRINHO_VAZIO + '\n\n' + T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             return
-        linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car['itens'])
+        linhas = '\n'.join(f'• {T.linha_item(i)}' for i in car['itens'])
         self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"), self._pessoas(), *_falta_minimo(car), subtotal=car.get("subtotal"))}',
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
 
@@ -1894,7 +1896,7 @@ class Bot:
         if not itens:
             self.perguntar_pedido()
             return
-        botoes = [(f'rem:{i}', it['nome'], f'{it["qtd"]}x · {T.reais(it.get("preco_total"))}')
+        botoes = [(f'rem:{i}', it['nome'], f'{T.qtd_nome(it["qtd"], "", it.get("unidade")).replace(" de ", "").rstrip()} · {T.reais(it.get("preco_total"))}')
                   for i, it in enumerate(itens[:10])]
         if len(botoes) <= 3:
             botoes = [(b[0], b[1]) for b in botoes]
@@ -2019,11 +2021,11 @@ class Bot:
         car = self.u['carrinho']
         if not novo:
             return car
-        guardadas = {i.get('cart_item_id'): (i.get('opcoes'), i.get('obs'), i.get('termo'), i.get('tipo_loja'))
+        guardadas = {i.get('cart_item_id'): (i.get('opcoes'), i.get('obs'), i.get('termo'), i.get('tipo_loja'), i.get('unidade'))
                      for i in car.get('itens') or []}
         for i in novo.get('itens') or []:
-            i['opcoes'], i['obs'], i['termo'], i['tipo_loja'] = guardadas.get(i.get('cart_item_id'),
-                                                                              ([], None, None, None))
+            i['opcoes'], i['obs'], i['termo'], i['tipo_loja'], i['unidade'] = guardadas.get(
+                i.get('cart_item_id'), ([], None, None, None, None))
         for k in ('itens', 'subtotal', 'taxa_entrega', 'taxas', 'desconto', 'total', 'minimo'):
             if novo.get(k) is not None:
                 car[k] = novo[k]
@@ -2404,7 +2406,7 @@ class Bot:
         self.u['carrinho'] = car
         self.u['fila'] = []
         self.u['grupo'] = None
-        linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car.get('itens') or [])
+        linhas = '\n'.join(f'• {T.linha_item(i)}' for i in car.get('itens') or [])
         self.dizer(f'🔁 Montei igual da outra vez:\n{linhas}')
         self.finalizar()
 

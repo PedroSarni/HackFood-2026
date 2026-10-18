@@ -347,6 +347,6 @@ def test_fala_longa_corta_no_fim_da_frase():
 
 def test_roteiro_simples_fala_dinheiro_e_opcoes_como_gente():
     fala = voz.roteiro_simples([{'tipo': 'botoes', 'texto': '🧺 Seu pedido até agora: *R$ 12,90*\n\nQuer mais?',
-                                 'opcoes': ['✅ Finalizar pedido', '➕ Quero mais coisas']}])
+                                 'opcoes': ['🧾 Revisar pedido', '➕ Quero mais coisas']}])
     assert '12 reais e 90. Quer mais?' in fala and 'R$' not in fala and fala.endswith(voz.CONVITE)
-    assert 'Finalizar pedido ou Quero mais coisas?' in fala
+    assert 'Revisar pedido ou Quero mais coisas?' in fala

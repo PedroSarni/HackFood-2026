@@ -220,7 +220,7 @@ def test_meu_pedido_com_carrinho_montando_mostra_o_carrinho_e_cade_e_do_que_ja_s
     m = _com_dois_paes()
     m.wpp.limpar()
     m.enviar('meu pedido')
-    assert 'Seu pedido:*' in m.wpp.textos()[-1] and '2x' in m.wpp.textos()[-1]   # U21: era o pedido antigo
+    assert 'Seu pedido:*' in m.wpp.textos()[-1] and '2 pacotes de' in m.wpp.textos()[-1]   # U21: era o pedido antigo
     assert interpretar.regra_rapida('cadê meu pedido') == {'acao': 'acompanhar', 'sobre': 'status'}
 
 

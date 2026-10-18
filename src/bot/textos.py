@@ -36,9 +36,14 @@ def somar_iguais(itens):
     return list(juntos.values())
 
 
+def linha_item(it):
+    """'2 kg de Banana' / '1 bandeja (500 g) de Carne moída' / '3x Leite': a unidade fica guardada na linha."""
+    return qtd_nome(it['qtd'], it['nome'], it.get('unidade'))
+
+
 def lista_itens(itens):
     """'5x Leite integral, 1x Pão francês': o que vai no lembrete e no "Combinado!" do automático."""
-    return ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in somar_iguais(itens))
+    return ', '.join(linha_item(i) for i in somar_iguais(itens))
 
 
 # --- botões fixos (id, título) --------------------------------------------------------
@@ -52,7 +57,7 @@ B_INICIO = ('inicio', '🏠 Início')
 B_OUTRA = ('outra', '🔎 Procurar outra')
 B_TROCAR_LOJA = ('loja', '🏪 Trocar de loja')     # lista com plano (src/bot/melhor_loja.py)
 B_FICAR_NA_LOJA = ('loja_fica', '↩️ Continuar aqui')
-B_FINALIZAR = ('fim', '✅ Finalizar pedido')
+B_FINALIZAR = ('fim', '🧾 Revisar pedido')  # abre o resumo pra conferir; quem fecha é o Confirmar (18/10: "Finalizar" prometia demais)
 B_MAIS_COISAS = ('add', '➕ Quero mais coisas')
 B_SUGERIR = ('sugerir', '💡 Me sugere algo')
 
@@ -292,10 +297,77 @@ B_PULAR = ('pular', '⏭️ Pular esse item')
 B_ESCREVER = ('outra', '✏️ Escrever de novo')
 
 
-def quantos(nome):
+def _sem_acento(texto):
+    import unicodedata
+    t = unicodedata.normalize('NFKD', str(texto or '').lower())
+    return ''.join(c for c in t if not unicodedata.combining(c))
+
+
+
+# --- unidade de venda ------------------------------------------------------------------------
+# 18/10: "Quantas unidades de Banana Nanica?" parecia uma banana, e era 1 kg. A unidade sai do nome e da
+# descrição do item ("Kg", "Aprox. 1 kg" = quilo; "Pacote 500 g" = pacote; "Bandeja 1 kg" = bandeja).
+# Hortifruti e carne sem nada escrito: quilo, que é como o iFood vende. O resto segue "unidades".
+_EMBALAGENS = [  # (palavra no texto, singular, plural, feminino)
+    ('pacote', 'pacote', 'pacotes', False), ('pct', 'pacote', 'pacotes', False), ('caixa', 'caixa', 'caixas', True),
+    ('cx', 'caixa', 'caixas', True), ('bandeja', 'bandeja', 'bandejas', True), ('lata', 'lata', 'latas', True),
+    ('garrafa', 'garrafa', 'garrafas', True), ('pote', 'pote', 'potes', False), ('saco', 'saco', 'sacos', False),
+    ('duzia', 'dúzia', 'dúzias', True), ('cacho', 'cacho', 'cachos', False), ('peca', 'peça', 'peças', True),
+    ('porcao', 'porção', 'porções', True), ('fatia', 'fatia', 'fatias', True), ('copo', 'copo', 'copos', False),
+    ('frasco', 'frasco', 'frascos', False), ('tubo', 'tubo', 'tubos', False), ('barra', 'barra', 'barras', True),
+    ('embalagem', 'embalagem', 'embalagens', True), ('fardo', 'fardo', 'fardos', False), ('pack', 'pack', 'packs', False),
+]
+_POR_QUILO = re.compile(r'\b(?:kg|kgs|quilo|quilos|kilo|kilos)\b')
+_PESO = re.compile(r'\b(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|litros?|un|unidades?)\b')
+_VENDIDO_POR_QUILO = ('banana', 'tomate', 'cebola', 'batata', 'laranja', 'maca', 'limao', 'cenoura', 'uva', 'mamao',
+                      'manga', 'pera', 'goiaba', 'abobrinha', 'pepino', 'beterraba', 'chuchu', 'mandioca', 'abobora',
+                      'carne', 'picanha', 'alcatra', 'contrafile', 'maminha', 'fraldinha', 'costela', 'acem', 'patinho',
+                      'coxao', 'musculo', 'lagarto', 'paleta', 'cupim', 'linguica', 'frango', 'peito', 'coxa', 'sobrecoxa',
+                      'file', 'peixe', 'tilapia', 'salmao', 'camarao', 'bife', 'moida')
+
+
+def unidade(nome, descricao='', tipo_loja=None):
+    """{'tipo': 'kg'|'emb'|'un', 'sing', 'plu', 'fem', 'detalhe'}: como a loja vende este item. Hortifruti e carne
+    valem pela 1ª palavra do NOME e só fora de restaurante ("Pizza de frango" e "muçarela, tomate" não são por quilo)."""
+    t = _sem_acento(f'{nome} {descricao or ""}')
+    palavras = set(re.findall(r'[a-z]+', t))
+    primeira = (re.findall(r'[a-z]+', _sem_acento(nome)) or [''])[0]
+    for chave, sing, plu, fem in _EMBALAGENS:
+        if chave in palavras:
+            peso = _PESO.search(t)
+            detalhe = f'{peso.group(1).replace(".", ",")} {peso.group(2)}' if peso and peso.group(2) not in ('un', 'unidade', 'unidades') else None
+            return {'tipo': 'emb', 'sing': sing, 'plu': plu, 'fem': fem, 'detalhe': detalhe}
+    if _POR_QUILO.search(t) or (tipo_loja != 'RESTAURANTE' and primeira in _VENDIDO_POR_QUILO):
+        return {'tipo': 'kg', 'sing': 'quilo', 'plu': 'quilos', 'fem': False, 'detalhe': None}
+    return {'tipo': 'un', 'sing': 'unidade', 'plu': 'unidades', 'fem': True, 'detalhe': None}
+
+
+def qtd_nome(qtd, nome, un=None):
+    """'2 kg de Banana nanica', '1 bandeja (500 g) de Carne moída', '3x Leite integral'."""
+    un = un or {}
+    if un.get('tipo') == 'kg':
+        return f'{qtd} kg de {nome}'
+    if un.get('tipo') == 'emb':
+        medida = f' ({un["detalhe"]})' if un.get('detalhe') else ''
+        return f'{qtd} {un["sing"] if qtd == 1 else un["plu"]}{medida} de {nome}'
+    return f'{qtd}x {nome}'
+
+
+def quantos(nome, un=None):
+    un = un or {}
+    if un.get('tipo') == 'kg':
+        return f'Quantos quilos de *{nome}* você quer?\nToque no número, ou escreva.'
+    if un.get('tipo') == 'emb':
+        medida = f' de {un["detalhe"]}' if un.get('detalhe') else ''
+        return f'{"Quantas" if un["fem"] else "Quantos"} {un["plu"]}{medida} de *{nome}* você quer?\nToque no número, ou escreva.'
     # "unidades" concorda sempre com "Quantas"; "de <nome>" serve pra qualquer produto, sem
     # risco de gênero errado ("Quantos Picanha" ficava torto)
     return f'Quantas unidades de *{nome}* você quer?\nToque no número, ou escreva.'
+
+
+def botoes_qtd(un=None):
+    sufixo = ' kg' if (un or {}).get('tipo') == 'kg' else ''
+    return [(f'qtd:{n}', f'{n}{sufixo}') for n in (1, 2, 3)]
 
 
 def escolha_opcao(grupo, n, total):
@@ -304,8 +376,8 @@ def escolha_opcao(grupo, n, total):
     return f'Escolha: *{grupo}* 👇'
 
 
-def colocado(qtd, nome):
-    return f'✅ Coloquei *{qtd}x {nome}* no seu pedido.'
+def colocado(qtd, nome, un=None):
+    return f'✅ Coloquei *{qtd_nome(qtd, nome, un)}* no seu pedido.'
 
 
 def proximo_da_lista(termo):
@@ -385,16 +457,10 @@ _ALCOOL = re.compile(r'\b(cerveja|chopp?|vinho|espumante|vodka|whisky|cachaca|gi
 MAIORIDADE = '🔞 Tem bebida alcoólica: venda só para maiores de 18 anos. O entregador pode pedir um documento na entrega.'
 
 
-def _sem_acento(texto):
-    import unicodedata
-    t = unicodedata.normalize('NFKD', str(texto or '').lower())
-    return ''.join(c for c in t if not unicodedata.combining(c))
-
-
 def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None, sugestao=None):
     linhas = ['🧾 *Confira seu pedido:*', '']
     for it in somar_iguais(carrinho['itens']):
-        linhas.append(f'• {it["qtd"]}x {it["nome"]} — {reais(it.get("preco_total"))}')
+        linhas.append(f'• {linha_item(it)} — {reais(it.get("preco_total"))}')
     linhas.append('')
     taxa_valor = carrinho.get('taxa_entrega')
     if taxa_valor is None and entrega:
@@ -801,7 +867,7 @@ def troquei_de_loja(loja, levados, ficaram):
     linhas = [f'🔁 Pronto, agora é no *{loja}*.']
     if levados:
         linhas.append('O que você já tinha escolhido veio junto:')
-        linhas += [f'• {i["qtd"]}x {i["nome"]}' + (f' — {reais(i["preco_total"])}' if i.get('preco_total') else '')
+        linhas += [f'• {linha_item(i)}' + (f' — {reais(i["preco_total"])}' if i.get('preco_total') else '')
                    for i in levados]
     if ficaram:
         linhas.append('Não tem lá: ' + ', '.join(f'*{n}*' for n in ficaram) + '.')

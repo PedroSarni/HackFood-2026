@@ -272,7 +272,7 @@ class LlmFake:
         if any(p[0] == 'arquivo' for p in partes):
             texto += ' pao'  # o "áudio" fala pão
         itens = []
-        for termo, loja in (('pao', 'MERCADO'), ('leite', 'MERCADO'), ('carne', 'MERCADO'),
+        for termo, loja in (('pao', 'MERCADO'), ('leite', 'MERCADO'), ('carne', 'MERCADO'), ('banana', 'MERCADO'),
                             ('pizza', 'RESTAURANTE'), ('dipirona', 'FARMACIA'), ('burger', 'RESTAURANTE')):
             if termo in texto:
                 itens.append({'termo': termo, 'tipo_loja': loja, 'quantidade': None, 'observacao': None})

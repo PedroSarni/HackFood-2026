@@ -215,6 +215,10 @@ def hora_em(texto):
     return f'{h:02d}:{mi:02d}' if h < 24 and mi < 60 else None
 
 
+FINALIZAR = re.compile(r'(?:ja |agora )?(?:pode |quero |vou )?(?:fechar|finalizar|encerrar|concluir|revisar)(?: o| meu)?(?: pedido)?'
+                       r'|(?:e )?so isso(?: mesmo)?|terminei|acabou|(?:pode )?fechar ai|ja fecha|fecha ai')
+
+
 def regra_rapida(texto):
     """Intenção sem LLM, ou None. Devolve dict no mesmo formato do ESQUEMA."""
     t = normalizar(texto)
@@ -230,6 +234,8 @@ def regra_rapida(texto):
         return {'acao': 'acompanhar', 'sobre': 'codigo_entrega'}
     if TROCAR_LOJA.search(t):
         return {'acao': 'trocar_loja'}
+    if FINALIZAR.fullmatch(t):  # "finalizar pedido", "pode fechar", "só isso" ditos: sem depender do botão nem da IA
+        return {'acao': 'finalizar'}
     if t in SIM:
         return {'acao': 'sim'}
     if t in NAO:
