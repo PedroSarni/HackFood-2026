@@ -43,8 +43,12 @@ export function sayFor(step, byId) {
   return { who, text: step.reserva ? `${text} · no modelo reserva` : text };
 }
 
+// Foto de cada agente (a ficha diz o arquivo); sem foto, vai o emoji.
+const PHOTOS = import.meta.glob('./images/agentes/*', { eager: true, query: '?url', import: 'default' });
+
 function Avatar({ agent, size = 44 }) {
-  return <span className="agent-avatar" style={{ '--agent': agent.cor, width: size, height: size, fontSize: size * .46 }} aria-hidden="true">{agent.emoji}</span>;
+  const photo = agent.foto && PHOTOS[`./images/agentes/${agent.foto}`];
+  return <span className={`agent-avatar ${photo ? 'with-photo' : ''}`} style={{ '--agent': agent.cor, width: size, height: size, fontSize: size * .46 }} aria-hidden="true">{photo ? <img src={photo} alt="" /> : agent.emoji}</span>;
 }
 
 // O palco: cada passo do diário vira um "recado" correndo entre o cliente, o Maestro, o agente e o iFood.

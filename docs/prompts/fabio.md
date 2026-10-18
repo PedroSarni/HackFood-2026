@@ -509,3 +509,11 @@ disjuntor zerado e mock religado enquanto investigamos. O Gemini também deu 429
 zerado por `modo.py --zerar`, webhook conferido; ~20 s, testado) e a skill `.claude/skills/destravar-ifood/`
 com o contexto do hackathon, o porquê e os limites. O filtro de segurança do agente barrou a 1ª versão
 (mandava rodar sem confirmar) e o commit da skill: ela ficou no disco pro Fabio commitar.
+
+## 2026-10-18 ~05h40 — foto do Tungs
+
+**Prompt:** "mude a foto do agente tungs para: [imagem do boneco de madeira com taco, Scawy_tung_tung.webp]"
+
+**Resposta:** A ficha do agente ganhou o campo `foto` (arquivo em `Frontend/Rascunho_Dash/images/agentes/`; sem foto,
+fica o emoji). O Tungs usa `tutor.webp`, com zoom no rosto pra caber no círculo do palco, dos cards e da ficha. Sem
+deploy: só o dash muda.

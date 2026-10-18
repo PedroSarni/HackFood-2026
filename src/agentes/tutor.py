@@ -16,5 +16,5 @@ FICHA = Agente(
     faz='Escreve a ajuda do momento quando dá erro ou a pessoa se perde.',
     plano_b='Sem ele, vai o texto fixo de ajuda daquela situação.',
     arquivos=('src/agentes/tutor.py', 'src/bot/tutor.py'),
-    sistemas=_sistemas,
+    sistemas=_sistemas, foto='tutor.webp',
 )

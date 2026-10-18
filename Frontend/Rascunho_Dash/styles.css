@@ -210,3 +210,5 @@
 @media(max-width:740px){.team-summary{grid-template-columns:1fr 1fr}.stage-peek{width:min(280px,86vw)}.baton{height:18px;top:-10px}}
 .stage-node.ifood small{white-space:nowrap}
 .stage-peek .icon-button{width:26px;height:26px;margin-left:auto}
+.agent-avatar.with-photo{overflow:hidden;background:#fff}
+.agent-avatar img{width:100%;height:100%;object-fit:cover;transform:scale(var(--photo-zoom,2.3));transform-origin:var(--photo-focus,57% 17%)}

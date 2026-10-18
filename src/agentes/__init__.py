@@ -46,6 +46,7 @@ class Agente:
     essencial: bool = False       # desligar muda muito a conversa: o dash pede confirmação
     servico_modelo: object = None  # () -> nome do modelo, pros serviços
     extra: dict = field(default_factory=dict)
+    foto: str | None = None       # arquivo em Frontend/Rascunho_Dash/images/agentes/ (sem foto = emoji)
 
     def prompts(self):
         try:
@@ -211,7 +212,7 @@ def fichas(cfg=None, ar=None):
         do_ar = ar_ag.get(a.id) or {}
         local = _modelos_de(a, cfg)
         saida.append({
-            'id': a.id, 'nome': a.nome, 'cargo': a.cargo, 'emoji': a.emoji, 'cor': a.cor, 'bordao': a.bordao,
+            'id': a.id, 'nome': a.nome, 'cargo': a.cargo, 'emoji': a.emoji, 'foto': a.foto, 'cor': a.cor, 'bordao': a.bordao,
             'faz': a.faz, 'planoB': a.plano_b, 'arquivos': list(a.arquivos), 'tipo': a.tipo, 'essencial': a.essencial,
             'ligado': ligado(cfg, a.id), 'modeloEscolhido': (cfg.get(a.id) or {}).get('modelo'),
             'modelos': local, 'modelosNoAr': do_ar.get('modelos'),
