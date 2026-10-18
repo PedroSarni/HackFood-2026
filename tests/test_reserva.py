@@ -262,3 +262,63 @@ def test_ponte_barrada_tambem_sobe_o_erro_e_com_modo_palco_vai_pro_mock(monkeypa
     estado = Armazem()
     assert com_reserva(estado, real, lambda f, **a: {'mock': f})('getUser') == {'mock': 'getUser'}
     assert estado['cfg:mock'] is True
+
+
+# --- OAuth barrado pelo Akamai: ninguém é deslogado por causa de IP ------------------------------------------
+
+def test_403_do_akamai_no_oauth_e_bloqueio_e_nao_token_invalido():
+    import httpx
+    from src.shared import ifood_mcp as M
+    http = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(403, text='<HTML>Access Denied</HTML>')))
+    with pytest.raises(M.ErroMCP) as e:
+        M.renovar('cid', 'seg', 'rt', http=http)
+    assert not isinstance(e.value, M.SemAutorizacao) and M.bloqueio_akamai(e.value)
+    http = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(400, json={'error': 'invalid_grant'})))
+    with pytest.raises(M.SemAutorizacao):
+        M.renovar('cid', 'seg', 'rt', http=http)
+
+
+def test_renovacao_barrada_vai_pela_ponte_e_sem_ponte_o_token_fica(monkeypatch):
+    import time
+    from src.bot.contexto import chamador_real
+    from src.bot.ifood import PrecisaLogin
+    from src.shared import ifood_mcp as M
+    monkeypatch.setattr(M, 'renovar', lambda *a, **k: (_ for _ in ()).throw(M.ErroMCP('HTTP_403', 'Access Denied (Akamai)')))
+    monkeypatch.setattr(M, '_freio', {'proxima': 0.0, 'bloqueado_ate': 0.0})
+    armazem = {'tok:1': {'access_token': 'velho', 'refresh_token': 'rt', 'expira_em': time.time() - 10}}  # vencido
+    pedidos = []
+
+    def ponte_token(modo, dados):
+        pedidos.append((modo, dados))
+        return {'access_token': 'novo', 'refresh_token': 'rt2', 'expira_em': time.time() + 3600}
+    chamadas = []
+    monkeypatch.setattr(M.ClienteMCP, 'chamar', lambda self, f, **a: chamadas.append(self.token) or {'ok': 1})
+    assert chamador_real(armazem, '1', ponte_token=ponte_token)('getUser') == {'ok': 1}
+    assert pedidos == [('refresh', {'refresh_token': 'rt'})] and chamadas == ['novo']
+    assert armazem['tok:1']['access_token'] == 'novo'
+    # sem ponte: o erro de bloqueio sobe, mas o token continua guardado (não vira PrecisaLogin)
+    armazem = {'tok:1': {'access_token': 'velho', 'refresh_token': 'rt', 'expira_em': time.time() - 10}}
+    with pytest.raises(M.ErroMCP) as e:
+        chamador_real(armazem, '1')('getUser')
+    assert not isinstance(e.value, PrecisaLogin) and 'tok:1' in armazem
+    # a ponte diz que o iFood recusou de verdade: aí sim é login de novo
+    with pytest.raises(PrecisaLogin):
+        chamador_real(armazem, '1', ponte_token=lambda m, d: {'auth': True})('getUser')
+    assert 'tok:1' not in armazem
+
+
+def test_rastreio_sem_login_para_sem_quebrar():
+    from src.bot.ifood import PrecisaLogin
+    from src.bot.rastreio import acompanhar
+    from tests.fakes import WhatsAppFake
+
+    class Api:
+        def rastrear(self, _pid):
+            raise PrecisaLogin()
+
+    class Ctx:
+        wpp = WhatsAppFake()
+
+        def ifood(self, _wa):
+            return Api()
+    assert acompanhar(Ctx(), 'wa', 'p1', dormir=lambda s: None) == 'sem_autorizacao'

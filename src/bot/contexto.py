@@ -188,7 +188,7 @@ def com_reserva(estado, real, reserva):
     return chamar
 
 
-def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2, ponte=None):
+def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2, ponte=None, ponte_token=None):
     """Função chamar(tool, **args) com o token da pessoa, renovando quando precisa.
     Token recusado no meio do caminho: renova uma vez e tenta de novo."""
     cid, segredo = _cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET')
@@ -206,6 +206,18 @@ def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2, ponte=Non
             except ifood_mcp.SemAutorizacao:
                 armazem.pop(f'tok:{wa_id}', None)
                 raise PrecisaLogin() from None
+            except ifood_mcp.ErroMCP as e:
+                # bloqueio do Akamai neste container: renova de outro (ponte_oauth). Sem ponte, sobe o erro de
+                # bloqueio, mas o token FICA: a pessoa não é deslogada por causa de IP (18/10)
+                if not ifood_mcp.bloqueio_akamai(e) or not ponte_token:
+                    raise
+                print(f'renovar token: IP deste container barrado, vai pela ponte')
+                novo = ponte_token('refresh', {'refresh_token': tok['refresh_token']})
+                if novo.get('auth'):
+                    armazem.pop(f'tok:{wa_id}', None)
+                    raise PrecisaLogin() from None
+                if novo.get('erro'):
+                    raise ifood_mcp.ErroMCP('HTTP_403', novo['erro'], tentar_de_novo=False) from None
             novo.setdefault('refresh_token', tok['refresh_token'])  # quando não rotaciona
             armazem[f'tok:{wa_id}'] = novo
             tok = novo
@@ -269,6 +281,10 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
     rec = Recorrencias(modal.Dict.from_name('hackfood-recorrencias', create_if_missing=True))
     ifood_mcp.APOSENTAR_SE_BARRADO = True  # container da conversa (nunca o do webhook) pode se aposentar se o IP for barrado
 
+    def ponte_token(modo, dados):
+        """Troca de código ou renovação de token feita de outro container (ponte_oauth em src/app.py)."""
+        return modal.Function.from_name(modulo_app.APP, 'ponte_oauth').remote(modo, dados)
+
     def ponte(token, ferramenta, args):
         """A chamada refeita de outra máquina do Modal (outro IP de saída), ver ponte_mcp em src/app.py.
         O erro volta por valor: exceção nossa não atravessa a fronteira do Modal."""
@@ -284,8 +300,8 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
         if modo_mock(estado):
             return painel.espiar_mcp(mock, diario, wid)
         if not reserva_armada(estado):
-            return painel.espiar_mcp(chamador_real(estado, wid, ponte=ponte), diario, wid)
-        real = chamador_real(estado, wid, prazo=PRAZO_COM_RESERVA, tentativas=1, ponte=ponte)
+            return painel.espiar_mcp(chamador_real(estado, wid, ponte=ponte, ponte_token=ponte_token), diario, wid)
+        real = chamador_real(estado, wid, prazo=PRAZO_COM_RESERVA, tentativas=1, ponte=ponte, ponte_token=ponte_token)
         return painel.espiar_mcp(com_reserva(estado, real, mock), diario, wid)
 
     def rastrear(wid, pedido_id):

@@ -300,6 +300,12 @@ def _pedir_token(http, client_id, client_secret, dados):
     # client_secret_post, como na doc (corpo form-encoded; JSON é recusado)
     dados = {**dados, 'client_id': client_id, 'client_secret': client_secret}
     r = http.post(TOKEN, data=dados, headers={'Accept': 'application/json'}, timeout=PRAZO)
+    _ver_bloqueio(r)
+    if r.status_code == 403 and 'Access Denied' in r.text:
+        # 18/10: o Akamai barrou o IP deste container também no id.ifood.com.br. Isso NÃO é token inválido:
+        # tratar como SemAutorizacao deslogava a pessoa (e o login de novo era barrado igual). Sobe como
+        # bloqueio, e quem chamou refaz de outro container (ponte_oauth em src/app.py).
+        raise ErroMCP('HTTP_403', 'Access Denied (Akamai) no OAuth do iFood', tentar_de_novo=False)
     try:
         j = r.json()
     except ValueError:

@@ -193,6 +193,26 @@ def acompanhar_pedido(wa_id: str, pedido_id: str):
     acompanhar(contexto_producao(estado, WhatsApp(), wa_id, origem='rastreio'), wa_id, pedido_id)
 
 
+@app.function(image=imagem, secrets=segredos, timeout=60, scaledown_window=30, max_containers=10)
+def ponte_oauth(modo: str, dados: dict):
+    """Troca do código de login ('code') ou renovação do token ('refresh') feita daqui, outro container (outro IP),
+    quando o Akamai barrou o container de origem no id.ifood.com.br (18/10: o do webhook, que nunca se aposenta,
+    estava barrado e NINGUÉM conseguia entrar). Barrado aqui também: este se aposenta e o próximo nasce em outro
+    lugar. Devolve os tokens, {'auth': True} se o iFood recusou de verdade, ou {'erro': ...} se barrou de novo."""
+    from src.shared import ifood_mcp
+    ifood_mcp.APOSENTAR_SE_BARRADO = True
+    cid, segredo = _cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET')
+    try:
+        if modo == 'code':
+            return ifood_mcp.trocar_codigo(cid, segredo, dados['code'], dados['verificador'], CALLBACK)
+        return ifood_mcp.renovar(cid, segredo, dados['refresh_token'])
+    except ifood_mcp.SemAutorizacao as e:
+        return {'auth': True, 'erro': str(e)[:200]}
+    except ifood_mcp.ErroMCP as e:
+        print(f'ponte_oauth: {modo} barrado aqui também: {e!r:.160}')
+        return {'erro': str(e)[:200]}
+
+
 @app.function(image=imagem, secrets=segredos, timeout=90, scaledown_window=30, max_containers=10)
 def ponte_mcp(token: str, ferramenta: str, args: dict):
     """ops-ifood-reroll (18/10): o Akamai do iFood bloqueia por IP de saída e o Modal tem vários (8 containers
@@ -407,9 +427,17 @@ def web():
             tokens = ifood_mcp.trocar_codigo(_cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET'),
                                              q['code'], sessao['verificador'], CALLBACK)
         except ifood_mcp.ErroMCP as e:
-            print(f'troca do code falhou: {e!r}')
-            return paginas.tela('😕', 'Não deu certo', 'Volte pro WhatsApp e tente entrar de novo.',
-                                'Voltar pro WhatsApp', voltar)
+            tokens = None
+            if ifood_mcp.bloqueio_akamai(e):  # o IP deste container (webhook) está barrado: troca de outro
+                print('troca do code: IP deste container barrado, vai pela ponte')
+                tokens = await ponte_oauth.remote.aio('code', {'code': q['code'], 'verificador': sessao['verificador']})
+                if tokens.get('erro'):
+                    print(f'troca do code pela ponte falhou: {tokens["erro"]}')
+                    tokens = None
+            if not tokens:
+                print(f'troca do code falhou: {e!r}')
+                return paginas.tela('😕', 'Não deu certo', 'Volte pro WhatsApp e tente entrar de novo.',
+                                    'Voltar pro WhatsApp', voltar)
         await estado.put.aio(f'tok:{sessao["wa_id"]}', tokens)
         await depois_do_login.spawn.aio(sessao['wa_id'])
         return paginas.logou('Pode voltar pro WhatsApp: já te mandei '

@@ -9,6 +9,7 @@ import time
 
 from src.bot import textos as T
 from src.bot import voz
+from src.bot.ifood import PrecisaLogin
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 
 # leve de propósito: o firewall do iFood barra IP por volume (17/10) e pedido de conta de teste nunca
@@ -83,7 +84,7 @@ def _acompanhar(ctx, wa_id, pedido_id, dormir, relogio):
         try:
             st = ctx.ifood(wa_id).rastrear(pedido_id)
             falhas = 0
-        except SemAutorizacao:
+        except (SemAutorizacao, PrecisaLogin):
             print(f'rastreio {pedido_id}: sem autorização, parando')
             return 'sem_autorizacao'
         except ErroMCP as e:
