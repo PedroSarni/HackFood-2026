@@ -1,5 +1,6 @@
 modal==1.5.4
 fastapi[standard]==0.141.1
 httpx==0.28.1
+anthropic==1.15.0
 pytest
 pillow

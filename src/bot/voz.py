@@ -234,7 +234,7 @@ Responda só o JSON do esquema."""
 ESQUEMA = {'type': 'OBJECT', 'properties': {'fala': {'type': 'STRING'}}, 'required': ['fala']}
 # fila própria: o áudio é a resposta inteira, então não dá pra esperar o lite oscilar até 7 s.
 # Medido em 17/10 22h: 3.5-flash-lite 0,9 s estável; 3.1-lite de 0,9 a 7 s; 3.8-flash dando 503.
-MODELOS_ROTEIRO = [('gemini-3.5-flash-lite', 3.0, ''), ('gemini-3.1-flash-lite', 3.0, '')]
+MODELOS_ROTEIRO = [('claude-sonnet-5-5', 4.0, ''), ('gemini-3.5-flash-lite', 3.0, ''), ('gemini-3.1-flash-lite', 3.0, '')]
 MAX_FALA = 800
 CONVITE = 'Pode me responder mandando um áudio ou escrevendo, tá bom?'
 CONVITE_CPF = ('O CPF, por segurança, me escreve aqui com os números. Se não quiser CPF na nota, '

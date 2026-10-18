@@ -67,7 +67,8 @@ def test_ficha_do_ar_nunca_leva_a_key_inteira():
     env = {'GEMINI_API_KEY': 'AIzaSecretoLongo1234', 'ELEVENLABS_API_KEY': 'sk_eleven_9876'}
     foto = agentes.foto_do_ar(env)
     assert 'AIzaSecretoLongo1234' not in repr(foto) and 'sk_eleven_9876' not in repr(foto)
-    assert foto['agentes']['foto']['keys'][0]['final'] == '····1234'
+    keys = {k['nome']: k for k in foto['agentes']['foto']['keys']}
+    assert keys['GEMINI_API_KEY']['final'] == '····1234' and keys['ANTHROPIC_API_KEY']['final'] is None
     arm = Armazem()
     agentes.publicar_ar(arm, 1000.0)
     agentes.publicar_ar(arm, 1100.0)   # menos de 5 min: não regrava

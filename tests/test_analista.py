@@ -44,7 +44,7 @@ def test_analisar_recusa_pagina_desconhecida_base_inteira_e_resposta_vazia():
 
 def test_analista_tem_ficha_com_fila_propria():
     ficha = agentes.POR_ID['analista']
-    assert ficha.nome == 'Sofia' and agentes.fila('analista', env={})[0][0] == 'gemini-3.8-flash'
+    assert ficha.nome == 'Sofia' and [m[0] for m in agentes.fila('analista', env={})][:2] == ['claude-sonnet-5-5', 'gemini-3.8-flash']
 
 
 def test_rota_de_insights_cacheia_avisa_desligado_e_so_aceita_local():

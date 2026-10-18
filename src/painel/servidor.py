@@ -20,6 +20,8 @@ GET /api/mcp?fonte=&dias=&conversa= -> uso do MCP por tool, tools nunca chamadas
 GET /api/agentes?fonte=&dias=&conversa= -> uso dos agentes de IA e das regras, linha do tempo da conversa
 GET /api/equipe?fonte=             -> a ficha de cada agente (src/agentes/): persona, prompt, fila, keys mascaradas
 POST /api/equipe/<agente>?fonte=   {ligado?, modelo?, limparModelo?} -> liga/desliga ou troca o modelo principal
+GET /api/alertas?fonte=            -> o sino: {alertas[], naoLidas} (créditos do Claude etc.)
+POST /api/alertas/lidas?fonte=     -> marca todos como lidos
 GET /api/ao-vivo?fonte=&desde=     -> os últimos passos do time, pra animação (sem texto de ninguém)
 POST /api/insights?fonte=          {pagina, dados, novo?} -> insights da Analista (roda no Modal, cache de 10 min)
 GET /api/saude
@@ -34,7 +36,7 @@ import threading
 import time
 
 from src import agentes
-from src.shared import painel
+from src.shared import alertas, painel
 
 RECALCULO = 20       # s: status muda com o relógio (carrinho vira abandonado após 30 min) mesmo sem evento novo
 ENVIO_MIN = 1.5      # s entre fotos no SSE: a demo tem MBs e muda toda hora
@@ -393,6 +395,26 @@ def criar_api(paineis, analista=chamar_analista):
                                         bool(corpo.get('limparModelo')))
         print(f'painel {fonte}: {agente_id} -> {corpo}')
         return Response(dados, media_type='application/json')
+
+    @api.get('/api/alertas')
+    async def ver_alertas(fonte: str = 'real'):
+        """O sino do dash: créditos do Claude acabaram, key recusada, Claude voltou (src/shared/alertas.py)."""
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+        try:
+            return JSONResponse(await asyncio.to_thread(alertas.listar, p.fonte.armazem()))
+        except Exception as e:  # noqa: BLE001 - Modal fora: o sino só não acende
+            return JSONResponse({'erro': str(e)[:200]}, status_code=503)
+
+    @api.post('/api/alertas/lidas')
+    async def ler_alertas(request: Request, fonte: str = 'real'):
+        if not _origem_local(request):
+            return JSONResponse({'erro': 'origem não permitida'}, status_code=403)
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+        return JSONResponse(await asyncio.to_thread(alertas.marcar_lidas, p.fonte.armazem()))
 
     @api.post('/api/insights')
     async def insights(request: Request, fonte: str = 'real'):

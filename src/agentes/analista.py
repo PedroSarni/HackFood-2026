@@ -19,5 +19,5 @@ FICHA = Agente(
     plano_b='Sem ela, o dash mostra só os números; o botão de IA avisa que ela está de folga.',
     arquivos=('src/agentes/analista.py', 'src/painel/analista.py'),
     sistemas=_sistemas,
-    modelos=[('gemini-3.8-flash', 25.0, 'low'), ('gemini-3.5-flash-lite', 12.0, '')],
+    modelos=[('claude-sonnet-5-5', 40.0, 'low'), ('gemini-3.8-flash', 25.0, 'low'), ('gemini-3.5-flash-lite', 12.0, '')],
 )

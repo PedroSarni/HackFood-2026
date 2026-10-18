@@ -278,7 +278,11 @@ def test_primeiro_modelo_da_fila(monkeypatch):
     monkeypatch.setenv('GEMINI_API_KEY', 'k')
     monkeypatch.delenv('BOT_GEMINI_MODELOS', raising=False)
     monkeypatch.delenv('BOT_LLM', raising=False)
-    assert _primeiro_modelo({}) == llm.MODELOS[0][0]
+    monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
+    assert _primeiro_modelo({}) == next(m[0] for m in llm.MODELOS if not llm._e_claude(m[0]))  # sem key do Claude
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'a')
+    assert _primeiro_modelo({}) == llm.CLAUDE
+    monkeypatch.delenv('ANTHROPIC_API_KEY')
     assert _primeiro_modelo({'modelos': [('gemini-x', 3.0, '')]}) == 'gemini-x'
     monkeypatch.setenv('GEMINI_API_KEY', '')
     monkeypatch.setenv('OPENROUTER_API_KEY', 'k')

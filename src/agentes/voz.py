@@ -22,6 +22,6 @@ FICHA = Agente(
     faz='Escreve o roteiro da fala e grava o áudio que vai pro WhatsApp.',
     plano_b='Sem ela, a resposta vai por escrito.',
     arquivos=('src/agentes/voz.py', 'src/bot/voz.py', 'src/shared/voz.py'),
-    keys=('GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'ELEVENLABS_API_KEY'),
+    keys=('ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'ELEVENLABS_API_KEY'),
     sistemas=_sistemas, extra={'fila_do_codigo': _fila_do_codigo},
 )

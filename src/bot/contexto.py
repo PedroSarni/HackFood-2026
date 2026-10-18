@@ -179,10 +179,13 @@ def chamador_real(armazem, wa_id):
 
 def _primeiro_modelo(kw):
     """1º da fila do llm.gerar_json: se outro modelo respondeu, a fila caiu pro reserva."""
-    if not llm._cfg('GEMINI_API_KEY') or llm._cfg('BOT_LLM') == 'openrouter':
-        fila = llm._fila_openrouter()
-        return f'openrouter:{fila[0]}' if fila else None
-    return (kw.get('modelos') or llm._modelos())[0][0]
+    fila = kw.get('modelos') or llm._modelos()
+    if llm._cfg('BOT_LLM') != 'openrouter':
+        for modelo, *_ in fila:  # sem a key do dono do modelo ele nem é tentado: o 1º é o próximo
+            if llm._cfg('ANTHROPIC_API_KEY' if llm._e_claude(modelo) else 'GEMINI_API_KEY'):
+                return modelo
+    fila_or = llm._fila_openrouter()
+    return f'openrouter:{fila_or[0]}' if fila_or else None
 
 
 def contexto_producao(estado, wpp, wa_id=None, origem=None):
@@ -193,6 +196,8 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
     from src.shared import painel
     from src.shared.mcp_fake import McpFake
 
+    from src.shared import alertas
+    llm.avisar = lambda *a: alertas.registrar(estado, *a)  # créditos do Claude etc. vão pro sino do dash
     diario = painel.diario_producao()
     wpp = painel.EspiaoWhatsApp(wpp, diario, origem)
     rec = Recorrencias(modal.Dict.from_name('hackfood-recorrencias', create_if_missing=True))

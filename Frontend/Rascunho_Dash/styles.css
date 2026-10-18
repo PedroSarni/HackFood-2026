@@ -284,3 +284,27 @@
 .ai-error .button{display:inline-flex;gap:6px;align-items:center}
 @media(max-width:740px){.ai-fab{right:16px;bottom:16px;width:52px;height:52px}.ai-panel{right:16px;bottom:80px;max-height:calc(100vh - 110px)}.ai-fab-tip{display:none}}
 @media(prefers-reduced-motion:reduce){.ai-overlay{display:none}}
+
+/* central de notificações (alertas.jsx): o sino do topo e a faixa de erro */
+.alert-bell{position:relative}
+.bell-button{position:relative;width:32px;height:32px;background:white}
+.bell-button.has-unread{color:var(--red);border-color:#f6c3c7}
+.bell-count{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--red);color:white;font-size:10px;font-weight:700;line-height:17px;text-align:center}
+.alert-panel{position:absolute;z-index:70;top:calc(100% + 8px);right:0;width:min(360px,calc(100vw - 32px));max-height:min(460px,70vh);overflow:auto;background:white;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px #0002}
+.alert-panel-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);color:var(--ink)}
+.alert-panel-head strong{margin-right:auto;font-size:13px}
+.alert-panel ul{list-style:none;margin:0;padding:0}
+.alert-item{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);color:var(--ink);font-size:12px}
+.alert-item:last-child{border-bottom:0}
+.alert-item>svg{flex-shrink:0;margin-top:1px}
+.alert-item.erro>svg{color:var(--red)}
+.alert-item.ok>svg{color:var(--green)}
+.alert-item.lida{opacity:.6}
+.alert-item p{margin:4px 0;color:#555;line-height:1.4}
+.alert-item small{display:block;margin:4px 0;color:var(--muted);font-family:monospace;font-size:10.5px;word-break:break-word}
+.alert-item span{color:var(--muted);font-size:11px}
+.alert-empty{margin:0;padding:18px 14px;color:var(--muted);font-size:12px;line-height:1.45}
+.alert-read{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--line);border-radius:6px;background:white;color:var(--ink);font-size:11.5px;white-space:nowrap;cursor:pointer}
+.alert-banner{align-items:center}
+.alert-banner>div{flex:1}
+@media (max-width:640px){.alert-panel{position:fixed;top:60px;right:16px;left:16px;width:auto}}

@@ -28,7 +28,7 @@ LOGIN_VALIDADE = 30 * 60      # link "Entrar no iFood" vale 30 min (cada toque g
 
 app = modal.App(APP)
 imagem = (modal.Image.debian_slim(python_version='3.12')
-          .pip_install('fastapi[standard]==0.141.1', 'httpx==0.28.1')
+          .pip_install('fastapi[standard]==0.141.1', 'httpx==0.28.1', 'anthropic==1.15.0')
           .add_local_python_source('src')
           # add_local_python_source só leva .py: sem isso o /logo.png dava 500 no ar
           .add_local_file(pathlib.Path(__file__).parent / 'web' / 'logo.png', '/root/src/web/logo.png'))
@@ -41,7 +41,9 @@ segredos = [modal.Secret.from_name('hackathon-whatsapp'),
             # palavra secreta de debug (DEBUG_RESET), fora do git; vazia = desligado
             modal.Secret.from_name('hackathon-debug'),
             # OPENROUTER_API_KEY: quebra-galho quando o Gemini estoura (src/shared/llm.py); PREENCHER = desligado
-            modal.Secret.from_name('hackathon-openrouter')]
+            modal.Secret.from_name('hackathon-openrouter'),
+            # ANTHROPIC_API_KEY: o Claude Sonnet é o 1º da fila de todo agente; sem crédito, o Gemini assume
+            modal.Secret.from_name('hackathon-anthropic')]
 
 estado = modal.Dict.from_name('hackfood-estado', create_if_missing=True)
 entrada = modal.Queue.from_name('hackfood-entrada', create_if_missing=True)
@@ -125,7 +127,8 @@ def analisar_pagina(pagina: str, dados: dict):
     Chamada pelo servidor local do painel (POST /api/insights); usa a fila e o interruptor da ficha dela."""
     from src import agentes
     from src.painel import analista
-    from src.shared import llm
+    from src.shared import alertas, llm
+    llm.avisar = lambda *a: alertas.registrar(estado, *a)
     cfg = agentes.config(estado)
     if not agentes.ligado(cfg, 'analista'):
         return {'erro': 'desligado'}

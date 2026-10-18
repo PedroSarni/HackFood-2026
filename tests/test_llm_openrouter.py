@@ -29,13 +29,15 @@ def chaves(monkeypatch):
     monkeypatch.setenv('OPENROUTER_API_KEY', 'o')
     monkeypatch.delenv('BOT_LLM', raising=False)
     monkeypatch.delenv('OPENROUTER_MODELOS', raising=False)
+    monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
 
 
 def test_gemini_fora_o_openrouter_responde(chaves):
     http, pedidos = cliente()
     dados, modelo, _ = llm.gerar_json('sis', [('texto', 'pode')], ESQUEMA, http=http)
     assert dados == {'acao': 'sim'} and modelo == f'openrouter:{llm.OPENROUTER_MODELOS[0]}'
-    assert sum('googleapis' in str(p.url) for p in pedidos) == len(llm.MODELOS)  # tentou o Gemini antes
+    gemini = [m for m in llm.MODELOS if not llm._e_claude(m[0])]
+    assert sum('googleapis' in str(p.url) for p in pedidos) == len(gemini)  # tentou o Gemini antes (sem key do Claude)
 
 
 def test_sem_key_do_openrouter_continua_so_gemini(chaves, monkeypatch):

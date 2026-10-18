@@ -1,7 +1,7 @@
 ---
 slug: bot-claude-llm
 owner: Fabio Araujo
-status: active
+status: done
 started: 2026-10-18 05:00
 ---
 
@@ -24,4 +24,8 @@ Não cobre: áudio (a API do Claude não ouve; continua no Scribe/Gemini) nem a 
 
 ## Onde está (preencher ao terminar)
 
-- 
+- `src/shared/llm.py` — `CLAUDE`, `_chamar_claude()`, disjuntor `_claude` (CLAUDE_PAUSA), `avisar`; `gerar_json()` mistura Claude e Gemini na mesma fila
+- `src/shared/alertas.py` — `registrar()`, `listar()`, `marcar_lidas()` (armazém hackfood-estado, chave `alertas`)
+- `src/painel/servidor.py` — `GET /api/alertas`, `POST /api/alertas/lidas`
+- `Frontend/Rascunho_Dash/alertas.jsx` — `<AlertBell />`, `<AlertBanner />`, `useAlerts()`
+- secret Modal `hackathon-anthropic` (ANTHROPIC_API_KEY)

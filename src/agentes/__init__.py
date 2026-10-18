@@ -40,7 +40,7 @@ class Agente:
     plano_b: str              # o que acontece quando ele falha ou está desligado
     arquivos: tuple           # onde mexer pra melhorar
     tipo: str = 'ia'          # 'ia' (prompt + modelo) | 'servico' (voz/ouvido, ElevenLabs)
-    keys: tuple = ('GEMINI_API_KEY', 'OPENROUTER_API_KEY')
+    keys: tuple = ('ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY')
     modelos: list | None = None   # [(modelo, prazo_s, pensamento)]; None = fila padrão do llm
     sistemas: object = None       # () -> [system prompts] (import tardio: evita import circular)
     essencial: bool = False       # desligar muda muito a conversa: o dash pede confirmação
@@ -62,7 +62,7 @@ def _carregar():
 
 TODOS = _carregar()
 POR_ID = {a.id: a for a in TODOS}
-SECRETS = {'GEMINI_API_KEY': 'hackathon-gemini', 'OPENROUTER_API_KEY': 'hackathon-openrouter',
+SECRETS = {'ANTHROPIC_API_KEY': 'hackathon-anthropic', 'GEMINI_API_KEY': 'hackathon-gemini', 'OPENROUTER_API_KEY': 'hackathon-openrouter',
            'ELEVENLABS_API_KEY': 'hackathon-elevenlabs'}
 _por_sistema = None
 

@@ -1,4 +1,8 @@
-"""Gemini: texto, áudio e foto entram, JSON sai (com esquema garantido pelo próprio modelo).
+"""LLM do bot: texto, áudio e foto entram, JSON sai (com esquema garantido pelo próprio modelo).
+
+18/10: o Claude Sonnet 5.5 (secret `hackathon-anthropic`, ANTHROPIC_API_KEY) é o 1º de toda fila e o
+Gemini virou reserva. Áudio pula o Claude (a API não ouve). Sem crédito ou com a key recusada, o Claude
+sai da fila por CLAUDE_PAUSA e o dash recebe um alerta (`avisar`, ligado em src/shared/alertas.py).
 
 Secret Modal `hackathon-gemini`: só a GEMINI_API_KEY, key própria do HackFood (até 17/10 20h
 era o `llm-conversor` do handwrite_bot, e a cota dele estourou). Override dos modelos por
@@ -23,8 +27,9 @@ import time
 import httpx
 
 GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
+CLAUDE = 'claude-sonnet-5-5'
 # 17/10 23h: o 3.1-lite passou a estourar 6 s seguidos e o 3.5-lite responde em ~1,2 s: o 3.5 vai na frente
-MODELOS = [('gemini-3.5-flash-lite', 6.0, ''), ('gemini-3.1-flash-lite', 4.0, ''),
+MODELOS = [(CLAUDE, 8.0, ''), ('gemini-3.5-flash-lite', 6.0, ''), ('gemini-3.1-flash-lite', 4.0, ''),
            ('gemini-3.8-flash', 9.0, 'low')]
 MAX_INLINE = 18 * 1024 * 1024
 
@@ -82,6 +87,122 @@ def _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento):
         raise ErroLLM(f'{modelo} finishReason={cand.get("finishReason")}')
     txt = ''.join(p.get('text', '') for p in (cand.get('content') or {}).get('parts', [])
                   if not p.get('thought'))
+    try:
+        return json.loads(txt)
+    except ValueError as e:
+        raise ErroLLM(f'{modelo} devolveu JSON inválido: {txt[:120]!r}') from e
+
+
+# --- principal: Claude ----------------------------------------------------------------------
+# pensamento '' = sem pensar (between_tools, effort low: é o mais rápido, ~1,6 s medido em 18/10);
+# 'low'/'medium'/'high' = pensa (adaptive) com esse effort. Sem retry do SDK: a fila já é o retry.
+CLAUDE_PAUSA = 600       # s fora da fila depois de "sem crédito" ou key recusada (e um alerta só)
+CLAUDE_PAUSA_429 = 60    # rate limit: sai rapidinho e o Gemini segura
+_claude = {'fora_ate': 0.0, 'motivo': None, 'alertou': False, 'cliente': None}
+avisar = None            # (tipo, titulo, detalhe) -> None; a produção liga no armazém (src/shared/alertas.py)
+
+
+def _e_claude(modelo):
+    return str(modelo).startswith('claude-')
+
+
+def _claude_pronto():
+    return bool(_cfg('ANTHROPIC_API_KEY')) and time.time() >= _claude['fora_ate']
+
+
+def _alertar(tipo, titulo, detalhe=''):
+    if avisar:
+        try:
+            avisar(tipo, titulo, detalhe)
+        except Exception as e:  # noqa: BLE001 - alerta é bônus, a resposta segue pelo Gemini
+            print(f'alerta {tipo} falhou: {e!r}')
+
+
+def _tirar_claude(segundos, motivo, alerta=None):
+    _claude['fora_ate'] = time.time() + segundos
+    _claude['motivo'] = motivo
+    print(f'claude fora da fila por {segundos}s: {motivo[:200]}')
+    if alerta:
+        _claude['alertou'] = True
+        _alertar(*alerta, motivo[:300])
+
+
+def _esquema_claude(e):
+    """Esquema OpenAPI do Gemini -> JSON Schema da saída estruturada do Claude (objetos fechados, nullable = anyOf)."""
+    if not isinstance(e, dict):
+        return e
+    s = {}
+    if 'type' in e:
+        s['type'] = str(e['type']).lower()
+    if 'properties' in e:
+        s['properties'] = {n: _esquema_claude(p) for n, p in e['properties'].items()}
+        s['additionalProperties'] = False
+    if 'items' in e:
+        s['items'] = _esquema_claude(e['items'])
+    for k in ('required', 'enum', 'description'):
+        if k in e:
+            s[k] = e[k]
+    if e.get('nullable'):
+        desc = s.pop('description', None)
+        s = {'anyOf': [s, {'type': 'null'}]}
+        if desc:
+            s['description'] = desc
+    return s
+
+
+def _conteudo_claude(partes):
+    """Texto, foto e PDF; com áudio devolve None (o Claude não ouve: a fila segue pro Gemini)."""
+    saida = []
+    for p in partes:
+        if p[0] == 'texto':
+            if p[1]:
+                saida.append({'type': 'text', 'text': p[1]})
+            continue
+        dado = base64.b64encode(p[2]).decode()
+        if str(p[1]).startswith('image/'):
+            saida.append({'type': 'image', 'source': {'type': 'base64', 'media_type': p[1], 'data': dado}})
+        elif p[1] == 'application/pdf':
+            saida.append({'type': 'document', 'source': {'type': 'base64', 'media_type': p[1], 'data': dado}})
+        else:
+            return None
+    return saida
+
+
+def _cliente_claude():
+    if _claude['cliente'] is None:
+        import anthropic
+        _claude['cliente'] = anthropic.Anthropic(api_key=_cfg('ANTHROPIC_API_KEY'), max_retries=0)
+    return _claude['cliente']
+
+
+def _chamar_claude(modelo, sistema, conteudo, esquema, prazo, pensamento):
+    import anthropic
+    pedido = {'model': modelo, 'max_tokens': 8192, 'system': sistema,
+              'messages': [{'role': 'user', 'content': conteudo}],
+              'output_config': {'effort': pensamento or 'low',
+                                'format': {'type': 'json_schema', 'schema': _esquema_claude(esquema)}}}
+    if not pensamento:
+        pedido['thinking'] = {'type': 'between_tools'}
+    try:
+        r = _cliente_claude().with_options(timeout=prazo).messages.create(**pedido)
+    except anthropic.APIStatusError as e:
+        msg = f'{modelo} HTTP {e.status_code} {e.type}: {" ".join(str(e.message).split())[:200]}'
+        texto = str(e.message).lower()
+        if e.status_code == 402 or e.type == 'billing_error' or 'credit balance' in texto:
+            _tirar_claude(CLAUDE_PAUSA, msg, ('claude_sem_credito', 'Acabaram os créditos do Claude'))
+        elif e.status_code in (401, 403):
+            _tirar_claude(CLAUDE_PAUSA, msg, ('claude_key', 'A key do Claude foi recusada'))
+        elif e.status_code == 429:
+            _tirar_claude(CLAUDE_PAUSA_429, msg)
+        raise ErroLLM(msg) from e
+    except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+        raise ErroLLM(f'{modelo}: {e!r}'[:200]) from e
+    if _claude['alertou']:  # voltou depois de uma pausa por crédito/key: avisa uma vez
+        _alertar('claude_voltou', 'O Claude voltou a responder', 'O bot já está usando o Claude de novo.')
+    _claude.update(motivo=None, alertou=False)
+    if r.stop_reason in ('refusal', 'max_tokens'):
+        raise ErroLLM(f'{modelo} stop_reason={r.stop_reason}')
+    txt = next((b.text for b in r.content if b.type == 'text'), '')
     try:
         return json.loads(txt)
     except ValueError as e:
@@ -164,18 +285,35 @@ def gerar_json(sistema, partes, esquema, http=None, modelos=None):
     """Uma resposta JSON no formato `esquema` (OpenAPI do Gemini: type OBJECT, STRING...).
     Tenta os modelos em ordem; devolve (dados, modelo_usado, segundos).
     modelos: fila própria [(modelo, prazo, pensamento)] pra quem tem pressa (roteiro do áudio).
-    Toda a fila do Gemini falhou: tenta o OpenRouter, se houver key (quebra-galho)."""
+    Claude e Gemini dividem a fila (o nome diz quem é); falhou tudo: OpenRouter, se houver key (quebra-galho)."""
     fila_or = _fila_openrouter()
     so_openrouter = _cfg('BOT_LLM') == 'openrouter' and fila_or
-    if not _cfg('GEMINI_API_KEY') and not fila_or:
-        raise ErroLLM('GEMINI_API_KEY não configurada')
+    if not _cfg('GEMINI_API_KEY') and not _cfg('ANTHROPIC_API_KEY') and not fila_or:
+        raise ErroLLM('nenhuma key de LLM configurada (ANTHROPIC_API_KEY, GEMINI_API_KEY)')
     http = http or httpx.Client()
     erros = []
     t0 = time.monotonic()
-    if _cfg('GEMINI_API_KEY') and not so_openrouter:
-        parts = _partes(partes)
+    if not so_openrouter:
+        parts = conteudo = None
         for modelo, prazo, pensamento in modelos or _modelos():
+            if _e_claude(modelo):
+                if not _claude_pronto():
+                    continue
+                conteudo = conteudo if conteudo is not None else _conteudo_claude(partes) or []
+                if not conteudo:  # áudio: o Claude não ouve, quem atende é o Gemini
+                    continue
+                try:
+                    return (_chamar_claude(modelo, sistema, conteudo, esquema, prazo, pensamento), modelo,
+                            time.monotonic() - t0)
+                except ErroLLM as e:
+                    erros.append(f'{modelo}: {e!r}'[:300])
+                    continue
+            if not _cfg('GEMINI_API_KEY'):
+                continue
+            parts = parts or _partes(partes)
             try:
+                if erros and _e_claude(erros[-1].split(':')[0]):
+                    print(f'claude falhou, indo de {modelo}: {erros[-1][:150]}')
                 return _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento), modelo, time.monotonic() - t0
             except (ErroLLM, httpx.HTTPError) as e:
                 if pensamento and 'thinking' in str(e).lower():  # nível não suportado: tenta sem
