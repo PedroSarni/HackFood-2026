@@ -337,6 +337,11 @@ class Bot:
                 r = regra_rapida(texto)
                 if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados'):
                     self.intencao(r)
+                elif (r and r['acao'] == 'saudacao') or _quer_novo_pedido(texto):
+                    # "oi" ou "quero fazer um pedido" não é endereço: não gasta geocoder nem prende a pessoa
+                    self.perguntar(T.ENDERECO_AINDA, [T.B_TENTAR, T.B_INICIO], fase='endereco')
+                elif not _parece_endereco(texto):
+                    self.perguntar(T.ENDERECO_NAO_PARECE, [T.B_TENTAR, T.B_INICIO], fase='endereco')
                 else:
                     u['ultima_acao'] = ['endereco', texto]  # "Tentar de novo" reusa o que ela digitou
                     self.receber_endereco(texto)
@@ -643,6 +648,7 @@ class Bot:
 
     def pedir_endereco(self, _arg=None):
         self.u['novo_endereco'] = None
+        self.u['falhas_endereco'] = 0
         self.dizer(T.PEDIR_ENDERECO)
         self.u['fase'] = 'endereco'
         self.u['pergunta'] = {'texto': T.PEDIR_ENDERECO, 'botoes': [], 'titulos': []}
@@ -680,6 +686,7 @@ class Bot:
         norm = self.ctx.normalizar_endereco(texto)
         r = self._geocodificar_ifood([norm['texto'], texto] if norm else [texto])
         if r.get('criado'):
+            self.u['falhas_endereco'] = 0
             self._endereco_salvo(r['criado'])
             return
         cands = r.get('candidatos') or []
@@ -689,9 +696,15 @@ class Bot:
             if c.get('lat') is None and norm['lat'] is not None:
                 c['lat'], c['lng'] = norm['lat'], norm['lng']
         if not cands:
-            self.dizer(T.ENDERECO_NAO_ACHEI)
-            self.u['fase'] = 'endereco'
+            # .get: estado salvo antes deste campo existir não tem a chave
+            self.u['falhas_endereco'] = self.u.get('falhas_endereco', 0) + 1
+            if self.u['falhas_endereco'] >= 2:  # 2ª falha seguida: dá saída com botão em vez de loop mudo
+                self.perguntar(T.ENDERECO_NAO_ACHEI, [T.B_TENTAR, T.B_INICIO], fase='endereco')
+            else:
+                self.dizer(T.ENDERECO_NAO_ACHEI)
+                self.u['fase'] = 'endereco'
             return
+        self.u['falhas_endereco'] = 0
         self.u['novo_endereco'] = {'texto': texto, 'candidatos': cands[:9], 'escolhido': None, 'bairro': None}
         if len(cands) == 1:
             self.escolher_candidato('0')
@@ -1533,3 +1546,19 @@ def _falha_do_ifood(cod):
 def _mime_aceito(mime):
     """O WhatsApp manda áudio como 'audio/ogg; codecs=opus'; o Gemini quer só 'audio/ogg'."""
     return (mime or 'application/octet-stream').split(';')[0].strip()
+
+
+LOGRADOURO = re.compile(r'\b(rua|av|avenida|travessa|praca|alameda|rodovia|estrada)\b')
+NOVO_PEDIDO = re.compile(r'\b(novo pedido|outro pedido|fazer (um )?pedido|quero pedir|menu|voltar)\b')
+
+
+def _parece_endereco(texto):
+    """Tem número/CEP, palavra de logradouro ou pelo menos 3 palavras. Senão nem vai pro geocoder."""
+    t = normalizar(texto)
+    return bool(re.search(r'\d', t) or LOGRADOURO.search(t) or len(t.split()) >= 3)
+
+
+def _quer_novo_pedido(texto):
+    """'Quero fazer um novo pedido' na etapa do endereço: é pedido de menu, não endereço."""
+    t = normalizar(texto)
+    return not re.search(r'\d', t) and not LOGRADOURO.search(t) and bool(NOVO_PEDIDO.search(t))

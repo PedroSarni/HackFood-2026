@@ -116,6 +116,59 @@ def test_endereco_invalido_pede_de_novo():
     assert m.estado()['fase'] == 'endereco'
 
 
+def test_ola_no_endereco_nao_vai_pro_geocoder_e_mostra_botoes():
+    m = Mundo()
+    m.enviar('quero pao')
+    antes = len(m.mcp.chamadas_de('createAddress'))
+    m.enviar('Olá')
+    assert len(m.mcp.chamadas_de('createAddress')) == antes
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['tentar', 'inicio']
+    assert 'endereço' in m.wpp.textos()[-1] and m.estado()['fase'] == 'endereco'
+
+
+def test_novo_pedido_no_endereco_nao_vai_pro_geocoder_e_mostra_botoes():
+    m = Mundo()
+    m.enviar('quero pao')
+    antes = len(m.mcp.chamadas_de('createAddress'))
+    m.enviar('Quero fazer um novo pedido')
+    assert len(m.mcp.chamadas_de('createAddress')) == antes
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['tentar', 'inicio']
+    assert m.estado()['fase'] == 'endereco'
+
+
+def test_texto_sem_cara_de_endereco_nao_vai_pro_geocoder():
+    m = Mundo()
+    m.enviar('quero pao')
+    antes = len(m.mcp.chamadas_de('createAddress'))
+    m.enviar('não sei')
+    assert len(m.mcp.chamadas_de('createAddress')) == antes
+    assert 'CEP' in m.wpp.textos()[-1]
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['tentar', 'inicio']
+    assert m.estado()['ultima_acao'][0] != 'endereco'  # "Tentar de novo" não reusa o que não foi pro geocoder
+
+
+def test_endereco_de_verdade_continua_indo_pro_geocoder():
+    m = Mundo()
+    m.enviar('quero pao')
+    antes = len(m.mcp.chamadas_de('createAddress'))
+    m.enviar('Rua das Flores, 120, São Carlos')
+    assert len(m.mcp.chamadas_de('createAddress')) > antes
+    assert m.estado()['ultima_acao'] == ['endereco', 'Rua das Flores, 120, São Carlos']
+    assert m.estado().get('falhas_endereco') == 0
+
+
+def test_duas_falhas_seguidas_no_endereco_mostram_botoes():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.enviar('perto da igreja')
+    assert m.wpp.saida[-1][0] == 'texto'  # 1ª falha: só o texto, como antes
+    m.enviar('perto da padaria')
+    tipo, d = m.wpp.saida[-1]
+    assert tipo == 'botoes' and 'Não achei esse endereço' in d['texto']
+    assert [i for i, _ in d['botoes']] == ['tentar', 'inicio']
+    assert m.estado()['fase'] == 'endereco'
+
+
 # --- busca, cards e "mais opções" --------------------------------------------------------
 
 def test_mais_opcoes_reaproveita_a_lista_sem_buscar_de_novo(monkeypatch):

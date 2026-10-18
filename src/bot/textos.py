@@ -94,7 +94,10 @@ PEDIR_ENDERECO = ('🏠 Pra onde eu mando suas compras?\n\n'
                   'Exemplo: _Rua das Flores, 120, São Carlos_')
 ENDERECO_NAO_ACHEI = ('Não achei esse endereço. 😕\n'
                       'Confira e escreva de novo, com rua, número e cidade.')
-ESCOLHA_ENDERECO = 'Qual destes é o seu endereço? Toque no certo 👇'
+ENDERECO_DICA = 'Escreva *rua, número e cidade*, ou só o *CEP*. 🙂'
+ENDERECO_AINDA = '😊 Pra montar o pedido, primeiro preciso do endereço de entrega.\n' + ENDERECO_DICA
+ENDERECO_NAO_PARECE = 'Hmm, isso não parece um endereço. 🤔\n' + ENDERECO_DICA
+ESCOLHA_ENDERECO ='Qual destes é o seu endereço? Toque no certo 👇'
 PEDIR_COMPLEMENTO = ('Tem apartamento, bloco ou casa nos fundos?\n'
                      'Escreva aqui. Se não tiver, toque em *Não tem*.')
 B_SEM_COMPLEMENTO = ('compl_nao', 'Não tem')
