@@ -22,3 +22,18 @@
 .demo-ribbon.live{background:#ecf8f2;color:#23785e}
 @media (prefers-reduced-motion:reduce){.source-badge.live i,.data-source.live .source-dot{animation:none}}
 .source-badge.demo{color:#5b4fb0;background:#f3f1ff;border-color:#e2ddfb}.source-badge.demo i,.data-source.demo .source-dot{background:#7a6ae0;animation:live-pulse 1.8s infinite}
+/* Uso do MCP e agentes (agentes.jsx) */
+.telemetry-note{display:flex;align-items:center;gap:9px;font-size:10px;color:#8a8a95;margin:-8px 0 16px}
+.telemetry-filters{gap:12px;flex-wrap:wrap}
+.telemetry-picker{display:flex;align-items:center;gap:8px;color:#8a8a95;min-width:0;max-width:100%}
+.telemetry-picker select{max-width:min(460px,70vw)}
+.usage-cell{display:flex;align-items:center;gap:8px}
+.usage-bar{display:inline-block;width:70px;height:5px;background:#f3f3f7;border-radius:3px;overflow:hidden}
+.usage-bar i{display:block;height:100%;background:var(--red);border-radius:3px}
+.chip-list{display:flex;flex-wrap:wrap;gap:7px;padding:16px 21px 20px}
+.chip-list b{font-weight:600;color:#8a72b5;margin-left:4px}
+.call-sequence{list-style:none;margin:0;padding:12px 21px 20px;display:grid;gap:2px}
+.call-sequence li{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto auto;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #f0f0f3;font-size:10px;color:#75757f}
+.call-sequence li strong{color:var(--ink);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.call-sequence li.failed strong{color:#cc5962}
+@media(max-width:740px){.call-sequence li{grid-template-columns:24px minmax(0,1fr) auto;row-gap:4px}.call-sequence li>span:nth-child(3),.call-sequence li>span:nth-child(4){display:none}}
