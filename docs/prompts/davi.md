@@ -436,3 +436,11 @@ outros [PREENCHER]."
 **Resposta:** A9 virou imagem no 04 e na entrega única. A recusa da piada vem da IA (não é texto fixo); o fixo
 (`FORA_DO_ESCOPO`) fica como plano B. A ajuda em 4 passos existe em `textos.AJUDA`, inclusive com "Nada é comprado sem
 você confirmar.", então foi mantida, sem print. Nota "Prints" do topo removida. Restam 2 [PREENCHER] por arquivo.
+
+## 2026-10-18 13:00 — slides do Breno no repositório
+
+**Prompt:** "Há um arquivo de slides na raiz do repositório, "Slideshow.pdf" (sem commit). Mova-o para
+docs/entregaveis/slides/AiFood-slides.pdf [...] adicione somente esse arquivo ao commit. [...] rode git status e me liste
+o que vai entrar."
+
+**Resposta:** PDF movido com mv e commitado em `docs/entregaveis/slides/AiFood-slides.pdf`. Nenhum texto alterado.
