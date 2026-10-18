@@ -577,25 +577,49 @@ def test_gemini_fora_do_ar_nao_busca_frase_ao_pe_da_letra():
     assert 'Não achei' not in textos and 'não entendi' in textos
 
 
-def test_pedido_minimo_sugere_o_que_a_pessoa_costuma_levar_na_mesma_loja():
+def test_pedido_minimo_sugere_o_que_acompanha_na_mesma_loja():
     m = Mundo()
-    m.armazem[f'hist:{m.wa}'] = {'leite integral': {'nome': 'Leite integral', 'vezes': 3, 'ultima': 1.0}}
     endereco_pronto(m)
-    m.tocar('pick:')
+    m.tocar('pick:')            # pão sírio do Supermercado Central, que no mock pede R$ 25
     m.tocar('qtd:1')
-    u = m.armazem[f'u:{m.wa}']
-    u['carrinho']['minimo'] = 60.0      # loja com mínimo alto: o pão sozinho não fecha
-    m.armazem[f'u:{m.wa}'] = u
     m.tocar('fim')
     assert 'sugerir' in m.wpp.todos_ids()   # 💡 junto do aviso de pedido mínimo
     m.wpp.limpar()
     m.enviar(('botao', 'sugerir'))
     textos = ' '.join(m.wpp.textos())
-    assert 'pedido mínimo' in textos and 'Leite integral' in textos and 'costuma' in textos
+    assert 'pedido mínimo' in textos and 'manteiga' in textos and 'pra acompanhar' in textos
     busca = m.mcp.chamadas_de('searchOffers')[-1]
-    assert busca['query'].lower() == 'leite integral'
+    assert busca['query'] == 'manteiga'
     assert busca['refinements']['merchantId'] == m.estado()['carrinho']['loja_id']
     assert m.wpp.cards()
+
+
+def test_lanche_ganha_sugestao_de_refri_e_o_que_fecha_o_minimo_vem_primeiro():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('quero um x burger')
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    m.tocar('fim')              # X-Burger R$ 22,90 e a lanchonete pede R$ 30: faltam R$ 7,10
+    m.wpp.limpar()
+    m.enviar(('botao', 'sugerir'))
+    textos = ' '.join(m.wpp.textos())
+    assert 'refrigerante' in textos and 'pra acompanhar' in textos
+    est = m.estado()
+    assert est['listas'][est['lista_atual']]['ofertas'][0]['nome'] == 'Refrigerante 600 ml'
+
+
+def test_farmacia_nao_empurra_remedio_e_sugere_o_que_a_pessoa_costuma_levar():
+    m = Mundo()
+    m.armazem[f'hist:{m.wa}'] = {'fralda geriatrica g': {'nome': 'Fralda geriátrica G', 'vezes': 2, 'ultima': 1.0}}
+    endereco_pronto(m)
+    m.enviar('quero dipirona')
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    m.wpp.limpar()
+    m.enviar('me sugere algo')
+    busca = m.mcp.chamadas_de('searchOffers')[-1]
+    assert busca['query'].lower() == 'fralda geriátrica' and 'costuma' in ' '.join(m.wpp.textos())
 
 
 def test_completar_o_valor_sugere_algo_parecido_mesmo_com_o_gemini_fora():
@@ -607,7 +631,8 @@ def test_completar_o_valor_sugere_algo_parecido_mesmo_com_o_gemini_fora():
     m.wpp.limpar()
     m.enviar('sla algo que complete esse valor')
     textos = ' '.join(m.wpp.textos())
-    assert 'Não achei' not in textos and 'Separei' in textos and m.wpp.cards()
+    assert 'Não achei' not in textos and ('pra acompanhar' in textos or 'Separei' in textos)
+    assert m.wpp.cards()
     est = m.estado()
     no_carrinho = {i['item_id'] for i in est['carrinho']['itens']}
     sugeridas = {o['item_id'] for o in est['listas'][est['lista_atual']]['ofertas']}
@@ -620,10 +645,26 @@ def test_pedir_sugestao_de_novo_traz_outra_coisa():
     endereco_pronto(m)
     m.tocar('pick:')
     m.tocar('qtd:1')
+    antes = len(m.mcp.chamadas_de('searchOffers'))
     m.enviar('me sugere algo')
+    meio = len(m.mcp.chamadas_de('searchOffers'))
     m.enviar('me sugere algo')
-    consultas = [c['query'].lower() for c in m.mcp.chamadas_de('searchOffers')[-2:]]
-    assert consultas[0] == 'leite integral' and consultas[1] != 'leite integral'
+    buscas = [c['query'].lower() for c in m.mcp.chamadas_de('searchOffers')]
+    primeira, segunda = set(buscas[antes:meio]), set(buscas[meio:])
+    assert primeira and segunda and not primeira & segunda   # cada toque traz outra coisa
+
+
+def test_carrinho_do_ifood_real_e_largado_quando_o_mock_liga():
+    m = Mundo()
+    endereco_pronto(m)
+    u = m.armazem[f'u:{m.wa}']
+    u['carrinho'] = {'id': 'cart-real', 'loja_id': 'loja-do-ifood-real', 'loja': 'Nissei Mercado - 431',
+                     'itens': [{'item_id': 'x', 'nome': 'Leite', 'qtd': 1}], 'subtotal': 5.0}
+    m.armazem[f'u:{m.wa}'] = u
+    m.enviar('quero leite')
+    busca = m.mcp.chamadas_de('searchOffers')[-1]
+    assert 'merchantId' not in (busca.get('refinements') or {})   # não fica preso no Nissei
+    assert m.wpp.cards() and not m.estado()['carrinho']
 
 
 def test_audio_vira_pedido():

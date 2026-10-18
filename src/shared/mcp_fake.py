@@ -13,6 +13,12 @@ item, opções obrigatórias do item.
 
 O estado (endereços, carrinhos, pedidos) fica em `armazem[chave]`: em produção, o mesmo
 modal.Dict do bot, então sobrevive entre uma mensagem e outra.
+
+Consistente de propósito (17/10, o mock virou o iFood da apresentação): cada loja tem o seu pedido
+mínimo, o mesmo no getMerchant e no carrinho; lanchonete, pizzaria, cantina e mercados têm o que
+acompanha (refri, suco, batata, sobremesa, manteiga, café) pra sugestão do mínimo sempre achar algo;
+a busca ignora palavra vazia ("de", "com") e põe na frente quem tem todas as palavras. Item novo vai
+SEMPRE no fim do CATALOGO: o id do item é o índice, e carrinho guardado no armazém aponta pra ele.
 """
 import copy
 import re
@@ -21,15 +27,17 @@ import uuid
 
 from src.shared.ifood_mcp import ErroMCP, _erro_em
 
+# (nome, vertical, tempo de entrega, taxa, nota, distância km, pedido mínimo)
 LOJAS = {
-    'm1': ('Mercado Bom Preço', 'GROCERIES', {'min': 25, 'max': 35}, 4.99, 4.6, 1.2),
-    'm2': ('Supermercado Central', 'GROCERIES', {'min': 40, 'max': 55}, 0.0, 4.4, 2.8),
-    'm3': ('Padaria Pão Quente', 'GROCERIES', {'min': 15, 'max': 25}, 3.49, 4.8, 0.6),
-    'r1': ('Pizzaria Bella Napoli', 'RESTAURANT', {'min': 35, 'max': 50}, 6.90, 4.7, 2.1),
-    'r2': ('Cantina da Vó', 'RESTAURANT', {'min': 30, 'max': 40}, 4.50, 4.9, 1.0),
-    'f1': ('Drogaria Saúde', 'DRUGSTORE', {'min': 20, 'max': 30}, 2.99, 4.5, 0.9),
-    'b1': ('Adega do Zé', 'LIQUORSTORE', {'min': 25, 'max': 35}, 5.00, 4.3, 1.7),
-    'p1': ('Pet Feliz', 'PETSTORE', {'min': 40, 'max': 60}, 7.90, 4.6, 3.3),
+    'm1': ('Mercado Bom Preço', 'GROCERIES', {'min': 25, 'max': 35}, 4.99, 4.6, 1.2, 20.0),
+    'm2': ('Supermercado Central', 'GROCERIES', {'min': 40, 'max': 55}, 0.0, 4.4, 2.8, 25.0),
+    'm3': ('Padaria Pão Quente', 'GROCERIES', {'min': 15, 'max': 25}, 3.49, 4.8, 0.6, 15.0),
+    'r1': ('Pizzaria Bella Napoli', 'RESTAURANT', {'min': 35, 'max': 50}, 6.90, 4.7, 2.1, 35.0),
+    'r2': ('Cantina da Vó', 'RESTAURANT', {'min': 30, 'max': 40}, 4.50, 4.9, 1.0, 30.0),
+    'f1': ('Drogaria Saúde', 'DRUGSTORE', {'min': 20, 'max': 30}, 2.99, 4.5, 0.9, 20.0),
+    'b1': ('Adega do Zé', 'LIQUORSTORE', {'min': 25, 'max': 35}, 5.00, 4.3, 1.7, 30.0),
+    'p1': ('Pet Feliz', 'PETSTORE', {'min': 40, 'max': 60}, 7.90, 4.6, 3.3, 40.0),
+    'l1': ('Lanchonete do Bairro', 'RESTAURANT', {'min': 20, 'max': 35}, 3.99, 4.7, 0.8, 30.0),
 }
 
 # grupo: (nome, minSelections, maxSelections, [(opção, preço adicional)])
@@ -81,10 +89,74 @@ CATALOGO = [
     ('b1', 'Vinho tinto suave', 'Garrafa 750 ml', 29.90, None, None),
     ('p1', 'Ração para cães adultos', 'Pacote 3 kg', 59.90, 49.90, None),
     ('p1', 'Ração para gatos', 'Pacote 1 kg', 29.90, None, None),
+    # --- 17/10 21h: o que acompanha (sugestão do pedido mínimo), a lanchonete e o básico do dia a dia ---
+    ('l1', 'X-Burger', 'Pão, hambúrguer 120 g, queijo e maionese da casa', 22.90, None, None),
+    ('l1', 'X-Salada', 'Pão, hambúrguer 120 g, queijo, alface e tomate', 24.90, None, None),
+    ('l1', 'X-Bacon', 'Pão, hambúrguer 120 g, queijo e bacon', 27.90, 25.90, None),
+    ('l1', 'Misto quente', 'Pão de forma, presunto e queijo na chapa', 12.90, None, None),
+    ('l1', 'Cachorro-quente', 'Salsicha, molho, milho e batata palha', 15.90, None, None),
+    ('l1', 'Batata frita (porção)', 'Porção 300 g', 14.90, None, None),
+    ('l1', 'Refrigerante lata 350 ml', 'Coca-Cola, Guaraná ou Sprite', 6.50, None, None),
+    ('l1', 'Refrigerante 600 ml', 'Coca-Cola ou Guaraná', 8.50, None, None),
+    ('l1', 'Suco natural de laranja', 'Copo 500 ml', 9.90, None, None),
+    ('r1', 'Refrigerante 2 litros', 'Coca-Cola ou Guaraná', 13.90, None, None),
+    ('r1', 'Pizza de chocolate', 'Chocolate ao leite e granulado', 44.90, None, _PIZZA),
+    ('r2', 'Refrigerante lata 350 ml', 'Coca-Cola ou Guaraná', 6.00, None, None),
+    ('r2', 'Suco natural de laranja', 'Copo 500 ml', 8.90, None, None),
+    ('r2', 'Pudim de leite', 'Fatia', 9.90, None, None),
+    ('m1', 'Refrigerante 2 litros', 'Coca-Cola', 11.99, 9.99, None),
+    ('m2', 'Refrigerante 2 litros', 'Guaraná Antarctica', 9.49, None, None),
+    ('m3', 'Refrigerante lata 350 ml', 'Coca-Cola', 5.50, None, None),
+    ('m2', 'Manteiga com sal', 'Pote 200 g', 12.49, None, None),
+    ('m2', 'Café torrado e moído', 'Pacote 500 g', 17.90, None, None),
+    ('m2', 'Queijo muçarela fatiado', 'Bandeja 200 g', 12.90, None, None),
+    ('m1', 'Queijo muçarela fatiado', 'Bandeja 200 g', 11.90, None, None),
+    ('m3', 'Queijo minas frescal', 'Peça aprox. 400 g', 18.90, None, None),
+    ('m1', 'Presunto fatiado', 'Bandeja 200 g', 8.90, None, None),
+    ('m3', 'Bolo de fubá', 'Unidade aprox. 600 g', 16.90, None, None),
+    ('m1', 'Achocolatado em pó', 'Lata 400 g', 9.90, None, None),
+    ('m2', 'Iogurte natural', 'Pote 170 g', 3.49, None, None),
+    ('m1', 'Água mineral sem gás', 'Garrafa 1,5 litro', 3.49, None, None),
+    ('m2', 'Água mineral sem gás', 'Garrafa 1,5 litro', 2.99, None, None),
+    ('m1', 'Óleo de soja', 'Garrafa 900 ml', 7.99, 6.99, None),
+    ('m2', 'Macarrão espaguete', 'Pacote 500 g', 4.79, None, None),
+    ('m1', 'Molho de tomate', 'Sachê 340 g', 3.29, None, None),
+    ('m2', 'Feijão preto', 'Pacote 1 kg', 9.49, None, None),
+    ('m2', 'Arroz branco tipo 1', 'Pacote 5 kg', 26.90, None, None),
+    ('m1', 'Sal refinado', 'Pacote 1 kg', 2.99, None, None),
+    ('m2', 'Farinha de trigo', 'Pacote 1 kg', 5.49, None, None),
+    ('m1', 'Farofa pronta', 'Pacote 500 g', 6.90, None, None),
+    ('m1', 'Cebola', 'Aprox. 1 kg', 5.99, None, None),
+    ('m1', 'Tomate', 'Aprox. 1 kg', 7.49, None, None),
+    ('m2', 'Batata', 'Aprox. 1 kg', 6.49, None, None),
+    ('m2', 'Alho', 'Cabeça aprox. 100 g', 3.99, None, None),
+    ('m2', 'Frango inteiro congelado', 'Aprox. 2,5 kg', 24.90, None, None),
+    ('m2', 'Biscoito recheado', 'Pacote 140 g', 3.99, None, None),
+    ('m1', 'Biscoito cream cracker', 'Pacote 200 g', 4.49, None, None),
+    ('m2', 'Papel higiênico', 'Pacote com 12 rolos', 21.90, 18.90, None),
+    ('m1', 'Detergente', 'Frasco 500 ml', 2.49, None, None),
+    ('m2', 'Sabonete', 'Pacote com 4', 8.90, None, None),
+    ('m1', 'Creme dental', 'Tubo 90 g', 4.99, None, None),
+    ('m2', 'Água sanitária', 'Frasco 2 litros', 6.99, None, None),
+    ('f1', 'Soro fisiológico', 'Frasco 500 ml', 6.90, None, None),
+    ('f1', 'Vitamina C 1 g', 'Tubo com 10 comprimidos efervescentes', 14.90, 11.90, None),
+    ('f1', 'Água mineral sem gás', 'Garrafa 500 ml', 2.50, None, None),
+    ('b1', 'Refrigerante 2 litros', 'Coca-Cola', 12.90, None, None),
+    ('b1', 'Gelo', 'Saco 5 kg', 9.90, None, None),
+    ('b1', 'Carvão', 'Saco 3 kg', 19.90, None, None),
+    ('p1', 'Areia para gatos', 'Pacote 4 kg', 24.90, None, None),
+    ('p1', 'Petisco para cães', 'Pacote 65 g', 9.90, None, None),
 ]
 SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
              'remedio': ['dipirona', 'paracetamol'], 'racao': ['racao'], 'almoco': ['marmita', 'sopa'],
-             'refeicao': ['marmita'], 'frios': ['manteiga']}
+             'refeicao': ['marmita'], 'frios': ['queijo', 'presunto', 'manteiga'],
+             'refri': ['refrigerante'], 'coca': ['refrigerante'], 'guarana': ['refrigerante'],
+             'lanche': ['x-', 'misto', 'cachorro'], 'sanduiche': ['x-', 'misto'], 'hamburguer': ['x-', 'burger'],
+             'bolacha': ['biscoito'], 'sobremesa': ['pudim', 'bolo', 'chocolate'],
+             'doce': ['doce', 'chocolate', 'pudim', 'bolo'], 'bebida': ['refrigerante', 'suco', 'agua mineral']}
+# não ajudam a achar produto: "pão de forma" é pão + forma, e o "de" casava com meio catálogo
+PALAVRAS_VAZIAS = {'de', 'da', 'do', 'das', 'dos', 'e', 'com', 'sem', 'pra', 'para', 'um', 'uma', 'o', 'a',
+                   'os', 'as', 'em', 'no', 'na', 'in', 'natura', 'kg', 'g', 'ml', 'l', 'un'}
 PAGAMENTOS = [('CREDIT_CARD', 'Cartão de Crédito'), ('DEBIT_CARD', 'Cartão de Débito'), ('PIX', 'PIX'),
               ('MEAL_VOUCHER', 'Vale Refeição')]
 STATUS = [('ORDER_CREATED', 'Order created.'), ('CONFIRMED', 'Merchant confirmed the order.'),
@@ -110,7 +182,7 @@ def _img(nome):
 
 
 def _loja(chave):
-    nome, _tipo, eta, taxa, nota, dist = LOJAS[chave]
+    nome, _tipo, eta, taxa, nota, dist, _minimo = LOJAS[chave]
     return {'merchantId': _uid('loja', chave), 'merchantName': nome,
             'merchantLogoUrl': _img(nome), 'reviewRating': nota, 'isOpen': True,
             'deliveryMethod': {'deliveryMethodMode': 'DELIVERY', 'fee': taxa, 'promotionalFee': None,
@@ -129,6 +201,11 @@ def _resultado_item(i):
 
 _ITEM_POR_ID = {_uid('item', i): i for i in range(len(CATALOGO))}
 _LOJA_POR_ID = {_uid('loja', k): k for k in LOJAS}
+
+
+def loja_do_mock(merchant_id):
+    """A loja é deste mock? O bot usa pra largar o carrinho do iFood real quando o mock liga (e vice-versa)."""
+    return merchant_id in _LOJA_POR_ID
 
 
 def _erro_discovery(codigo, msg, retry=False):
@@ -243,10 +320,10 @@ class McpFake:
         if not _n(query).strip():
             raise _erro_discovery('INVALID_QUERY', 'The search query is empty.', True)
         refin = refinements or {}
-        alvos = set()
-        for t in _n(query).split():
-            alvos.update(SINONIMOS.get(t, [t]))
-        achados = []
+        todas = re.findall(r'[a-z0-9]+', _n(query))
+        palavras = [t for t in todas if t not in PALAVRAS_VAZIAS and len(t) > 1] or todas
+        alvos = [SINONIMOS.get(t, [t]) for t in palavras]  # cada palavra casa com ela ou um sinônimo
+        pontos = {}
         for i, (lj, nome, _d, preco, promo, _g) in enumerate(CATALOGO):
             if merchantType and LOJAS[lj][1] != merchantType:
                 continue
@@ -255,9 +332,15 @@ class McpFake:
             if refin.get('maxItemPrice') and (promo or preco) > float(refin['maxItemPrice']):
                 continue
             nn = _n(nome)
-            if not any(a in nn for a in alvos):
-                continue
-            achados.append(i)
+            casou = [any(a in nn for a in alts) for alts in alvos]
+            if any(casou):
+                pontos[i] = (sum(casou), casou[0])
+        # 1º quem tem todas as palavras; depois quem tem a 1ª, o produto ("leite" de "leite integral"),
+        # do que casa mais pro que casa menos; o resto só se não sobrou nada
+        cheios = [i for i, (n, _p) in pontos.items() if n == len(alvos)]
+        do_produto = sorted((i for i, (n, p) in pontos.items() if p and n < len(alvos)),
+                            key=lambda i: -pontos[i][0])
+        achados = (cheios + do_produto) or sorted(pontos, key=lambda i: -pontos[i][0])
         tam = max(1, min(int(pageSize or 10), 25))
         ini = int(nextPageToken or 0)
         pagina = achados[ini:ini + tam]
@@ -285,7 +368,7 @@ class McpFake:
         if merchantId not in _LOJA_POR_ID:
             raise _erro_discovery('MERCHANT_NOT_FOUND', 'merchant not found')
         lj = _LOJA_POR_ID[merchantId]
-        return {**_loja(lj), 'merchantType': LOJAS[lj][1], 'minimumOrderAmount': 15.0,
+        return {**_loja(lj), 'merchantType': LOJAS[lj][1], 'minimumOrderAmount': LOJAS[lj][6],
                 'deliveryMethods': [{'deliveryMethodId': 'ECONOMIC', 'deliveryMethodMode': 'DELIVERY',
                                      'fee': LOJAS[lj][3], 'estimatedMinutes': LOJAS[lj][2]}]}
 
@@ -410,7 +493,7 @@ class McpFake:
         end = next((e for e in st['enderecos'] if e['addressId'] == addressId), {})
         loc = end.get('location') or {}
         car = {'cartId': cid, 'merchant': {'merchantId': merchantId, 'merchantName': LOJAS[lj][0],
-                                           'orderMinimumPrice': 15.0, 'formattedAddress': 'Rua da Loja, 10'},
+                                           'orderMinimumPrice': LOJAS[lj][6], 'formattedAddress': 'Rua da Loja, 10'},
                'items': linhas, 'deliveryAddress': {'streetName': loc.get('street'), 'streetNumber': loc.get('number'),
                                                     'neighborhood': loc.get('neighborhood')},
                'deliveryMethod': None, 'paymentMethod': None, 'fees': [], 'warning': None, '_endereco': addressId}

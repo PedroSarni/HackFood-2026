@@ -236,7 +236,7 @@ class LlmFake:
             texto += ' pao'  # o "áudio" fala pão
         itens = []
         for termo, loja in (('pao', 'MERCADO'), ('leite', 'MERCADO'), ('carne', 'MERCADO'),
-                            ('pizza', 'RESTAURANTE'), ('dipirona', 'FARMACIA')):
+                            ('pizza', 'RESTAURANTE'), ('dipirona', 'FARMACIA'), ('burger', 'RESTAURANTE')):
             if termo in texto:
                 itens.append({'termo': termo, 'tipo_loja': loja, 'quantidade': None, 'observacao': None})
         if 'mais opcoes' in texto or 'outras' in texto:
@@ -257,6 +257,7 @@ class Mundo:
         from src.bot.fluxo import Bot
         self.wa = wa
         self.armazem = Armazem()
+        self.armazem['cfg:mock'] = True  # o Mundo é sempre o iFood falso (McpFake), como a produção com o mock ligado
         self.wpp = WhatsAppFake()
         self.llm = LlmFake()
         self.rastreios = []

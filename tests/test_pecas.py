@@ -364,3 +364,37 @@ def test_pede_sugestao_sem_gemini():
         assert pede_sugestao(frase), frase
     for frase in ('quero pão', 'leite integral', 'frango completo', 'pedido completo', 'tanto faz'):
         assert not pede_sugestao(frase), frase
+
+
+def test_complementos_oferece_o_que_acompanha_e_nunca_remedio():
+    from src.bot.combina import complementos
+    assert complementos(['X-Burger'], 'RESTAURANTE')[0] == 'refrigerante'
+    assert complementos(['Pão francês'], 'MERCADO')[0] == 'manteiga'
+    assert 'refrigerante' not in complementos(['X-Bacon', 'Refrigerante lata 350 ml'], 'RESTAURANTE')
+    assert complementos(['Ovos bandeja x 12'], 'MERCADO') == ['refrigerante']   # "x" no meio não é lanche
+    assert complementos(['Dipirona 500 mg'], 'FARMACIA') == []
+
+
+def test_mock_busca_ignora_palavra_vazia_e_poe_na_frente_quem_tem_tudo():
+    mcp = McpFake()
+    loc = {'latitude': -22.0, 'longitude': -47.9}
+
+    def nomes(q):
+        r = mcp.chamar('searchOffers', query=q, userLocation=loc, resultKind='ITEM', pageSize=25)
+        return [x['itemName'] for x in r['results']]
+    forma = nomes('pão de forma')
+    assert forma[:2] == ['Pão de forma tradicional', 'Pão de forma integral']
+    assert all(n.startswith('Pão') for n in forma)   # o "de" não traz mais carne de panela
+    assert 'Refrigerante lata 350 ml' in nomes('refri')
+
+
+def test_mock_cada_loja_tem_o_seu_minimo_igual_na_loja_e_no_carrinho():
+    from src.shared.mcp_fake import LOJAS, _uid
+    mcp = McpFake()
+    loc = {'latitude': -22.0, 'longitude': -47.9}
+    loja = _uid('loja', 'l1')
+    burger = mcp.chamar('searchOffers', query='x-burger', userLocation=loc, resultKind='ITEM')['results'][0]
+    car = mcp.chamar('createCart', merchantId=loja, addressId='end-1',
+                     items=[{'itemId': burger['itemId'], 'quantity': 1, 'options': []}])
+    det = mcp.chamar('getMerchant', merchantId=loja, userLocation=loc)
+    assert car['merchant']['orderMinimumPrice'] == det['minimumOrderAmount'] == LOJAS['l1'][6] == 30.0

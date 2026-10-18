@@ -17,6 +17,7 @@ import traceback
 
 from src.bot import ranking, relevancia, tutor
 from src.bot import textos as T
+from src.bot.combina import complementos
 from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, pede_sugestao,
                                  regra_rapida)
@@ -104,6 +105,13 @@ class Bot:
     def processar(self, wa_id, msgs):
         self.wa = wa_id
         self.u = u = self._carregar(wa_id)
+        car = u.get('carrinho') or {}
+        if car.get('loja_id') and not self.ctx.carrinho_valido(car):
+            # ligaram/desligaram o mock: o carrinho é do outro iFood e prendia a busca numa loja que não existe aqui
+            print(f'carrinho de outro iFood largado {wa_id}: {car.get("loja")}')
+            u.update(carrinho=None, fila=[], listas={}, lista_atual=None, atual=None, visiveis=[], sugeridos=None)
+            if u.get('fase') in NO_MEIO_DO_PEDIDO:
+                u['fase'] = 'inicio'
         if msgs and msgs[-1].get('_nome'):
             u['nome'] = msgs[-1]['_nome']
         anterior = u.get('ultima_msg') or 0  # lido antes de sobrescrever (recorrencia.py usa o novo)
@@ -641,10 +649,10 @@ class Bot:
 
     def sugerir(self, _arg=None, itens=None):
         """'Me sugere algo', 'algo que complete esse valor' ou o botão 💡. Na loja do carrinho,
-        oferece 1º o que a pessoa costuma comprar (hist:{wa}), depois o que o Gemini achou que
-        combina, depois algo parecido com o carrinho; quem fecha o pedido mínimo vem na frente.
-        Cada pedido de sugestão traz outra coisa (u['sugeridos'], por loja). No máximo 3 buscas
-        por toque: o iFood barra rajada."""
+        oferece 1º o que acompanha o pedido (o que o Gemini sugeriu e src/bot/combina.py: refri pro
+        lanche, manteiga pro pão), depois o que a pessoa costuma comprar (hist:{wa}), depois algo
+        parecido com o carrinho; quem fecha o pedido mínimo vem na frente. Cada pedido de sugestão
+        traz outra coisa (u['sugeridos'], por loja). No máximo 3 buscas por toque: o iFood barra rajada."""
         if not self.exigir_login(None):
             return
         if not self.garantir_endereco({'acao': 'sugerir'}):
@@ -654,9 +662,12 @@ class Bot:
         ja = u.get('sugeridos') or {}
         if ja.get('loja') != car.get('loja_id'):
             ja = {'loja': car.get('loja_id'), 'termos': []}
-        candidatos = ([{'termo': t, 'de_onde': 'costuma'} for t in self._costuma(car)]
-                      + [{'termo': i['termo'], 'busca': i.get('busca'), 'tipo_loja': i.get('tipo_loja'),
-                          'de_onde': 'combina'} for i in itens or []]
+        tipo = (u.get('atual') or {}).get('tipo_loja') or 'MERCADO'
+        nomes = [i.get('nome') or '' for i in car.get('itens') or []]
+        candidatos = ([{'termo': i['termo'], 'busca': i.get('busca'), 'tipo_loja': i.get('tipo_loja'),
+                        'de_onde': 'combina'} for i in itens or []]
+                      + [{'termo': t, 'de_onde': 'combina'} for t in complementos(nomes, tipo)]
+                      + [{'termo': t, 'de_onde': 'costuma'} for t in self._costuma(car)]
                       + [{'termo': t, 'de_onde': 'parecido'} for t in self._parecidos(car)])
         candidatos = [c for c in candidatos if normalizar(c['termo'])]
         if candidatos and all(normalizar(c['termo']) in ja['termos'] for c in candidatos):
@@ -670,7 +681,6 @@ class Bot:
             self.perguntar_pedido()
             return
         falta = _falta(car)
-        tipo = (u.get('atual') or {}).get('tipo_loja') or 'MERCADO'
         evitar = [i.get('item_id') for i in car.get('itens') or []]
         for c in novos[:3]:
             ja['termos'].append(normalizar(c['termo']))
@@ -681,7 +691,8 @@ class Bot:
                       'tipo_loja': tipo if car.get('itens') else (c.get('tipo_loja') or tipo)}
             if self.buscar(pedido, antes=T.sugestao(c['termo'], c['de_onde'], falta, car.get('loja'))):
                 return
-        self.perguntar(T.SEM_SUGESTAO, [T.B_FINALIZAR, T.B_INICIO] if car.get('itens') else [T.B_INICIO],
+        outra = [T.B_SUGERIR] if len(novos) > 3 else []  # sobrou o que tentar: o 💡 tenta os próximos
+        self.perguntar(T.SEM_SUGESTAO, outra + ([T.B_FINALIZAR, T.B_INICIO] if car.get('itens') else [T.B_INICIO]),
                        fase='pedido')
 
     def _costuma(self, car):

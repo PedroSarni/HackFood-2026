@@ -54,7 +54,7 @@ apagar_dados, parar_lembrete, agendar, fora_do_escopo, nao_entendi.
 ("pão francês", "leite integral", "carne moída", "dipirona"), sem a quantidade. \
 quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
 detalhes ("bem passado", "sem cebola", "marca Italac"). Quando acao=sugerir, até 3 produtos \
-que combinem com o que já está no pedido, no mesmo formato.
+que acompanhem o que já está no pedido (refrigerante pro lanche, manteiga pro pão), no mesmo formato.
 - busca: o texto que vai na busca do iFood, que é burra (casa com nome de loja e com sabor). \
 1 a 4 palavras, como o produto aparece num catálogo. Se a palavra pura engana, desambigue: \
 "cebola" -> "cebola in natura" (senão vem salgadinho sabor cebola), "limão" -> "limão tahiti", \

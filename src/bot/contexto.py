@@ -57,6 +57,12 @@ class Contexto:
     def logado(self, wa_id):
         return bool(self.armazem.get(f'tok:{wa_id}'))
 
+    def carrinho_valido(self, car):
+        """O carrinho guardado é deste iFood? Ligar/desligar o mock deixa o carrinho do outro lado órfão,
+        e a busca ficava presa numa loja que não existe aqui ("Não achei X no Nissei" pra tudo)."""
+        from src.shared.mcp_fake import loja_do_mock
+        return loja_do_mock(car.get('loja_id')) == modo_mock(self.armazem)
+
     def llm(self, sistema, partes, esquema):
         return self._gerar_json(sistema, partes, esquema)
 

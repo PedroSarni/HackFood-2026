@@ -116,6 +116,9 @@ texto      o endereço, quando acao=endereco
 
 ## 4. Login do iFood — de onde vem o `.../login/CODIGO`
 
+> **A URL do bot é fixa.** O callback (`.../ifood/callback`) está cadastrado no portal e a edição está
+> bloqueada: não mude o nome do app, o label, o workspace nem a região no Modal (`AGENTS.md` §0.0).
+
 Quando o bot precisa que a pessoa entre na conta iFood, ele manda um botão "Entrar no iFood"
 cujo link é `https://<nosso-backend>/login/<codigo>`.
 
@@ -243,9 +246,10 @@ Sequência obrigatória do iFood, que o fluxo (`finalizar`) respeita:
   botões. Quem digita o número de uma opção é atendido igual a quem toca.
 - **Uma loja por pedido.**
 - **Pedido mínimo não trava ninguém.** O aviso de mínimo (e o "O que mais você quer?" abaixo dele)
-  vem com **💡 Me sugere algo**: na loja do carrinho, o bot oferece 1º o que a pessoa costuma comprar
-  (histórico `hist:`), depois o que combina (Gemini), depois algo parecido com o carrinho, e quem
-  fecha o mínimo sozinho aparece primeiro. "Me sugere", "algo que complete esse valor" e afins caem
+  vem com **💡 Me sugere algo**: na loja do carrinho, o bot oferece 1º o que acompanha o pedido
+  (refri pro lanche, manteiga pro pão: `src/bot/combina.py`, mais o que o Gemini sugerir), depois o
+  que a pessoa costuma comprar (histórico `hist:`), depois algo parecido com o carrinho, e quem fecha
+  o mínimo sozinho aparece primeiro. Remédio nunca entra como sugestão. "Me sugere", "algo que complete esse valor" e afins caem
   na sugestão mesmo com o Gemini fora (`pede_sugestao`, sem IA).
 - **Pagamento: só PIX e vales** (limitação da API para cartão).
 - **O CPF e documentos não passam pela IA.**
@@ -288,6 +292,11 @@ A etapa atual (`u['fase']`) é o que o fluxo usa pra saber o que fazer com a pr�
 
 - **Modo real** (atual): o bot fala com o iFood de verdade. A pessoa precisa fazer o login real
   (conta iFood própria ou uma conta de teste do portal, que tem OTP na tela).
+- **Mock no ar desde 17/10 ~21h25**: o iFood real cai muito por firewall, então a demo roda no mock.
+  Liga e desliga sem deploy: `scripts/modo.py --mock on|off`. O mock é consistente de propósito:
+  pedido mínimo por loja (o mesmo na loja e no carrinho), lanchonete, pizzaria, cantina e mercados com
+  o que acompanha (refri, suco, batata, sobremesa), e busca que ignora "de"/"com" e põe na frente quem
+  tem todas as palavras.
 - **Modo demo**: ligar com `IFOOD_MOCK=1` no secret `hackathon-ifood`. O iFood vira o mock e o
   login é simulado. Útil pra demonstrar sem depender de uma conta iFood.
 
@@ -302,7 +311,7 @@ A etapa atual (`u['fase']`) é o que o fluxo usa pra saber o que fazer com a pr�
 ## 13. Rodar, testar, publicar
 
 ```powershell
-# testes (118, roda em segundos)
+# testes (rodam em segundos)
 .venv\Scripts\python.exe -m pytest
 
 # publicar no Modal
