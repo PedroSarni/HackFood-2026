@@ -1863,3 +1863,80 @@ def test_sugestao_da_ia_passa_pelo_crivo_do_codigo():
     assert 'café' not in textos and 'refrigerante' not in textos.lower()  # só cita o que está no carrinho
     assert 'Que tal *batata frita* pra acompanhar?' in textos
     assert m.mcp.chamadas_de('searchOffers')[-1]['query'] == 'batata frita'
+
+
+# --- loja que exige CPF já no item (MERCH-007, QA do Nissei 18/10) -------------------------------
+
+def _loja_exige_cpf(m, monkeypatch, vezes=1):
+    """createCart (1º item) devolve MERCH-007 `vezes` vezes, como o Nissei no MCP real."""
+    from src.shared import mcp_fake
+    original = mcp_fake.McpFake.t_createCart
+    falta = {'n': vezes}
+
+    def exige(self, st, *a, **kw):
+        if falta['n']:
+            falta['n'] -= 1
+            raise mcp_fake._erro_cart('MERCH-007', 'Este restaurante obriga a digitação do CPF',
+                                      'Este restaurante obriga a digitação do CPF.')
+        return original(self, st, *a, **kw)
+    monkeypatch.setattr(mcp_fake.McpFake, 't_createCart', exige)
+
+
+def test_cpf_pedido_no_item_retoma_o_item_escolhido(monkeypatch):
+    m = Mundo()
+    endereco_pronto(m)
+    _loja_exige_cpf(m, monkeypatch)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    assert 'exige *CPF na nota*' in m.wpp.textos()[-1] and m.estado()['fase'] == 'cpf'
+    m.wpp.limpar()
+    m.enviar('529.982.247-25')
+    textos = ' '.join(m.wpp.textos())
+    assert 'vazio' not in textos
+    itens = m.estado()['carrinho']['itens']
+    assert itens and itens[0]['qtd'] == 3  # o item escolhido entrou
+    assert m.estado()['cpf'] == '52998224725'  # guardado pra próxima loja que exigir
+
+
+def test_cpf_informado_fica_na_conversa_e_nao_e_pedido_de_novo(monkeypatch):
+    m = Mundo()
+    endereco_pronto(m)
+    _loja_exige_cpf(m, monkeypatch, vezes=2)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.enviar('529.982.247-25')  # a loja recusa de novo, mesmo com o CPF
+    textos = ' '.join(m.wpp.textos()[-2:])
+    assert 'vazio' not in textos and 'exige *CPF na nota*' not in m.wpp.textos()[-1]
+    assert 'Não consegui' in textos and m.estado()['fase'] == 'pedido'  # diz que não deu e volta pro menu
+    assert m.estado()['cpf']  # o CPF continua guardado
+    m.wpp.limpar()
+    m.enviar('quero pao')  # 2ª tentativa: não pede o CPF de novo
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    assert not any('exige *CPF na nota*' in t for t in m.wpp.textos())
+    assert m.estado()['carrinho']['itens']
+
+
+def test_cpf_pedido_no_segundo_item_poe_o_item_e_nao_pula_pro_fechamento(monkeypatch):
+    from src.shared import mcp_fake
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    antes = sum(i['qtd'] for i in m.estado()['carrinho']['itens'])
+    original, falta = mcp_fake.McpFake.t_addItemToCart, {'n': 1}
+
+    def exige(self, st, *a, **kw):
+        if falta['n']:
+            falta['n'] -= 1
+            raise mcp_fake._erro_cart('MERCH-007', 'Este restaurante obriga a digitação do CPF',
+                                      'Este restaurante obriga a digitação do CPF.')
+        return original(self, st, *a, **kw)
+    monkeypatch.setattr(mcp_fake.McpFake, 't_addItemToCart', exige)
+    m.enviar('quero pao')
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    assert m.estado()['fase'] == 'cpf'
+    m.enviar('529.982.247-25')
+    assert sum(i['qtd'] for i in m.estado()['carrinho']['itens']) == antes + 1  # o 2º item entrou
+    assert m.estado()['fase'] != 'confirmar'  # não pulou pro resumo sem ele

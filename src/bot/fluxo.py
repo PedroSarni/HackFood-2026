@@ -2069,8 +2069,20 @@ class Bot:
     def receber_cpf(self, texto):
         cpf = cpf_em(texto)
         if cpf:
-            self.u['cpf'] = cpf
-            self.finalizar()
+            u = self.u
+            u['cpf'] = cpf  # fica na conversa: a próxima loja que exigir não pede de novo (nunca vai pra IA nem log)
+            retomar = u.pop('retomar_cpf', None)
+            if not retomar or _fechamento(retomar):
+                if not (u.get('carrinho') or {}).get('itens'):
+                    self.menu(T.NAO_RETOMEI)  # nada pra retomar nem carrinho: nunca "pedido vazio"
+                    return
+                self.finalizar()  # o CPF foi pedido no fechamento: segue a compra, como sempre
+                return
+            # o CPF foi exigido no meio do caminho (ao pôr o item): refaz o que a pessoa estava fazendo
+            if retomar[0] == 'botao':
+                self.botao(retomar[1])
+            else:
+                self.intencao(retomar[1])
             return
         t = normalizar(texto)
         if t in SEM_CPF:
@@ -2844,9 +2856,17 @@ class Bot:
         elif 'MERCH-007' in cod or 'CPF' in str(e).upper():
             # 17/10 19h: "MERCH-007: Este restaurante obriga a digitação do CPF" caía no "Tentar de
             # novo" genérico e a pessoa batia 3x no mesmo erro. Agora pede o CPF, sem a opção "sem CPF".
-            u['cpf'] = None
             if u.get('carrinho'):
                 u['carrinho']['cpf_obrigatorio'] = True
+            if cpf_em(u.get('cpf') or ''):
+                # já temos o CPF e a loja recusou mesmo assim: pedir de novo não resolve
+                u['retomar_cpf'] = None
+                self.menu(T.CPF_NAO_RESOLVEU)
+                return
+            u['cpf'] = None
+            ult = u.get('ultima_acao')
+            # o que retomar quando o CPF chegar (no fechamento, o carrinho cheio já leva de volta pro resumo)
+            u['retomar_cpf'] = ult if ult and ult[0] in ('botao', 'intencao') else None
             self.perguntar(T.CPF_OBRIGATORIO, [T.B_CANCELAR], fase='cpf')
         elif 'DOCUMENT' in cod:
             u['cpf'] = None
@@ -2857,6 +2877,13 @@ class Bot:
                 self.ctx.armazem['ifood_instavel'] = self.ctx.agora()
                 msg = self._tutor('ifood_fora', msg)
             self.perguntar(msg, [T.B_TENTAR, T.B_INICIO])
+
+
+def _fechamento(acao):
+    """A ação que esbarrou no CPF era fechar o pedido? Aí o CPF leva de volta pro resumo, nunca envia direto."""
+    if acao[0] == 'botao':
+        return str(acao[1]).split(':')[0] in ('ok', 'fim', 'finalizar', 'pag', 'ent', 'cupom', 'lem')
+    return (acao[1] or {}).get('acao') in ('finalizar', 'sim')
 
 
 def _mesmo_termo(a, b):

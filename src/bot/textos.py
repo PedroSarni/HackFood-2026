@@ -421,6 +421,10 @@ FECHANDO ='⏳ Fechando com a loja (entrega, pagamento e cupom). Já te mando o 
 CPF_OBRIGATORIO = ('🧾 Essa loja exige *CPF na nota* pra fazer o pedido.\n'
                    'Escreva seu CPF aqui (só os números), por favor. 🙂')
 
+CPF_NAO_RESOLVEU = ('Não consegui seguir com essa loja, mesmo com o seu CPF. 😕\n'
+                    'Seu CPF ficou guardado, não vou pedir de novo. Vamos tentar outra coisa?')
+NAO_RETOMEI = 'Anotei seu CPF! 🙂 Mas não consegui voltar pro que você estava fazendo.'
+
 PEDIR_CPF = ('🧾 Pra nota fiscal, me mande seu *CPF* (só os números).\n'
              'Se não quiser, toque em *Sem CPF*.')
 B_SEM_CPF = ('cpf_nao', 'Sem CPF')

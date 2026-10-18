@@ -278,3 +278,19 @@ tanto no `complementos` quanto no que a IA propõe no sugerir; `so_o_produto` ti
 ("pra acompanhar o café"), e a frase fica a do código, que não cita nada. Foto sem relação no meio dos cards volta
 pro menu sem os cards na memória. 1 teste existente mudou (afirmava `fase == 'escolhendo'` depois da foto sem
 relação, o oposto do pedido). 3 testes novos, 473 passando. Sem deploy.
+
+## 2026-10-18 09:00 — CPF exigido no item (MERCH-007) perdia o item e pedia o CPF de novo
+
+**Prompt:** "Bug no fluxo do CPF com MCP real (src/bot/fluxo.py, em volta de receber_cpf, sem_cpf e do tratamento de
+erro MERCH-007 [...]). Sintoma (QA em loja real, Nissei Mercado, que exige CPF): a pessoa toca 'Quero esse' em um leite
+→ o bot responde 'Essa loja exige CPF na nota... escreva seu CPF' → a pessoa manda o CPF → o bot diz 'Seu pedido ainda
+está vazio' e perdeu o item. Na 2ª tentativa (mesmo leite) pediu o CPF DE NOVO. [...] 1. Reproduza com o mock [...]
+2. Depois que o CPF válido chegar, RETOMAR o que a pessoa estava fazendo [...] 3. Guardar o CPF informado na sessão
+[...] 4. Se não conseguir retomar, dizer isso e voltar ao menu, nunca 'pedido vazio'. [...] (o Fabio mexe em fluxo.py no
+claim bot-kit-consistency: se houver conflito, pare e me avise) [...]"
+
+**Resposta:** Sem conflito com o claim do Fabio. Reproduzido no mock (createCart/addItemToCart com MERCH-007). Agora o
+erro guarda a ação da vez (`retomar_cpf`) e, com o CPF, refaz o item escolhido; no fechamento segue pro resumo como
+antes (nunca envia direto). O CPF dado fica em `u['cpf']`; se a loja recusa de novo com o CPF já em mãos, diz que não
+deu e volta pro menu, sem pedir de novo. Sem nada pra retomar nem carrinho: "Anotei seu CPF" + menu. 3 testes novos
+(falham sem a correção), nenhum existente mudou. Sem deploy.
