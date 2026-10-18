@@ -1,26 +1,37 @@
-"""Servidor LOCAL do dash: lê o diário do bot e empurra as conversas pro navegador em tempo real.
+"""Servidor LOCAL do dash: empurra as conversas pro navegador em tempo real, de duas fontes ao mesmo tempo.
 
-    .venv/Scripts/python.exe -m src.painel.servidor             # bot de verdade (modal.Dict hackfood-painel)
-    .venv/Scripts/python.exe -m src.painel.servidor --simular   # clientes simulados, só nesta máquina
+    .venv/Scripts/python.exe -m src.painel.servidor
+
+- `real`: o diário do bot de verdade (modal.Dict hackfood-painel). Precisa do login do Modal nesta máquina.
+- `demo`: clientes simulados conversando com o Bot de verdade (MCP falso), com 30 dias de histórico
+  e gente nova chegando ao vivo. Pra apresentação: volume alto sem tocar em dado real.
+O dash troca entre as duas no seletor do topo, sem reiniciar nada.
+
+O histórico da demo leva uns 15 s pra gerar na 1ª vez; depois fica em cache na pasta temporária
+e só é "trazido pra hoje" (os horários andam junto com o relógio). `--nova-demo` gera de novo.
 
 Depois, em Frontend/Rascunho_Dash: `npm run dev` (o Vite repassa /api pra cá).
+Roda só em 127.0.0.1 de propósito: o diário real tem conversa de gente de verdade e o dash ainda
+não tem login de admin.
 
-Roda só em 127.0.0.1 e de propósito não vai pro Modal: o diário tem conversa de gente de
-verdade, e o dash ainda não tem login de admin. Pra ler o modal.Dict basta estar logado no
-Modal nesta máquina (o mesmo login do deploy).
-
-GET /api/sessoes  -> {fonte, agora, sessions}   (foto do momento)
-GET /api/stream   -> text/event-stream          (manda a foto de novo a cada mudança)
+GET /api/sessoes?fonte=real|demo  -> {fonte, estado, agora, sessions}   (foto do momento)
+GET /api/stream?fonte=real|demo   -> text/event-stream                  (a foto de novo a cada mudança)
+GET /api/saude
 """
 import argparse
 import asyncio
 import json
+import os
+import tempfile
 import threading
 import time
 
 from src.shared import painel
 
-RECALCULO = 20   # s: status muda com o relógio (carrinho vira abandonado após 30 min) mesmo sem evento novo
+RECALCULO = 20       # s: status muda com o relógio (carrinho vira abandonado após 30 min) mesmo sem evento novo
+ENVIO_MIN = 1.5      # s entre fotos no SSE: a demo tem MBs e muda toda hora
+DEMO = {'dias': 30, 'conversas': 900, 'semente': 17, 'versao': 2}
+CACHE_DEMO = os.path.join(tempfile.gettempdir(), 'hackfood-painel-demo-v{versao}-{dias}d-{conversas}-{semente}.json'.format(**DEMO))
 
 
 class DictTravado(dict):
@@ -46,16 +57,20 @@ class DictTravado(dict):
             return {k: v for k, v in self.items() if k.startswith('ev:') and k not in vistos}
 
 
-class FonteModal:
-    nome = 'bot'
+class FonteReal:
+    nome = 'real'
 
     def __init__(self):
-        import modal
-        self.dic = modal.Dict.from_name(painel.NOME_DICT, create_if_missing=True)
+        self.dic = None
         self.versao = object()
+        self.estado = 'conectando'
 
     def novos(self, vistos):
+        if self.dic is None:
+            import modal
+            self.dic = modal.Dict.from_name(painel.NOME_DICT, create_if_missing=True)
         versao = self.dic.get('versao')
+        self.estado = 'pronto'
         if versao == self.versao:
             return {}
         self.versao = versao
@@ -65,21 +80,59 @@ class FonteModal:
         return {k: self.dic.get(k) for k in chaves}
 
 
-class FonteSimulada:
-    nome = 'simulado'
+class FonteDemo:
+    nome = 'demo'
 
-    def __init__(self):
+    def __init__(self, nova=False):
+        self.dic = DictTravado()
+        self.estado = 'carregando'
+        self.progresso = 0.0
+        self.parar = threading.Event()
+        threading.Thread(target=self._preparar, args=(nova,), daemon=True).start()
+
+    def _preparar(self, nova):
         from src.painel import simulador
         from src.shared import ifood_mcp
         ifood_mcp.INTERVALO_MIN = 0   # MCP falso: o freio de ~3 chamadas/s só atrasaria
-        self.dic = DictTravado()
-        print('simulador: preenchendo os últimos 7 dias...')
-        clientes = simulador.preencher_historico(self.dic)
-        print(f'simulador: {len(self.dic.novos(set()))} eventos no histórico; agora ao vivo')
-        self.parar = threading.Event()
-        threading.Thread(target=simulador.rodar_ao_vivo, args=(self.dic, self.parar, clientes), daemon=True).start()
+        clientes = None
+        if not nova and self._carregar_cache():
+            print(f'demo: histórico do cache ({len(self.dic) - 1} eventos), trazido pra hoje')
+        else:
+            print(f'demo: gerando {DEMO["conversas"]} conversas em {DEMO["dias"]} dias (só na 1ª vez)...')
+
+            def avancar(n, total):
+                self.progresso = n / total
+            clientes = simulador.preencher_historico(self.dic, dias=DEMO['dias'], conversas=DEMO['conversas'],
+                                                     semente=DEMO['semente'], progresso=avancar)
+            self._salvar_cache()
+            print(f'demo: {len(self.dic.novos(set()))} eventos gerados')
+        self.estado = 'pronto'
+        if clientes is None:
+            clientes = [simulador._cliente(self.dic, n) for n in range(len(simulador.NOMES))]
+        simulador.rodar_ao_vivo(self.dic, self.parar, clientes)
+
+    def _carregar_cache(self):
+        try:
+            with open(CACHE_DEMO, encoding='utf-8') as f:
+                cache = json.load(f)
+        except (OSError, ValueError):
+            return False
+        desvio = time.time() - cache['gerado']
+        for ev in cache['eventos'].values():
+            ev['ts'] += desvio
+        self.dic.update(cache['eventos'])
+        return True
+
+    def _salvar_cache(self):
+        try:
+            with open(CACHE_DEMO, 'w', encoding='utf-8') as f:
+                json.dump({'gerado': time.time(), 'eventos': self.dic.novos(set())}, f, ensure_ascii=False)
+        except OSError as e:
+            print(f'demo: não deu pra guardar o cache: {e!r}')
 
     def novos(self, vistos):
+        if self.estado != 'pronto':
+            return {}   # enquanto gera, não recalcula a cada evento (seriam milhares de fotos)
         return self.dic.novos(vistos)
 
 
@@ -89,35 +142,40 @@ class Painel:
         self.intervalo = intervalo
         self.eventos = {}
         self.versao = 0
-        self.foto = json.dumps({'fonte': fonte.nome, 'agora': time.time(), 'sessions': []})
         self.erro = None
         self._recalculo = 0
         self._sessoes = None
+        self.foto = self._fotografar([])
+
+    def _fotografar(self, sessoes):
+        return json.dumps({'fonte': self.fonte.nome, 'estado': self.fonte.estado, 'erro': self.erro,
+                           'progresso': getattr(self.fonte, 'progresso', None), 'agora': time.time(),
+                           'sessions': sessoes}, ensure_ascii=False)
 
     def girar(self):
         """Busca o que chegou; recalcula as sessões se chegou algo (ou o relógio pediu)."""
+        estado_antes = (self.fonte.estado, self.erro, getattr(self.fonte, 'progresso', None))
         try:
             novos = self.fonte.novos(self.eventos.keys())
             self.erro = None
-        except Exception as e:  # noqa: BLE001 - Modal fora do ar: segue servindo a última foto
+        except Exception as e:  # noqa: BLE001 - Modal fora do ar ou sem login: segue servindo a última foto
             if not self.erro:
-                print(f'painel: ler o diário falhou: {e!r}')
-            self.erro = str(e)[:200]
+                print(f'painel {self.fonte.nome}: ler o diário falhou: {e!r}')
+            self.erro = str(e)[:300] or type(e).__name__
+            self.fonte.estado = 'erro'
             novos = {}
         novos = {k: v for k, v in novos.items() if isinstance(v, dict)}
-        if not novos and time.time() - self._recalculo < RECALCULO:
+        estado_mudou = estado_antes != (self.fonte.estado, self.erro, getattr(self.fonte, 'progresso', None))
+        if not novos and not estado_mudou and time.time() - self._recalculo < RECALCULO:
             return False
         self.eventos.update(novos)
         self._recalculo = time.time()
-        sessoes = painel.montar_sessoes(self.eventos.values(), demo=self.fonte.nome == 'simulado')
-        mudou = sessoes != self._sessoes
+        sessoes = painel.montar_sessoes(self.eventos.values(), demo=self.fonte.nome == 'demo')
+        mudou = sessoes != self._sessoes or estado_mudou
         self._sessoes = sessoes
-        self.foto = json.dumps({'fonte': self.fonte.nome, 'agora': time.time(), 'erro': self.erro, 'sessions': sessoes},
-                               ensure_ascii=False)
+        self.foto = self._fotografar(sessoes)
         if mudou:
             self.versao += 1
-            if novos:
-                print(f'painel: +{len(novos)} evento(s) · {len(sessoes)} sessões')
         return mudou
 
     def rodar(self):
@@ -126,34 +184,46 @@ class Painel:
             time.sleep(self.intervalo)
 
 
-def criar_api(p):
+def criar_api(paineis):
     from fastapi import FastAPI, Request
-    from fastapi.responses import Response, StreamingResponse
+    from fastapi.responses import JSONResponse, Response, StreamingResponse
 
     api = FastAPI(docs_url=None, redoc_url=None)
 
+    def escolher(fonte):
+        return paineis.get(fonte or 'real')
+
     @api.get('/api/sessoes')
-    async def sessoes():
+    async def sessoes(fonte: str = 'real'):
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
         return Response(p.foto, media_type='application/json')
 
     @api.get('/api/stream')
-    async def stream(request: Request):
+    async def stream(request: Request, fonte: str = 'real'):
+        p = escolher(fonte)
+        if not p:
+            return JSONResponse({'erro': f'fonte desligada: {fonte}'}, status_code=404)
+
         async def eventos():
-            visto, quieto = -1, time.time()
+            visto, enviado = -1, 0.0
             while not await request.is_disconnected():
-                if p.versao != visto:
-                    visto, quieto = p.versao, time.time()
+                agora = time.time()
+                if p.versao != visto and agora - enviado >= ENVIO_MIN:
+                    visto, enviado = p.versao, agora
                     yield f'event: sessoes\ndata: {p.foto}\n\n'
-                elif time.time() - quieto > 15:
-                    quieto = time.time()
+                elif agora - enviado > 15:
+                    enviado = agora
                     yield ': segue vivo\n\n'   # comentário SSE: mantém a conexão aberta
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.3)
         return StreamingResponse(eventos(), media_type='text/event-stream',
                                  headers={'cache-control': 'no-cache', 'x-accel-buffering': 'no'})
 
     @api.get('/api/saude')
     async def saude():
-        return {'ok': True, 'fonte': p.fonte.nome, 'eventos': len(p.eventos), 'erro': p.erro}
+        return {nome: {'estado': p.fonte.estado, 'eventos': len(p.eventos), 'erro': p.erro}
+                for nome, p in paineis.items()}
 
     return api
 
@@ -161,14 +231,20 @@ def criar_api(p):
 def main():
     import uvicorn
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--simular', action='store_true', help='clientes simulados em vez do bot de verdade')
     ap.add_argument('--porta', type=int, default=8787)
+    ap.add_argument('--sem-real', action='store_true', help='não lê o Modal (sem login, sem internet)')
+    ap.add_argument('--sem-demo', action='store_true', help='não sobe os clientes simulados')
+    ap.add_argument('--nova-demo', action='store_true', help='ignora o cache e gera o histórico da demo de novo')
     args = ap.parse_args()
-    p = Painel(FonteSimulada() if args.simular else FonteModal())
-    p.girar()
-    threading.Thread(target=p.rodar, daemon=True).start()
-    print(f'painel: http://127.0.0.1:{args.porta}/api/sessoes ({p.fonte.nome})')
-    uvicorn.run(criar_api(p), host='127.0.0.1', port=args.porta, log_level='warning')
+    paineis = {}
+    if not args.sem_real:
+        paineis['real'] = Painel(FonteReal())
+    if not args.sem_demo:
+        paineis['demo'] = Painel(FonteDemo(nova=args.nova_demo), intervalo=2.0)  # remontar 20 mil eventos custa ~0,5 s
+    for p in paineis.values():
+        threading.Thread(target=p.rodar, daemon=True).start()
+    print(f'painel: http://127.0.0.1:{args.porta}/api/saude · fontes: {", ".join(paineis)}')
+    uvicorn.run(criar_api(paineis), host='127.0.0.1', port=args.porta, log_level='warning')
 
 
 if __name__ == '__main__':

@@ -16,8 +16,11 @@ import time
 from src.shared import painel
 from tests.fakes import Armazem, Mundo
 
-NOMES = ['Dona Cida', 'Seu Antônio', 'Marina Costa', 'Pedro Almeida', 'Ana Oliveira', 'Lucas Santos',
-         'Beatriz Lima', 'Rafael Souza', 'Juliana Rocha', 'Bruno Ferreira', 'Camila Alves', 'Seu Zé']
+PRIMEIROS = ['Dona Cida', 'Seu Antônio', 'Marina', 'Pedro', 'Ana', 'Lucas', 'Beatriz', 'Rafael', 'Juliana', 'Bruno',
+             'Camila', 'Seu Zé', 'Dona Lurdes', 'Gabriel', 'Luiza', 'Felipe', 'Dona Neide', 'Seu Jorge', 'Carla', 'Tiago']
+SOBRENOMES = ['Costa', 'Almeida', 'Oliveira', 'Santos', 'Lima', 'Souza', 'Rocha', 'Ferreira', 'Alves', 'Martins']
+NOMES = [f'{p} {SOBRENOMES[i * 7 % len(SOBRENOMES)]}' if not p.startswith(('Dona', 'Seu')) else p
+         for i, p in enumerate(PRIMEIROS)] + [f'{p} {s}' for p in PRIMEIROS[2:11] for s in SOBRENOMES[:4]]
 ITENS = ['quero pao', 'quero leite', 'preciso de carne', 'quero uma pizza', 'preciso de dipirona']
 
 
@@ -100,6 +103,17 @@ def _passo(m, ritmo, *msgs):
     m.esperar(random.uniform(2, 9) * ritmo)
 
 
+def _escolher(m, ritmo):
+    """Toca em "Quero esse", passa pelas opções obrigatórias e escolhe a quantidade."""
+    m.tocar('pick:')
+    m.esperar(random.uniform(3, 8) * ritmo)
+    for _ in range(3):  # opções obrigatórias (tamanho da pizza, acompanhamento...)
+        if m.tem('opt:') and not m.tem('qtd:'):
+            m.tocar('opt:')
+    if m.tem('qtd:'):
+        m.tocar(f'qtd:{random.choice([1, 1, 2, 3])}')
+
+
 def jornada(m, ritmo=1.0, sorte=None):
     """Uma conversa com final sorteado: compra, abandono, cancelamento, só um oi..."""
     r = sorte if sorte is not None else random.random()
@@ -126,13 +140,7 @@ def jornada(m, ritmo=1.0, sorte=None):
         m.esperar(random.uniform(3, 8) * ritmo)
     if not m.tem('pick:'):
         return 'sem cards'
-    m.tocar('pick:')
-    m.esperar(random.uniform(3, 8) * ritmo)
-    for _ in range(3):  # opções obrigatórias (tamanho da pizza, acompanhamento...)
-        if m.tem('opt:') and not m.tem('qtd:'):
-            m.tocar('opt:')
-    if m.tem('qtd:'):
-        m.tocar(f'qtd:{random.choice([1, 1, 2, 3])}')
+    _escolher(m, ritmo)
     m.esperar(random.uniform(3, 10) * ritmo)
     if 0.14 <= r < 0.26:
         return 'largou o carrinho'
@@ -142,6 +150,15 @@ def jornada(m, ritmo=1.0, sorte=None):
         return 'sem finalizar'
     m.tocar('fim')
     m.esperar(random.uniform(2, 6) * ritmo)
+    for _ in range(3):  # abaixo do pedido mínimo: aceita a sugestão do bot e tenta fechar de novo
+        if m.estado().get('fase') != 'mais' or not m.tem('sugerir'):
+            break
+        m.tocar('sugerir')
+        if not m.tem('pick:'):
+            break
+        _escolher(m, ritmo)
+        if m.tem('fim'):
+            m.tocar('fim')
     if m.estado().get('fase') == 'pagamento':
         m.tocar('pag:0')
     if 0.32 <= r < 0.38:
@@ -164,21 +181,29 @@ def jornada(m, ritmo=1.0, sorte=None):
 
 
 def _cliente(dic, n):
-    return MundoAnotado(diario_dic=dic, nome=NOMES[n % len(NOMES)], wa=f'55169{n:08d}')
+    m = MundoAnotado(diario_dic=dic, nome=NOMES[n % len(NOMES)], wa=f'55169{n:08d}')
+    m._fixo = None  # o Mundo dos testes nasce com relógio parado em 2027; aqui ainda não tem relógio
+    return m
 
 
-def preencher_historico(dic, dias=7, conversas=60, semente=17):
-    """Conversas espalhadas nos últimos `dias`, no relógio adiantado (roda em segundos)."""
+def preencher_historico(dic, dias=7, conversas=60, semente=17, clientes=None, progresso=None):
+    """Conversas espalhadas nos últimos `dias`, no relógio adiantado (roda bem mais rápido que o real).
+    O relógio de cada cliente só anda pra frente: conversa nova começa depois que a anterior acabou."""
     random.seed(semente)
     agora = time.time()
-    clientes = [_cliente(dic, n) for n in range(len(NOMES))]
-    for _ in range(conversas):
+    clientes = clientes or [_cliente(dic, n) for n in range(len(NOMES))]
+    inicios = sorted(agora - random.uniform(0.05, dias) * 86400 for _ in range(conversas))
+    for n, inicio in enumerate(inicios):
         m = random.choice(clientes)
-        m.agora = agora - random.uniform(0.2, dias) * 86400
+        if m._fixo is not None and inicio < m._fixo + painel.INATIVIDADE + 60:
+            continue  # esse cliente ainda está "no meio" da conversa anterior
+        m.agora = inicio
         try:
             jornada(m, ritmo=0.2)
         except Exception as e:  # noqa: BLE001 - conversa simulada que tropeça não para as outras
             print(f'simulador: conversa do histórico tropeçou: {e!r}')
+        if progresso:
+            progresso(n + 1, len(inicios))
     return clientes
 
 

@@ -21,3 +21,4 @@
 .live-banner{display:flex;gap:12px;align-items:flex-start;font-size:11px;color:#23785e;background:#ecf8f2;border:1px solid #cfeadc;padding:13px 15px;border-radius:7px;margin:0 0 18px}.live-banner svg{flex-shrink:0;margin-top:1px}.live-banner p{margin-top:5px;line-height:1.6;opacity:.9}.live-banner code{font-size:10px;background:#ffffffaa;border-radius:4px;padding:1px 5px}.live-banner.offline{color:#b42330;background:#fff0f1;border-color:#f8d9dc}
 .demo-ribbon.live{background:#ecf8f2;color:#23785e}
 @media (prefers-reduced-motion:reduce){.source-badge.live i,.data-source.live .source-dot{animation:none}}
+.source-badge.demo{color:#5b4fb0;background:#f3f1ff;border-color:#e2ddfb}.source-badge.demo i,.data-source.demo .source-dot{background:#7a6ae0;animation:live-pulse 1.8s infinite}

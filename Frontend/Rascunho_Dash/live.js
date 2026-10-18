@@ -1,23 +1,25 @@
 import { useEffect, useState } from 'react';
 
-// Conversas do bot em tempo real: o servidor local (src/painel/servidor.py) manda a foto inteira
-// por SSE a cada mudança. O EventSource reconecta sozinho se o servidor cair e voltar.
+// Conversas em tempo real: o servidor local (src/painel/servidor.py) manda a foto inteira por SSE a
+// cada mudança, de uma de duas fontes: 'real' (diário do bot) ou 'demo' (clientes simulados).
+// O EventSource reconecta sozinho se o servidor cair e voltar.
 export const liveAvailable = () => typeof EventSource !== 'undefined';
+const empty = { status: 'connecting', state: null, sessions: [], now: null, error: null, progress: null };
 
-export function useLiveSessions(enabled) {
-  const [state, setState] = useState({ status: 'connecting', source: null, sessions: [], now: null, error: null });
+export function useLiveSessions(source) {
+  const [live, setLive] = useState(empty);
   useEffect(() => {
-    if (!enabled || !liveAvailable()) return undefined;
-    setState(s => ({ ...s, status: 'connecting' }));
-    const stream = new EventSource('/api/stream');
+    if (!source || !liveAvailable()) return undefined;
+    setLive(empty);
+    const stream = new EventSource(`/api/stream?fonte=${source}`);
     stream.addEventListener('sessoes', event => {
       try {
         const data = JSON.parse(event.data);
-        setState({ status: 'live', source: data.fonte, sessions: data.sessions || [], now: data.agora * 1000, error: data.erro });
+        setLive({ status: 'live', state: data.estado, sessions: data.sessions || [], now: data.agora * 1000, error: data.erro, progress: data.progresso });
       } catch { /* foto quebrada: espera a próxima */ }
     });
-    stream.onerror = () => setState(s => ({ ...s, status: 'offline' }));
+    stream.onerror = () => setLive(s => ({ ...s, status: 'offline' }));
     return () => stream.close();
-  }, [enabled]);
-  return state;
+  }, [source]);
+  return live;
 }
