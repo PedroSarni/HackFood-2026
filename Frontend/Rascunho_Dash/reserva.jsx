@@ -6,11 +6,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 //   reserva sem mostrar erro a ninguém. Desligado (padrão), queda do iFood é erro de verdade, como deve ser.
 // - "Catálogo de reserva": o mock do MCP ligado agora (na mão ou porque o iFood caiu com o modo palco armado).
 const MOCK_MS = 15000;
-const hora = ts => new Date(ts * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
-function Chave({ titulo, detalhe, ligado, onChange, disabled, dica }) {
-  return <label className="mode-control mock-switch" title={dica}>
-    <span><span className="mock-switch-title">{titulo}</span><small>{detalhe}</small></span>
+function Chave({ titulo, ligado, onChange, disabled }) {  // sem descrição nem dica: no palco, só o nome e a chave
+  return <label className="mode-control mock-switch">
+    <span><span className="mock-switch-title">{titulo}</span></span>
     <input role="switch" type="checkbox" aria-label={titulo} checked={ligado} disabled={disabled} onChange={onChange} />
     <span className="switch-track"><span /></span>
   </label>;
@@ -42,12 +41,8 @@ export function MockSwitch({ source }) {
     } catch { /* fica como estava */ }
     setBusy(false);
   };
-  const reserva = !state.ligado ? 'iFood de verdade' : state.auto ? `entrou sozinho às ${hora(state.desde)}` : 'ligado no dash';
   return <div className="mock-switches">
-    <Chave titulo="Botão 1" detalhe={state.reservaAuto ? 'iFood caiu? vai pra reserva' : 'desligado'} ligado={state.reservaAuto}
-      disabled={busy} onChange={() => mudar({ reservaAuto: !state.reservaAuto })}
-      dica="Com o modo palco, no 1º erro do iFood o bot passa pro catálogo de reserva sem mostrar erro a ninguém." />
-    <Chave titulo="Botão 2" detalhe={reserva} ligado={state.ligado} disabled={busy}
-      onChange={() => mudar({ ligado: !state.ligado })} dica={state.motivo || 'Mock do MCP do iFood'} />
+    <Chave titulo="Botão 1" ligado={state.reservaAuto} disabled={busy} onChange={() => mudar({ reservaAuto: !state.reservaAuto })} />
+    <Chave titulo="Botão 2" ligado={state.ligado} disabled={busy} onChange={() => mudar({ ligado: !state.ligado })} />
   </div>;
 }
