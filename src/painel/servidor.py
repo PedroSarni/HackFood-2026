@@ -41,7 +41,7 @@ from src.shared import alertas, painel
 
 RECALCULO = 20       # s: status muda com o relógio (carrinho vira abandonado após 30 min) mesmo sem evento novo
 ENVIO_MIN = 1.5      # s entre fotos no SSE: a demo tem MBs e muda toda hora
-DEMO = {'dias': 30, 'conversas': 900, 'semente': 17, 'versao': 4}  # 4: a demo cutuca, esquece carrinho e lembra
+DEMO = {'dias': 30, 'conversas': 900, 'semente': 17, 'versao': 5}  # 5: a demo cutuca, esquece carrinho e lembra
 CACHE_DEMO = os.path.join(tempfile.gettempdir(), 'hackfood-painel-demo-v{versao}-{dias}d-{conversas}-{semente}.json'.format(**DEMO))
 
 

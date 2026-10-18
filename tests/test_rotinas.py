@@ -145,15 +145,30 @@ def test_quem_volta_depois_da_cutucada_fecha_o_pedido_e_conta_como_voltou():
 def test_cron_da_demo_adia_fora_da_janela_e_o_lembrete_aparece_na_volta():
     dic = {}
     m = simulador._cliente(dic, 0)
-    m.agora = AGORA
+    m.agora = AGORA - 3600                                         # a última conversa dela foi há 1h
     m.recs_dic[m.wa] = [{'id': 'r1', 'pedido_id': None, 'dias': 7, 'resumo': '2x Pão francês', 'loja': 'Padaria',
                          'total': 5.0, 'proximo': AGORA - 60, 'avisado': False, 'loja_id': None, 'itens': None}]
     total = simulador.varrer(dic, [m], AGORA)
     assert total['adiado'] == 1 and total['janela'] == 0          # ninguém falou com o bot nas últimas 24h
+    assert m.agora == AGORA - 3600      # só adiou: o relógio dela não anda (senão ela nunca mais puxava conversa)
     [ev] = [e for e in m.eventos() if e['tipo'] == 'rotina']
     assert ev['adiado'] == 1 and ev['vencidos'] == 1 and ev['ativos'] == 1
+    m.agora = AGORA + 600
     simulador._passo(m, 0, 'oi')                                   # a pessoa volta: o lembrete aparece
     assert [painel.rotina_da_saida(e) for e in m.eventos() if e['tipo'] == 'saida'] == ['lembrete']
+
+
+def test_historico_da_demo_tem_lembrete_ligado_mostrado_na_volta_e_respondido():
+    dic = {}
+    clientes = [simulador._cliente(dic, n) for n in range(5)]
+    simulador.preencher_historico(dic, dias=21, conversas=120, semente=3, clientes=clientes)
+    eventos = [v for k, v in dic.items() if k.startswith('ev:')]
+    botoes = [str(e.get('botao') or '') for e in eventos if e['tipo'] == 'entrada']
+    assert any(b.startswith('rec:') and b != 'rec:0' for b in botoes)          # alguém ligou o lembrete
+    lem = {x['id']: x for x in painel.resumo_rotinas(eventos, {})['rotinas']}['lembrete']
+    assert lem['disparos'] > 0 and (lem['canais'] or {}).get('na volta')         # venceu, esperou e apareceu na volta
+    assert any(b.startswith('lem:') for b in botoes)                             # e a pessoa respondeu
+    assert [e for e in eventos if e['tipo'] == 'rotina']                         # o cron deixou rastro
 
 
 def test_cache_da_demo_traz_clientes_e_lembretes_pra_hoje():

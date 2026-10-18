@@ -293,21 +293,24 @@ def varrer(dic, clientes, quando=None, ocupados=(), anotar=True, antes=None):
     """O cron dos lembretes (src/app.py, lembretes) na demo: avisa quem tem lembrete vencido (as mesmas funções de
     src/bot/recorrencia.py) e anota a passada no diário. Quem está no meio de uma conversa fica pra próxima.
     `anotar=False` só anota se a contagem mudou desde `antes` (o histórico não precisa de 2.880 passadas iguais)."""
-    from src.bot.recorrencia import agenda, disparar_vencidos
+    from src.bot.recorrencia import Recorrencias, agenda, disparar_vencidos
     quando = quando or time.time()
     total = {'janela': 0, 'template': 0, 'adiado': 0, 'erro': 0}
     for m in list(clientes):
-        if m.wa in ocupados or not m.recs_dic.get(m.wa):
-            continue
-        if m._fixo is not None:   # histórico: o relógio de cada cliente só anda pra frente
-            if m._fixo > quando:
+        if m.wa in ocupados or not Recorrencias(m.recs_dic, agora=lambda: quando).vencido_sem_aviso(m.wa):
+            continue   # nada vencido: o relógio da pessoa fica onde está
+        antes = m._fixo
+        if antes is not None:   # histórico: o relógio de cada cliente só anda pra frente
+            if antes > quando:
                 continue
             m.agora = quando
         cont = disparar_vencidos(m.armazem, painel.EspiaoWhatsApp(m.wpp, m.diario, 'lembrete'),
                                  dic_rec=m.recs_dic, agora=quando, so=m.wa)
         for k, v in cont.items():
             total[k] = total.get(k, 0) + v
-        if cont.get('janela') and m._fixo is not None and random.random() < 0.6:
+        if antes is not None and not (cont.get('janela') or cont.get('template')):
+            m._fixo = antes   # só adiou: nada chegou pra pessoa, e ela pode puxar conversa (e ver o lembrete)
+        elif cont.get('janela') and antes is not None and random.random() < 0.6:
             m.esperar(random.uniform(60, 900))   # avisada dentro da janela: às vezes já responde
             _decidir_lembrete(m, 0.2)
     if anotar or total != antes:
