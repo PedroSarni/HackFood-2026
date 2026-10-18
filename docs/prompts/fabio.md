@@ -118,3 +118,12 @@ acham algo e, em loja de comida, a sugestão sempre acha o que acompanha. Carrin
 
 **Resposta:** Aceito: a voz (o bot falando) é a feature nova da outra janela. Esta sessão commita só o que
 ela mesma mudou e faz o deploy a partir do main commitado, pra não subir a voz pela metade.
+
+## 2026-10-17 21:40 — tá tudo deployado?
+
+**Prompt:** "ta tudo deployado"
+
+**Resposta:** Tudo o que está commitado, sim: o último deploy (v23, 21:37) é o main `636939e`, e nada
+entrou no main depois. Fora do ar fica só o que a outra janela ainda não commitou: a voz de saída
+(`voz.py` e mudanças em fluxo, contexto, textos, whatsapp e llm) e ajustes no painel. Com isso na pasta,
+os testes passam (213). Entra no ar quando aquela janela commitar e fizer o deploy.
