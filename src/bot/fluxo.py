@@ -1002,8 +1002,12 @@ class Bot:
             return
         car = self.u.get('carrinho')
         texto = T.PERGUNTA_PEDIDO
+        ideias = False
         if car and car.get('itens'):
             texto = 'O que mais você quer? 😊\nÉ só escrever ✍️'
+        elif (self.u.get('pergunta') or {}).get('texto') == T.PERGUNTA_PEDIDO:
+            # o "Fazer pedido" logo embaixo da mesma pergunta só repetia ela (QA U1): explica e mostra ideias
+            texto, ideias = T.COMO_PEDIR, True
         botoes = [T.B_FINALIZAR, T.B_INICIO] if car and car.get('itens') else self._atalhos()
         falta = _falta(car or {})
         if falta:  # abaixo do mínimo a sugestão vira botão: quem não sabe o que digitar só toca
@@ -1012,11 +1016,13 @@ class Bot:
             botoes = [T.B_SUGERIR] + botoes
         if botoes:
             self.perguntar(texto, botoes, fase='pedido')
-            return
-        # sem pedido nem histórico não há atalho que sirva: só a pergunta, sem botão que não leva a nada
-        self.dizer(texto)
-        self.u['fase'] = 'pedido'
-        self.u['pergunta'] = {'texto': texto, 'botoes': [], 'titulos': []}
+        else:
+            # sem pedido nem histórico não há atalho que sirva: só a pergunta, sem botão que não leva a nada
+            self.dizer(texto)
+            self.u['fase'] = 'pedido'
+            self.u['pergunta'] = {'texto': texto, 'botoes': [], 'titulos': []}
+        if ideias:
+            self._mostrar_vitrine()
 
     def sugerir(self, _arg=None, itens=None):
         """'Me sugere algo', 'algo que complete esse valor' ou o botão 💡. Na loja do carrinho,
@@ -1099,6 +1105,7 @@ class Bot:
             return
         if not self.garantir_endereco({'acao': 'comprar', 'itens': itens}):
             return
+        u['foto'] = None   # compra nova: o "Sim, quero!" da foto de antes refazia a busca dela (QA U10)
         sem_carrinho = not (u.get('carrinho') or {}).get('itens')
         if sem_carrinho:
             u['plano'] = None
@@ -1926,14 +1933,15 @@ class Bot:
             return
         u['fila'] = []
         api = self.ctx.ifood(self.wa)
+        modelo = u.pop('agendar_modelo', None)
+        if modelo:  # "todo dia às 7h peça dois pães": este carrinho vira o modelo do automático, nada sai agora.
+            # Antes do mínimo da loja (QA U24: barrava o agendamento sem compra nenhuma hoje); no dia ele vale
+            self._salvar_modelo(car, modelo)
+            return
         if car.get('minimo') and (car.get('subtotal') or 0) < car['minimo']:
             self.perguntar(f'O pedido mínimo do *{car.get("loja")}* é {T.reais(car["minimo"])}. 🙂\n'
                            f'Seu pedido está em {T.reais(car.get("subtotal"))}. Quer colocar mais alguma coisa?',
                            [T.B_SUGERIR, T.B_MAIS_COISAS, T.B_CANCELAR], fase='mais')
-            return
-        modelo = u.pop('agendar_modelo', None)
-        if modelo:  # "todo dia às 7h peça dois pães": este carrinho vira o modelo do automático, nada sai agora
-            self._salvar_modelo(car, modelo)
             return
         if u.get('fase') == 'confirmar' and u.get('resumo_de') == _marca_resumo(car):
             # 18/10 03h33: o fechamento demorou, a pessoa tocou Finalizar 3x e recebeu 3 resumos de uma vez.
@@ -2285,8 +2293,10 @@ class Bot:
     def cancelar(self, _arg=None):
         u = self.u
         tinha = bool((u.get('carrinho') or {}).get('itens'))
+        # as listas vão junto: um "Quero esse" de antes do cancelar reabria a compra (QA U7)
         u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None, 'grupo': None,
-                  'kit': None, 'grupo_pendente': None, 'foto': None, 'plano': None, 'troca_de': None})
+                  'kit': None, 'grupo_pendente': None, 'foto': None, 'plano': None, 'troca_de': None,
+                  'listas': {}, 'lista_atual': None, 'visiveis': [], 'sugeridos': None})
         self.menu(T.CANCELADO if tinha else 'Tudo bem! 🙂')
 
     # ================================================================== depois do pedido
@@ -2448,8 +2458,9 @@ class Bot:
                       'loja_id': car.get('loja_id'), 'itens': linhas},
             modelo['dias'], hora=modelo.get('hora'), ciclo=DEMO_SEGUNDOS if demo else None)
         u.update(carrinho=None, fila=[], agendar_hora=None)
-        self.perguntar(T.modelo_ok(resumo, car.get('loja'), modelo['dias'], modelo.get('hora')), self._menu(),
-                       fase='pedido')
+        abaixo = car.get('minimo') if car.get('minimo') and (car.get('subtotal') or 0) < car['minimo'] else None
+        self.perguntar(T.modelo_ok(resumo, car.get('loja'), modelo['dias'], modelo.get('hora'), minimo=abaixo),
+                       self._menu(), fase='pedido')
         if demo:
             self.ctx.agendar_lembrete(self.wa, rec['proximo'])
 

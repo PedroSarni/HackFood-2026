@@ -120,6 +120,8 @@ def logou(nome, conta=None):
 PERGUNTA_PEDIDO = ('O que você quer pedir? 😊\n\n'
                    'Pode escrever do seu jeito ✍️\n'
                    'Exemplo: _pão, leite e café_')
+COMO_PEDIR = ('É só me dizer aqui o que você quer, escrevendo ✍️ ou mandando um áudio 🎤.\n'
+              'Exemplo: _2 pães e 1 leite_')
 
 AJUDA = ('Eu faço pedidos no iFood pra você. 🛒\n\n'
          '1️⃣ Me escreva o que você quer\n'
@@ -491,10 +493,14 @@ def agendar_itens(itens, dias, hora=None):
             'e só peço com o seu *sim*. 😉')
 
 
-def modelo_ok(resumo, loja, dias, hora=None):
+def modelo_ok(resumo, loja, dias, hora=None, minimo=None):
+    """`minimo`: a loja pede mais do que o modelo soma. Agendar vale mesmo assim (nada é comprado hoje); no dia o
+    resumo mostra o que falta."""
+    aviso = (f'\nℹ️ O pedido mínimo do *{loja or "mercado"}* é {reais(minimo)}: no dia, se não chegar nisso, eu te '
+             'ajudo a completar.') if minimo else ''
     return (f'Combinado! ✅ *{quando(dias, hora).capitalize()}* eu te chamo aqui pra pedir *{resumo}*'
             + (f' do *{loja}*' if loja else '') + '. Nada foi pedido agora: no dia, com o seu *sim*, '
-            'o pedido sai. 🛵\nPra parar, é só escrever *parar lembrete*.')
+            f'o pedido sai. 🛵{aviso}\nPra parar, é só escrever *parar lembrete*.')
 
 
 def confirmar_agendar(resumo, dias, hora=None):

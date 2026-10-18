@@ -123,6 +123,54 @@ def test_carrinho_do_outro_ifood_avisa_e_segue_com_o_que_a_pessoa_escreveu():
     assert T.PEDIDO_RECOMECADO in m.wpp.textos()[0] and m.wpp.cards()   # avisou e foi buscar o leite
 
 
+def test_agendar_abaixo_do_minimo_agenda_e_no_dia_pede_pra_completar():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('todo dia as 7h quero pao')
+    m.tocar('pick:')
+    m.tocar('qtd:1')               # 1 pacote não chega no mínimo da loja (3 chegam)
+    m.tocar('fim')
+    assert not m.mcp.chamadas_de('submitOrder')
+    [rec] = m.recs_dic[m.wa]                                   # QA U24: o mínimo barrava o agendamento
+    ultimo = m.wpp.textos()[-1]
+    assert 'Combinado' in ultimo and 'pedido mínimo' in ultimo
+    m.wpp.limpar()
+    m.enviar(('botao', f'lem:pedir:{rec["id"]}'))              # o dia chegou: o mínimo vale agora
+    assert not m.mcp.chamadas_de('submitOrder') and 'mínimo' in ' '.join(m.wpp.textos())
+
+
+def test_quero_esse_de_antes_do_cancelar_e_botao_velho():
+    m = Mundo()
+    endereco_pronto(m)
+    pick = next(i for i in reversed(m.wpp.todos_ids()) if i.startswith('pick:'))
+    m.enviar('cancelar')
+    m.wpp.limpar()
+    m.enviar(('botao', pick))
+    assert T.BOTAO_VELHO in m.wpp.textos()[-1] and m.estado()['fase'] == 'pedido'   # QA U7: reabria a compra
+
+
+def test_sim_quero_da_foto_de_antes_nao_refaz_a_busca_depois_de_outro_pedido():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar(('foto', 'f1'))
+    sim = next(i for i in m.wpp.todos_ids() if i.startswith('foto:sim:'))
+    m.enviar('quero leite')
+    buscas = len(m.mcp.chamadas_de('searchOffers'))
+    m.wpp.limpar()
+    m.enviar(('botao', sim))
+    assert T.BOTAO_VELHO in m.wpp.textos()[-1]                                  # QA U10
+    assert len(m.mcp.chamadas_de('searchOffers')) == buscas
+
+
+def test_fazer_pedido_embaixo_da_mesma_pergunta_ensina_em_vez_de_repetir():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('cancelar')                              # menu: "O que você quer pedir?" + atalhos
+    m.wpp.limpar()
+    m.enviar(('botao', 'pedir'))
+    assert m.wpp.textos()[0] == T.COMO_PEDIR and T.PERGUNTA_PEDIDO not in m.wpp.textos()   # QA U1
+
+
 def test_meu_pedido_com_carrinho_montando_mostra_o_carrinho_e_cade_e_do_que_ja_saiu():
     m = _com_dois_paes()
     m.wpp.limpar()
