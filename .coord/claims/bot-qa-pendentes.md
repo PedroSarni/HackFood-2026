@@ -1,7 +1,7 @@
 ---
 slug: bot-qa-pendentes
 owner: araujo.fabio@usp.br
-status: active
+status: done
 started: 2026-10-18 06:30
 ---
 
@@ -32,3 +32,12 @@ fechadas, decisão), O1/O2 e M1 (diferenças do mock), U27 (resolvido junto com 
 ## Peças compartilháveis que vou criar
 
 - nenhuma
+
+## Onde está
+
+- 180a989: B3/U4 (aviso e menu quando o carrinho é do outro iFood), U21 ("meu pedido" mostra o carrinho)
+- 76a345d: U24 (agendar abaixo do mínimo), U7 e U10 (botão velho), U1 ("Fazer pedido" explica e mostra ideias)
+- 4143c34: U9 (foto sozinha pergunta), U3 (Mudar no pagamento e no CPF), H4 (apagar para o rastreio), M3 (nome do
+  WhatsApp na saudação), U17 (prompt da Lia)
+- U18 ficou como estava (resposta só em áudio é de propósito, com teste); a tabela pro reteste está no fim de
+  `docs/qa-18-10.md`. Testes em `tests/test_achados_qa.py`.

@@ -642,3 +642,19 @@ O rastreio avisava qualquer código novo. Agora "registrado" e PIX_CREATED ficam
 o PIX), recusa de pagamento depois de a loja confirmar fica só no log (se o pedido cair, o CANCELLED avisa) e
 status que vai e volta avisa uma vez só. Recusa antes da confirmação continua avisando. 489 testes.
 
+## 2026-10-18 ~06h25 — o resto dos relatos do Davi
+
+**Prompt:** "leia tudo que ele escreveu nos relatos dele, ok? vamos arrumando o que esta pendente de ser arrumado
+agora"
+
+**Resposta:** Li o `docs/qa-18-10.md` e o `docs/prompts/davi.md`. Claim `bot-qa-pendentes`; a alta prioridade já
+estava feita (U11/U16 643c477, U14 71e2001 da outra sessão, M2/U20 44b1aad). Corrigidos, com teste:
+- **B3/U4:** o carrinho que sumiu às 01h43 foi o mock desligado com o carrinho de mentira montado; o bot largava
+  calado. Agora avisa e o toque na lista velha volta pro menu (180a989).
+- **U21, U24, U7, U10, U1:** "meu pedido" mostra o carrinho montando; agendar abaixo do mínimo vale; botão velho de
+  antes do cancelar e da foto não ressuscita nada; "Fazer pedido" não repete a pergunta (180a989, 76a345d).
+- **U9, U3, H4, M3, U17:** foto sozinha sempre pergunta; "Mudar" no pagamento e no CPF; apagar os dados para o
+  rastreio; saudação com o nome do WhatsApp; "leite" fica "leite" (4143c34).
+- **Mantidos de propósito:** U12, U18 (só áudio, tem teste), C1, U27, O1/O2, M1. A tabela do que mudou ficou no fim
+  do `docs/qa-18-10.md`, pro reteste do Davi. 500 testes.
+
