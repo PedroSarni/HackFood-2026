@@ -29,6 +29,11 @@ Baileys/Evolution/Z-API). Antes de qualquer feature, leia [`docs/whatsapp.md`](d
 o número, as variáveis (`.env.example`), onde ficam as credenciais, como o webhook funciona e as pegadinhas
 (responder 200 na hora, dedup, janela de 24h). Credenciais nunca vão para o git.
 
+**A URL do bot é fixa.** O login do iFood (OAuth) está cadastrado com
+`https://fabio-araujo-silva--hackfood-bot.us-east.modal.run/ifood/callback`, e a edição da callback URI está
+**bloqueada no portal** (só a organização muda). Não troque o nome do app Modal (`hackfood-bot`), o label, o
+workspace nem a região, e não suba o bot de produção em outro app: a URL muda e o login do iFood quebra.
+
 ## 0.1 Arquivos protegidos: só o Fabio altera
 
 Só **Fabio** (`araujo.fabio@usp.br`) pode alterar estes arquivos:

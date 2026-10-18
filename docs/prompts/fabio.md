@@ -80,3 +80,41 @@ do iFood quebra.
 **Prompt:** apague o estatico do pedro
 
 **Resposta:** Saiu a "Base estática" do dash: fixtures de `data.js`, o roteiro "Simular compra", o CSV e o PDF de exemplo. Ficaram só Dados reais e Demonstração; o cartão "Explorar demonstração" agora abre a Demonstração. A base fixa sobrevive só em `Frontend/Rascunho_Dash/tests/fixtures.js`, pros testes (19 passando). `app.js` (versão antiga em JS puro, não usada pelo `index.html`) não foi mexido.
+
+## 2026-10-17 ~21h20 — URL fixa em lugar crucial, refri pro lanche, nome do git
+
+**Prompt:** "[citou o aviso: não dá pra mudar nome do app, label ou região no Modal, senão o login do iFood
+quebra] salve essa informacoes em algum lugar muito crucial. sobre: [citou o 'completar o valor'] pode ser um
+refri pra um sanduiche ou sempre algo assim, sabe. [citou 'Falta o seu nome no git'] ignore isso"
+
+**Resposta:** URL fixa registrada no `AGENTS.md` §0.0 (todo agente lê ao chegar), num comentário em cima do
+`APP` no `src/app.py` e no `como-funciona.md` §4. A sugestão do mínimo passou a oferecer 1º o que acompanha
+(`src/bot/combina.py`: refri pro lanche, manteiga pro pão; nunca remédio nem álcool), depois o que a pessoa
+costuma comprar, depois algo parecido. Commits com a identidade atual: `90ca03e`, `123d7c7`, `6bbeb88`.
+
+## 2026-10-17 ~21h25 — key da ElevenLabs e deploy liberado
+
+**Prompt:** "chave do elevenlabs [key da ElevenLabs]" / "ao finalizar pode fazer deploy"
+
+**Resposta:** Key no secret `hackathon-elevenlabs`. Scribe validado com 1 chamada: um áudio em pt-BR gerado
+pela voz do próprio Windows ("Oi, eu quero dois pacotes de pão francês e um litro de leite, por favor") voltou
+transcrito certinho. Deploy no fim da rodada.
+
+## 2026-10-17 ~21h30 — mock no lugar do iFood, MUITO CONSISTENTE
+
+**Prompt:** "vamos deixar um mock ligado no lugar do mcp do ifood de fato, ok? deixe um mock bem consistente
+baseado no que ja conversamos aqui, ja que ele tende a cair com frequencia, ok?? MUITO CONSISTENTE"
+
+**Resposta:** Mock ligado em produção às ~21h25 (`scripts/modo.py --mock on`, sem deploy). O mock ficou
+consistente de propósito: pedido mínimo por loja (o mesmo na loja e no carrinho), Lanchonete do Bairro, refri,
+suco, batata e sobremesa onde faz sentido, o básico do dia a dia (óleo, macarrão, cebola, papel higiênico...),
+e busca que ignora "de"/"com" e põe na frente quem tem todas as palavras. Auditoria: todas as buscas típicas
+acham algo e, em loja de comida, a sugestão sempre acha o que acompanha. Carrinho do iFood real (o do Nissei)
+é largado quando o mock liga: antes a busca ficava presa numa loja que o mock não tem.
+
+## 2026-10-17 ~21h40 — a voz de saída é pedido do Fabio
+
+**Prompt:** "eu que pedi, é uma feature nova, apenas aceite"
+
+**Resposta:** Aceito: a voz (o bot falando) é a feature nova da outra janela. Esta sessão commita só o que
+ela mesma mudou e faz o deploy a partir do main commitado, pra não subir a voz pela metade.

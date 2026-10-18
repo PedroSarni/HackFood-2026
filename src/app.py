@@ -18,6 +18,8 @@ import time
 
 import modal
 
+# NÃO MUDE APP, ROTULO, BASE nem a região: o callback do OAuth do iFood está cadastrado com esta URL
+# e o portal não deixa mais editar (AGENTS.md §0.0). Mudou a URL, o login do iFood quebra.
 APP = 'hackfood-bot'
 ROTULO = 'hackfood-bot'
 BASE = os.environ.get('HACKFOOD_BASE') or f'https://fabio-araujo-silva--{ROTULO}.us-east.modal.run'
