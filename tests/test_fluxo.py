@@ -1185,6 +1185,98 @@ def test_recomendacao_sem_carrinho_nao_quebra_e_sugere_algo_da_hora():
     assert 'travadinha' not in textos and 'Que tal' in textos and m.wpp.cards()
 
 
+def test_codigo_de_entrega_perguntado_depois_responde_o_codigo_e_nao_o_status():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')                         # pedido feito
+    codigo = m.estado()['pedidos'][0]['codigo_entrega']
+    assert codigo
+    m.wpp.limpar()
+    m.enviar('qual é o código de entrega?')
+    texto = ' '.join(m.wpp.textos())
+    assert 'código de entrega' in texto and codigo in texto
+
+
+def test_codigo_de_entrega_de_pedido_antigo_busca_no_ifood():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    u = m.armazem[f'u:{m.wa}']
+    codigo = u['pedidos'][0].pop('codigo_entrega')   # pedido feito antes de o campo existir
+    m.armazem[f'u:{m.wa}'] = u
+    m.wpp.limpar()
+    m.enviar('qual a senha do entregador?')
+    assert codigo in ' '.join(m.wpp.textos())
+
+
+def test_codigo_de_entrega_no_meio_de_outro_pedido_responde_e_volta_pros_cards():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    codigo = m.estado()['pedidos'][0]['codigo_entrega']
+    m.enviar('quero pao')                  # pedido novo, cards na tela
+    assert m.estado()['fase'] == 'escolhendo'
+    m.wpp.limpar()
+    m.enviar('qual o codigo de entrega?')
+    assert codigo in ' '.join(m.wpp.textos())
+    assert m.estado()['fase'] == 'escolhendo'   # não perdeu o lugar
+
+
+def test_quanto_deu_responde_o_total_do_pedido():
+    from src.bot import textos as T
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    total = m.estado()['pedidos'][0]['total']
+    m.llm.resposta = {'acao': 'acompanhar', 'sobre': 'total'}
+    m.enviar('quanto deu meu pedido?')
+    m.llm.resposta = None
+    assert T.reais(total) in ' '.join(m.wpp.textos())
+
+
+def test_ta_chegando_responde_status_inteiro_com_previsao_e_codigo():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    ped = m.estado()['pedidos'][0]
+    m.wpp.limpar()
+    m.llm.resposta = {'acao': 'acompanhar', 'sobre': 'previsao'}
+    m.enviar('ta chegando?')
+    m.llm.resposta = None
+    texto = ' '.join(m.wpp.textos())
+    assert '🕒 Chega' in texto and ped['codigo_entrega'] in texto and ped['codigo'] in texto
+    assert 'meu_pedido' in m.wpp.todos_ids()                  # Atualizar status
+    assert 'Fazer novo pedido' in str(m.wpp.saida[-1])        # não "Fazer pedido": já tem pedido feito
+
+
+def test_a_segunda_foto_escolhe_pela_posicao():
+    m = Mundo()
+    endereco_pronto(m)
+    est = m.estado()
+    assert len(est['visiveis']) >= 2
+    _, lid, idx = est['visiveis'][1].split(':')
+    nome = est['listas'][lid]['ofertas'][int(idx)]['nome']
+    m.llm.resposta = {'acao': 'escolher'}
+    m.enviar('quero a segunda foto que voce mandou')
+    m.llm.resposta = None
+    assert m.estado()['carrinho']['itens'][0]['nome'] == nome
+
+
+def test_segunda_feira_nao_e_a_segunda_opcao():
+    m = Mundo()
+    endereco_pronto(m)
+    assert len(m.estado()['visiveis']) >= 2
+    m.llm.resposta = {'acao': 'escolher'}
+    m.enviar('quero pra segunda-feira')
+    m.llm.resposta = None
+    assert not (m.estado().get('carrinho') or {}).get('itens')
+    assert 'Qual deles' in ' '.join(m.wpp.textos())
+
+
+def test_cpf_dito_antes_da_hora_fica_guardado_e_nao_vai_pro_gemini():
+    m = Mundo()
+    endereco_pronto(m)
+    antes = m.llm.chamadas
+    m.enviar('meu cpf é 529.982.247-25')
+    assert m.estado()['cpf'] == '52998224725' and m.llm.chamadas == antes
+    assert 'Anotei seu CPF' in ' '.join(m.wpp.textos())
+
+
 def test_audio_vira_pedido():
     m = Mundo()
     endereco_pronto(m)

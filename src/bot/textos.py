@@ -20,6 +20,8 @@ def reais(v):
 # --- botões fixos (id, título) --------------------------------------------------------
 
 B_PEDIR = ('pedir', '🛒 Fazer pedido')
+B_NOVO_PEDIDO = ('pedir', '🛒 Fazer novo pedido')   # o perguntar troca sozinho quando já tem pedido feito
+B_ATUALIZAR = ('meu_pedido', '🔄 Atualizar status')
 B_REPETIR = ('repetir', '🔁 Pedir de novo')
 B_MEU_PEDIDO = ('meu_pedido', '📦 Meu pedido')
 B_INICIO = ('inicio', '🏠 Início')
@@ -274,6 +276,28 @@ PEDIR_CPF = ('🧾 Pra nota fiscal, me mande seu *CPF* (só os números).\n'
              'Se não quiser, toque em *Sem CPF*.')
 B_SEM_CPF = ('cpf_nao', 'Sem CPF')
 CPF_INVALIDO = 'Esse CPF não parece certo. 🤔 Confira os números e mande de novo.'
+CPF_ANOTADO = '✅ Anotei seu CPF pra nota fiscal.'
+
+
+def sobre_pedido(sobre, pedido, endereco=None):
+    """Resposta pra pergunta sobre o pedido feito; None = é o status (vem do rastreio)."""
+    if sobre == 'codigo_entrega':
+        if not pedido.get('codigo_entrega'):
+            return 'Ainda não tenho o código de entrega desse pedido. 😕 Ele aparece no app do iFood, em *Pedidos*.'
+        return f'🔑 O código de entrega é *{pedido["codigo_entrega"]}*. Fale ele pro entregador quando ele chegar. 🛵'
+    if sobre == 'total':
+        pago = f' ({pedido["pagamento"]})' if pedido.get('pagamento') else ''
+        return f'🧾 Seu último pedido deu *{reais(pedido.get("total"))}*{pago}.'
+    if sobre == 'itens':
+        loja = f'\n🏪 {pedido["loja"]}' if pedido.get('loja') else ''
+        return f'🧾 Você pediu: {pedido.get("resumo") or "—"}{loja}'
+    if sobre == 'pagamento':
+        if not pedido.get('pagamento'):
+            return 'A forma de pagamento desse pedido aparece no app do iFood, em *Pedidos*. 🙂'
+        return f'💳 Pagamento: *{pedido["pagamento"]}*.'
+    if sobre == 'endereco':
+        return f'🏠 Vai pra: {pedido.get("endereco") or endereco or "o endereço salvo"}'
+    return None
 QUAL_PAGAMENTO = 'Como você quer pagar? 💳'
 QUAL_ENTREGA = 'Quando você quer receber? 🛵'
 LOJA_FECHADA = 'Essa loja não está entregando agora. 😕'
@@ -569,3 +593,24 @@ def kit_sem_principal(termo):
 
 def kit_no_pedido(loja):
     return f'✅ Coloquei o kit no seu pedido do *{loja}*.'
+
+
+FINAIS = {'DELIVERED', 'CONCLUDED', 'CANCELLED', 'CANCELED', 'PAYMENT_DECLINED'}
+
+
+def como_esta(codigo, descricao, pedido, previsao=None, sobre=None):
+    """Status do pedido com o que a pessoa quer saber: onde está, quando chega, de onde vem, o código de
+    entrega e o que vem. Entregue ou cancelado: o status e o que veio, sem previsão nem código."""
+    status = status_pedido(codigo, descricao)
+    final = codigo in FINAIS or status in (STATUS['CONCLUDED'], STATUS['CANCELLED'])
+    linhas = [status]
+    if previsao and not final:  # "Tá chegando?" (sobre=previsao): a previsão vem primeiro
+        linhas.insert(0 if sobre == 'previsao' else 1, f'🕒 Chega {previsao}.')
+    numero = f'pedido *{pedido["codigo"]}*' if pedido.get('codigo') else None
+    if pedido.get('loja') or numero:
+        linhas.append('🏪 ' + ' · '.join(x for x in (pedido.get('loja'), numero) if x))
+    if pedido.get('codigo_entrega') and not final:
+        linhas.append(f'🔑 Código de entrega: *{pedido["codigo_entrega"]}* (fale pro entregador)')
+    if pedido.get('resumo'):
+        linhas.append(f'🧾 {pedido["resumo"]}' + (f' — {reais(pedido["total"])}' if pedido.get('total') else ''))
+    return '\n'.join(linhas)

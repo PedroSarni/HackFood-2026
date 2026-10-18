@@ -312,6 +312,16 @@ Validação contra o Gemini de verdade (só Gemini, nada de iFood): `modal run s
   quantidade (a dita, senão 1) nem opção (a dita, senão a padrão da loja). "Pode fechar" junto vai
   direto pro fim do checkout: total, pagamento e uma sugestão do que acompanha. Pagamento dito antes
   ("no pix") não é perguntado de novo. Número solto ("2") continua igual a tocar o botão.
+- **Pergunta sobre o pedido é respondida, em qualquer etapa.** "Qual o código de entrega?" (reconhecido
+  até sem o Gemini), "quanto deu?", "o que eu pedi?", "como paguei?", "pra onde vai?" respondem o que
+  perguntaram, e a pessoa volta pra etapa em que estava (endereço, cards, pagamento...). O pedido feito
+  guarda código de entrega, pagamento e endereço pra isso, e o Gemini sabe qual foi o último pedido.
+  "A primeira foto", "o último" escolhem pela posição ("segunda-feira" não). CPF dito antes da hora
+  fica guardado pra nota e nunca vai pro Gemini.
+- **Status inteiro.** "Tá chegando?", "cadê meu pedido?", "o entregador chegou?" respondem onde o pedido
+  está, quando chega em horário ("entre 23h46 e 23h56", da hora do pedido + o tempo da loja), loja,
+  número, código de entrega, o que vem e o total, com *Atualizar status*. Quem já pediu vê *Fazer novo
+  pedido* no lugar de *Fazer pedido*.
 - **Uma loja por pedido.**
 - **Pedido mínimo não trava ninguém.** O aviso de mínimo (e o "O que mais você quer?" abaixo dele)
   vem com **💡 Me sugere algo**: na loja do carrinho, o bot oferece 1º o que acompanha o pedido

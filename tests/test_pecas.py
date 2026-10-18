@@ -476,3 +476,52 @@ def test_sugestao_da_hora_do_dia_em_brasilia():
     assert _da_hora(em(8))[0][0] == 'pão francês'
     assert _da_hora(em(12))[0][0] == 'marmita'
     assert _da_hora(em(20))[0][0] == 'pizza'
+
+
+def test_regra_rapida_pega_codigo_de_entrega_sem_gemini():
+    from src.bot.interpretar import regra_rapida
+    for frase in ('Qual é o código de entrega?', 'qual a senha do entregador', 'me passa o codigo pro motoboy'):
+        assert regra_rapida(frase) == {'acao': 'acompanhar', 'sobre': 'codigo_entrega'}, frase
+    assert (regra_rapida('qual o codigo do produto') or {}).get('sobre') is None
+
+
+def test_posicao_dita_precisa_de_artigo_e_ignora_dia_da_semana():
+    from src.bot.fluxo import _posicao_dita
+    assert _posicao_dita('Eu quero o arroz do tipo um, a primeira foto que você mandou', 3) == 1
+    assert _posicao_dita('quero o último', 3) == 3
+    assert _posicao_dita('o do meio', 3) == 2
+    assert _posicao_dita('pode ser pra segunda-feira', 3) is None
+    assert _posicao_dita('é a primeira vez que peço', 3) is None
+    assert _posicao_dita('a quinta', 3) is None          # não tem quinta opção
+    assert _posicao_dita('quero o dois', 3) == 2
+    assert _posicao_dita('a opção três', 3) == 3
+    assert _posicao_dita('o arroz do tipo um', 3) is None    # "tipo 1" é a classificação do arroz
+    assert _posicao_dita('eu quero um', 3) is None           # sem artigo é quantidade
+
+
+def test_cpf_sai_do_que_vai_pro_llm():
+    from src.bot.fluxo import _cpf_no_texto, _sem_cpf
+    assert _sem_cpf('meu cpf 529.982.247-25 e quero pão') == 'meu cpf [CPF] e quero pão'
+    assert _cpf_no_texto('meu cpf é 529.982.247-25') == ('52998224725', '')
+    assert _cpf_no_texto('quero pão, cpf 52998224725') == ('52998224725', 'quero pão')
+    assert _cpf_no_texto('cpf na nota 529.982.247-25') == ('52998224725', '')
+    assert _cpf_no_texto('meu telefone é 11987654321') is None   # dígito verificador não bate
+
+
+def test_previsao_de_chegada_em_horario_de_brasilia():
+    import calendar
+    from src.bot.fluxo import _previsao
+    quando = calendar.timegm((2026, 10, 18, 2, 21, 0))       # 23h21 em Brasília
+    ped = {'quando': quando, 'tempo': '25-35 min'}
+    assert _previsao(ped, quando + 60) == 'entre 23h46 e 23h56'
+    assert _previsao(ped, quando + 3600) == 'até as 23h56'
+    assert _previsao({'quando': quando}, quando) is None
+
+
+def test_como_esta_entregue_nao_mostra_previsao_nem_codigo():
+    from src.bot import textos as T
+    ped = {'codigo': 'C1006', 'loja': 'Padaria', 'codigo_entrega': '1006', 'resumo': '3x Café', 'total': 25.49}
+    andando = T.como_esta('PREPARING', '', ped, 'entre 23h46 e 23h56')
+    assert '23h46' in andando and '1006' in andando and 'Padaria' in andando
+    entregue = T.como_esta('DELIVERED', '', ped, 'entre 23h46 e 23h56')
+    assert '23h46' not in entregue and 'Código de entrega' not in entregue and '3x Café' in entregue

@@ -146,7 +146,7 @@ class Bot:
         self._gravar()
         try:
             entradas = entradas_de(msgs)
-            self._disse = ' / '.join(e.texto for e in entradas if e.texto)[:300]
+            self._disse = _sem_cpf(' / '.join(e.texto for e in entradas if e.texto))[:300]
             if self._debug_reset(entradas):   # palavra secreta de debug: desloga e zera tudo
                 return
             if self._sessao_ociosa(anterior, entradas):
@@ -430,6 +430,8 @@ class Bot:
         Se a Meta recusar a mensagem interativa (formato), manda as opções numeradas em texto:
         a pessoa responde o número e a conversa segue (o "2" já vira o 2º botão)."""
         botoes = [tuple(b) for b in botoes]
+        if (self.u or {}).get('pedidos'):  # quem já pediu vê "Fazer novo pedido" ("Fazer pedido" confundia)
+            botoes = [T.B_NOVO_PEDIDO if b == T.B_PEDIR else b for b in botoes]
         # título longo é cortado pela Meta ("Não desejo sachês #…"): o que está entre parênteses
         # vira detalhe no texto; se mesmo assim não couber em 20, vai de lista (24 + descrição 72)
         curtos = [partir(b[1], MAX_BOTAO) for b in botoes]
@@ -542,6 +544,13 @@ class Bot:
             self.repetir_pergunta(T.NAO_ENTENDI)
             return
 
+        achado = _cpf_no_texto(texto) if fase != 'cpf' else None
+        if achado:  # CPF dito antes da hora: guarda pra nota fiscal e tira do texto (CPF nunca vai pra IA)
+            u['cpf'], texto = achado
+            self.dizer(T.CPF_ANOTADO)
+            if not texto and not midias:
+                self.repetir_pergunta()
+                return
         if fase == 'cpf':  # CPF nunca vai pra IA
             # sem nenhum número não tem CPF ali: é outro assunto ("cancelar", "tira a coca"), que segue o fluxo
             if texto and (re.search(r'\d', texto) or normalizar(texto) in SEM_CPF):
@@ -559,7 +568,7 @@ class Bot:
         if not midias:
             if fase in ('complemento', 'bairro'):
                 r = regra_rapida(texto)
-                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados'):
+                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados', 'acompanhar'):
                     self.intencao(r)  # comando escapa da etapa, como no endereço
                     return
                 if (r and r['acao'] == 'saudacao') or (not r and _quer_novo_pedido(texto)):
@@ -572,7 +581,7 @@ class Bot:
                     return
             if fase == 'endereco':
                 r = regra_rapida(texto)
-                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados'):
+                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados', 'acompanhar'):
                     self.intencao(r)
                 elif (r and r['acao'] == 'saudacao') or _quer_novo_pedido(texto):
                     # "oi" ou "quero fazer um pedido" não é endereço: não gasta geocoder nem prende a pessoa
@@ -668,7 +677,7 @@ class Bot:
             e.mime, e.dados = mime or e.mime, dados  # já baixado: o Gemini não baixa de novo
             return e
         print(f'scribe {self.wa}: {texto[:200]}')
-        self._disse = ' / '.join(x for x in (self._disse, texto) if x)[:300]
+        self._disse = _sem_cpf(' / '.join(x for x in (self._disse, texto) if x))[:300]
         return Entrada('texto', texto)
 
     def intencao(self, it):
@@ -762,7 +771,7 @@ class Bot:
         elif a == 'cancelar':
             self.cancelar()
         elif a == 'acompanhar':
-            self.acompanhar()
+            self.acompanhar(sobre=it.get('sobre'))
         elif a == 'repetir':
             self.repetir()
         elif a == 'endereco':
@@ -1351,7 +1360,7 @@ class Bot:
         toque em "Quero esse". Sem como saber qual, pergunta qual (em vez de "não entendi")."""
         pid = self._oferta_falada(it.get('numero'), it, self._visiveis())
         if not pid:
-            self._rodape_cards('Qual deles? Diga o número ou o nome, ou toque em *Quero esse*. 🙂')
+            self._rodape_cards('Qual deles? Diga o número ou o nome. 🙂')  # o rodapé já fala do botão
             return
         self.botao(pid)
 
@@ -1362,6 +1371,9 @@ class Bot:
             return visiveis[n - 1]
         if len(visiveis) == 1:
             return visiveis[0]
+        posicao = _posicao_dita(self._disse, len(visiveis))
+        if posicao:
+            return visiveis[posicao - 1]
         falado = normalizar(' '.join([self._disse or ''] + [i['termo'] for i in it.get('itens') or []]))
         nomes = {}
         for pid in visiveis:
@@ -1812,6 +1824,11 @@ class Bot:
                 if tentativa == 0:
                     self.ctx.dormir(1.5)
         u['pedidos'][0]['codigo'] = detalhes.get('codigo')
+        # guardados pra responder depois "qual o código de entrega?", "como eu paguei?", "pra onde vai?"
+        u['pedidos'][0].update(codigo_entrega=detalhes.get('codigo_entrega'),
+                               pagamento=(car.get('pagamento') or {}).get('nome'),
+                               endereco=(u.get('endereco') or {}).get('texto'),
+                               tempo=(car.get('entrega') or {}).get('tempo'))
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
                                   detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo'),
                                   total=car.get('total'), pessoas=pessoas))
@@ -1909,12 +1926,29 @@ class Bot:
 
     # ================================================================== depois do pedido
 
-    def acompanhar(self, _arg=None):
+    def acompanhar(self, _arg=None, sobre=None):
+        """"cadê meu pedido" e qualquer pergunta sobre o pedido feito: responde o que perguntaram (código de
+        entrega, quanto deu, o que veio, pagamento, endereço), não só o status (23h02 o "qual o código de
+        entrega?" ganhou status duas vezes), e a pessoa volta pra etapa em que estava."""
         if not self.exigir_login(['botao', 'meu_pedido']):
+            return
+        car = self.u.get('carrinho') or {}
+        if sobre == 'total' and car.get('itens'):  # "quanto deu?" montando o pedido: é o carrinho de agora
+            self._responder_e_seguir(f'🧺 Seu pedido até agora: *{T.reais(car.get("total") or car.get("subtotal"))}*')
             return
         pedidos = self.u.get('pedidos') or []
         if not pedidos:
             self.perguntar(T.SEM_PEDIDO, self._menu(), fase='pedido')
+            return
+        ped = pedidos[0]
+        if sobre == 'codigo_entrega' and not ped.get('codigo_entrega'):  # pedido de antes deste campo: busca
+            try:
+                ped['codigo_entrega'] = self.ctx.ifood(self.wa).pedido(ped['id']).get('codigo_entrega')
+            except ErroMCP as e:
+                print(f'getOrder pro código de entrega: {e!r}')
+        resposta = T.sobre_pedido(sobre, ped, (self.u.get('endereco') or {}).get('texto'))
+        if resposta:
+            self._responder_e_seguir(resposta)
             return
         try:
             st = self.ctx.ifood(self.wa).rastrear(pedidos[0]['id'])
@@ -1925,8 +1959,22 @@ class Bot:
             self.u['pedidos'] = pedidos[1:]
             self.perguntar(T.SEM_PEDIDO, self._menu(), fase='pedido')
             return
-        self.perguntar(T.status_pedido(st.get('codigo'), st.get('descricao')) +
-                       f'\n\n🧾 {pedidos[0].get("resumo", "")}', [T.B_PEDIR, T.B_INICIO], fase='acompanhando')
+        # o status inteiro: onde está, quando chega, de onde vem, o código e o que vem (23h21 "Tá chegando?"
+        # e "O entregador chegou?" ganharam uma linha só e os botões de pedir de novo)
+        self._responder_e_seguir(T.como_esta(st.get('codigo'), st.get('descricao'), ped,
+                                             _previsao(ped, self.ctx.agora()), sobre),
+                                 [T.B_ATUALIZAR, T.B_PEDIR])
+
+    def _responder_e_seguir(self, resposta, botoes=None):
+        """Responde a pergunta e devolve a pessoa pra onde estava: no meio do endereço ou de um pedido a
+        pergunta da etapa volta; fora disso, os atalhos."""
+        fase = self.u.get('fase')
+        if fase in ('endereco', 'complemento', 'bairro'):
+            self._voltar_pra_etapa(resposta)
+        elif fase in NO_MEIO_DO_PEDIDO and (self.u.get('pergunta') or {}).get('botoes'):
+            self.repetir_pergunta(resposta)
+        else:
+            self.perguntar(resposta, botoes or [T.B_MEU_PEDIDO, T.B_PEDIR], fase='acompanhando')
 
     def repetir(self, _arg=None):
         if not self.exigir_login(['botao', 'repetir']):
@@ -2510,6 +2558,74 @@ def _sugeridas(ofertas, s):
     if s.get('falta'):
         ofertas.sort(key=lambda o: (o['preco'] < s['falta'], abs(o['preco'] - s['falta'])))
     return ofertas
+
+
+ORDINAIS = {'primeiro': 1, 'primeira': 1, 'segundo': 2, 'segunda': 2, 'terceiro': 3, 'terceira': 3,
+            'quarto': 4, 'quarta': 4, 'quinto': 5, 'quinta': 5}
+ARTIGOS = {'o', 'a', 'da', 'do', 'na', 'no', 'pela', 'pelo'}
+CARDINAIS = {'um': 1, 'dois': 2, 'tres': 3, 'quatro': 4, 'cinco': 5}   # "o um", "opção dois", "foto três"
+CPF_NO_TEXTO = re.compile(r'\b\d{3}[.\s]?\d{3}[.\s]?\d{3}[-.\s]?\d{2}\b')
+CPF_ANTES = re.compile(r'(?i)\b(?:(?:o\s+)?meu\s+)?cpf\s*(?:é|e|eh|:|=)?\s*$')
+ENCHIMENTO_CPF = {'meu', 'o', 'cpf', 'e', 'eh', 'na', 'nota', 'fiscal', 'pra', 'para', 'com', 'segue', 'ai',
+                  'aqui', 'ta', 'esta', 'numero', 'do', 'da', 'coloca', 'poe', 'bota', 'ok'}
+
+
+def _hora_br(ts):
+    return time.strftime('%Hh%M', time.gmtime(ts - 3 * 3600))  # Brasília: UTC-3, sem horário de verão
+
+
+def _previsao(pedido, agora):
+    """"entre 23h46 e 23h56": hora do pedido + tempo de entrega da loja ("25-35 min"). Passou do fim: "até
+    as 23h56". None sem os dois dados."""
+    nums = [int(n) for n in re.findall(r'\d+', str(pedido.get('tempo') or ''))][:2]
+    quando = pedido.get('quando')
+    if not nums or not quando:
+        return None
+    ini, fim = float(quando) + nums[0] * 60, float(quando) + nums[-1] * 60
+    if agora > fim:
+        return f'até as {_hora_br(fim)}'
+    if nums[0] == nums[-1]:
+        return f'por volta das {_hora_br(fim)}'
+    return f'entre {_hora_br(ini)} e {_hora_br(fim)}'
+
+
+def _posicao_dita(disse, quantos):
+    """"a primeira foto", "o segundo", "o último", "o do meio", "o um", "opção dois": a posição dita
+    (1..quantos) ou None. Só com artigo (ou "opção", "número", "foto") antes, e nunca "segunda-feira",
+    "primeira vez" nem "arroz tipo um"."""
+    palavras = normalizar(disse or '').split()
+    posicao = None
+    for k, w in enumerate(palavras):
+        antes = palavras[k - 1] if k else ''
+        depois = palavras[k + 1] if k + 1 < len(palavras) else ''
+        if antes not in ARTIGOS | {'numero', 'opcao', 'foto'} or depois in ('feira', 'vez'):
+            continue
+        if w in ORDINAIS:
+            posicao = ORDINAIS[w]
+        elif w in CARDINAIS and antes in ARTIGOS | {'numero', 'opcao', 'foto'}:
+            posicao = CARDINAIS[w]
+        elif w in ('ultimo', 'ultima'):
+            posicao = quantos
+        elif w == 'meio' and quantos % 2:
+            posicao = quantos // 2 + 1
+    return posicao if posicao and posicao <= quantos else None
+
+
+def _sem_cpf(texto):
+    """Número com cara de CPF vira [CPF]: o _disse vai pro LLM (voz e tutor)."""
+    return CPF_NO_TEXTO.sub('[CPF]', texto or '')
+
+
+def _cpf_no_texto(texto):
+    """CPF válido no meio de qualquer mensagem ("meu cpf é 529.982.247-25"): (cpf, texto sem ele) ou None.
+    O que sobra do tipo "meu cpf é" some junto."""
+    for m in CPF_NO_TEXTO.finditer(texto or ''):
+        cpf = cpf_em(m.group(0))
+        if cpf:
+            antes = CPF_ANTES.sub('', texto[:m.start()])  # "meu cpf é " colado no número sai junto
+            resto = ' '.join(f'{antes} {texto[m.end():]}'.split()).strip(' ,.;:-')
+            return cpf, '' if set(normalizar(resto).split()) <= ENCHIMENTO_CPF else resto
+    return None
 
 
 def _da_hora(agora):

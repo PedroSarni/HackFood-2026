@@ -40,6 +40,9 @@ ESQUEMA = {
                    'description': 'true se a pessoa pediu pra fechar o pedido junto ("quero esse e pode fechar")'},
         'pagamento': {'type': 'STRING', 'nullable': True, 'enum': ['PIX', 'VALE_REFEICAO', 'VALE_ALIMENTACAO'],
                       'description': 'como a pessoa disse que vai pagar, se disse'},
+        'sobre': {'type': 'STRING', 'nullable': True,
+                  'enum': ['status', 'codigo_entrega', 'previsao', 'itens', 'total', 'pagamento', 'endereco'],
+                  'description': 'quando acompanhar: do que a pessoa perguntou sobre o pedido'},
     },
     'required': ['acao'],
 }
@@ -48,7 +51,9 @@ SISTEMA = """\
 Você interpreta mensagens de WhatsApp para um assistente que faz pedidos no iFood \
 (mercado, restaurante, farmácia, bebidas, pet). Quem escreve, na maioria, são pessoas idosas \
 ou com pouca prática com celular: escrevem com erros, sem acento, abreviado, em várias \
-mensagens picadas, ou mandam áudio e foto. Seja generoso: descubra o que a pessoa quer AGORA.
+mensagens picadas, ou mandam áudio e foto. Seja generoso: descubra o que a pessoa quer AGORA. Ela \
+adianta ou atrasa passos (diz o pagamento antes da hora, responde uma pergunta velha, pergunta do pedido no \
+meio de outra coisa): a ação é o que ela quer agora, não a etapa que está na tela.
 
 Responda só o JSON do esquema. Campos:
 - acao: uma de comprar, sugerir, mais_opcoes, escolher, sim, nao, quantidade, endereco, ver_pedido, \
@@ -78,6 +83,8 @@ sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebi
 finalizar", "é só isso"); senão null.
 - pagamento: PIX, VALE_REFEICAO ou VALE_ALIMENTACAO se a pessoa disse como vai pagar ("no pix", "vale \
 refeição"); senão null.
+- sobre: quando acompanhar, do que a pessoa perguntou (status, codigo_entrega, previsao, itens, total, \
+pagamento, endereco); senão null.
 - texto: quando endereco, o endereço como a pessoa disse. Quando grupo, SÓ as restrições e ajustes \
 ("um é vegetariano", "até 30 reais cada", "sem refri", "troca a coca por guaraná"), nunca a comida nem o \
 número de pessoas; sem restrição = null.
@@ -100,7 +107,10 @@ Regras:
 na tela, 1). Se ela disse quantidade, vai em itens.
 - "sim", "pode", "isso", "confirma", "fechou", "ok" = sim. "não", "nao quero", "errado" = nao.
 - "acabou", "só isso", "pode fechar", "terminei" = finalizar.
-- "cadê meu pedido", "já saiu?", "vai demorar?" = acompanhar.
+- "cadê meu pedido", "já saiu?", "vai demorar?" = acompanhar. Qualquer pergunta sobre o pedido feito \
+também é acompanhar, com sobre: "qual o código de entrega" = codigo_entrega, "quanto deu" = total, "o que \
+eu pedi" = itens, "como paguei" = pagamento, "pra onde vai" = endereco, "que horas chega", "tá chegando?", "vai demorar?" = previsao, "o entregador \
+chegou?", "onde está meu pedido?" = status.
 - "o de sempre", "pedir igual da outra vez", "repetir" = repetir.
 - "me sugere algo", "o que você recomenda", "qualquer coisa", "você escolhe", "algo pra completar \
 o valor" ou "o pedido mínimo" = sugerir (quando a pessoa não disse o produto).
@@ -154,6 +164,8 @@ COMANDOS = {
 }
 # "cancelar o pedido", "quero cancelar", "cancela tudo" (com erro de digitação no fim, "pediod"); "cancela a
 # coca" NÃO casa: tirar um item fica com o Gemini
+# "qual é o código de entrega?", "a senha do entregador", "código pro motoboy"
+CODIGO_ENTREGA = re.compile(r'\b(?:codigo|senha|cod)\b(?: \w+){0,3} (?:entrega|entregador|motoboy|confirmacao)\b')
 CANCELAR = re.compile(r'^(?:quero |pode |por favor )?cancel(?:a|ar)(?: (?:o|a|meu|minha|esse|essa))?'
                       r'(?: (?:pedi\w*|compra|tudo|isso|carrinho))?$')
 
@@ -197,6 +209,8 @@ def regra_rapida(texto):
         return {'acao': COMANDOS[t]}
     if CANCELAR.match(t):
         return {'acao': 'cancelar'}
+    if CODIGO_ENTREGA.search(t):  # importante demais pra depender do Gemini
+        return {'acao': 'acompanhar', 'sobre': 'codigo_entrega'}
     if t in SIM:
         return {'acao': 'sim'}
     if t in NAO:
@@ -354,6 +368,9 @@ def contexto_para_llm(estado):
     if estado.get('fase') == 'kit' and kit.get('linhas'):
         linhas.append(f'Kit na tela pra {kit.get("pessoas")} pessoas ({(kit.get("tema") or {}).get("termo")}): '
                       + ', '.join(f'{lin["qtd"]}x {lin["nome"]}' for lin in kit['linhas']))
+    ultimo = (estado.get('pedidos') or [None])[0]
+    if ultimo:  # sem isso "qual o código?" no meio de outra coisa não tinha a que se referir
+        linhas.append(f'Último pedido já feito (pode estar a caminho): {ultimo.get("resumo") or "—"}.')
     car = estado.get('carrinho') or {}
     if car.get('itens'):
         linhas.append('Já no pedido: ' + ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens']))
