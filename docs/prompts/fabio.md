@@ -420,3 +420,10 @@ abri o claim `dash-agents-control`.
 - **Testes e deploy:** 419 do back e 35 do front passando. Deploy às ~02h30 (2af1cf6). A ficha do ar aparece no
   dash depois da 1ª mensagem que o bot receber.
 
+
+## 2026-10-18 ~02h00 — mock de volta
+
+**Prompt:** "volte o mock do mcp"
+
+**Resposta:** Mock religado (`scripts/modo.py --mock on`, sem deploy): o bot volta ao iFood falso na próxima
+mensagem. Tempo rápido segue ligado.
