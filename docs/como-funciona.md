@@ -58,6 +58,8 @@ interface. O bot não sabe a diferença.
 | `src/bot/ranking.py` | Ordem em que as ofertas aparecem (aguardando a regra do time) |
 | `src/bot/rastreio.py` | Acompanha o pedido depois de feito e avisa cada mudança |
 | `src/bot/recorrencia.py` | Compra recorrente: lembra a pessoa de pedir de novo |
+| `src/bot/foto.py` | Foto vira pedido: o prompt/esquema que diz se é comida, lista, produto ou outra coisa |
+| `src/bot/grupo.py` | Dividir com os amigos: monta o kit numa loja só e faz a conta do "por pessoa" |
 | `src/bot/textos.py` | Tudo que o bot fala, num lugar só |
 | `src/bot/contexto.py` | Junta as peças (WhatsApp, iFood, Gemini, armazém) num objeto só |
 | `src/web/paginas.py` | Páginas HTML: termos, privacidade, exclusão e as telas de login |
@@ -101,10 +103,10 @@ Intenção que o modelo devolve (`ESQUEMA` em `interpretar.py`):
 acao       comprar | mais_opcoes | escolher | sim | nao | quantidade | endereco |
            ver_pedido | finalizar | tirar_item | cancelar | acompanhar | repetir |
            ajuda | saudacao | agradecer | sair | apagar_dados | parar_lembrete |
-           agendar | fora_do_escopo | nao_entendi
-itens      [{termo, quantidade?, tipo_loja, observacao?}]   (quando acao=comprar)
-numero     1, 2, 3...                                       (quando escolher/quantidade)
-texto      o endereço, quando acao=endereco
+           agendar | grupo | fora_do_escopo | nao_entendi
+itens      [{termo, quantidade?, tipo_loja, observacao?}]   (quando acao=comprar; no grupo, o principal 1º)
+numero     1, 2, 3...                                       (escolher/quantidade; no grupo, quantas pessoas)
+texto      o endereço, quando acao=endereco; no grupo, só a restrição ("sem refri")
 ```
 
 - `tipo_loja` ∈ MERCADO, RESTAURANTE, FARMACIA, BEBIDAS, PET, LOJA — o modelo classifica
@@ -239,6 +241,60 @@ Sequência obrigatória do iFood, que o fluxo (`finalizar`) respeita:
   Demo: `modal run scripts/modo.py --rapido on` faz o 1º lembrete vir em 1 minuto, seja qual for a
   frequência/horário; a pessoa vê o combinado normal ("todo dia às 18h"), como se o tempo tivesse
   passado (função `lembrete_na_hora`, sem esperar o cron de 15 min).
+
+---
+
+## 9.1 Foto vira pedido (src/bot/foto.py)
+
+Foto mandada **em qualquer momento**, até como 1ª mensagem e antes do login, é pedido. O Gemini olha a foto
+junto com a legenda e o que veio na mesma rajada (até 4 fotos; "documento" de imagem ou PDF também vale) e
+diz o que ela é:
+
+- **Comida** (lanche, pizza, prato, foto de cardápio): o bot comenta e pergunta *"Quer que eu procure algo
+  parecido?"* (botões `foto:sim:<id>` / `foto:nao:<id>`, ou "sim" escrito). Com o sim, busca os
+  `parecidos` que o modelo sugeriu, do mais parecido pro mais genérico ("x-bacon", "hambúrguer"), no máximo 3
+  buscas, e junta tudo num carrossel só. Legenda que já é pedido ("quero isso", "me vê 2 desse") pula a
+  pergunta e a quantidade da legenda já vale; legenda com pessoas ("pra mim e mais 3") vira o kit da §9.2.
+  As duas coisas também são pegas por regra no código (`QUER_ISSO`, `pessoas_em`), porque o modelo às vezes
+  não marca.
+- **Lista de compras** (papel, bilhete, print) ou **produto** (caixa de remédio, pacote): vira a lista do
+  pedido, igual a uma lista escrita (um item de cada vez). No meio do endereço, a lista espera o endereço
+  terminar (vira o `pendente`).
+- **Outra coisa**: comenta e volta pra onde a pessoa estava. Se veio texto pedindo algo junto ("quero ração
+  pra ele" + foto do gato), o pedido escrito vale.
+- **Etapa do CPF**: a foto nem é aberta nem vai pra IA (pode ser o documento). Documento pessoal em qualquer
+  etapa vira "outro" e nada dele é transcrito nem vai pro log.
+- O id no botão (`<id>`) impede que o "Sim" de uma foto antiga busque os parecidos de uma foto nova.
+
+## 9.2 Dividir com os amigos: o kit em grupo (src/bot/grupo.py)
+
+"Quero lanchar em 5 pessoas hambúrguer", "pizza pra 4 dividindo", "eu e mais 3 vamos rachar uma pizza" =
+`acao=grupo`. O número de pessoas conta quem escreve ("com 4 amigos" = 5). Falta algo? O bot pergunta só o
+que falta (quantas pessoas, com botões 2/4/6 ou o número escrito; ou o que querem comer). Mais de 30 pessoas
+pede outro número; 1 pessoa vira pedido normal.
+
+Como o kit é montado, **sempre numa loja só** (o iFood fecha um pedido por loja):
+
+1. busca o principal e agrupa as ofertas por loja, na ordem do iFood (guardado pro **🔄 Outra loja**, que
+   troca de loja sem buscar de novo);
+2. abre os principais da loja (`getItem`) e já escolhe as opções obrigatórias pelo código: pizza pra 3+
+   pessoas vai **grande**, o que bate com o pedido ("coca") vem antes;
+3. busca na mesma loja o que acompanha (`combina.py`: refri e batata pro lanche) e o que pediram junto
+   ("com coca"); bebida alcoólica só se pedirem;
+4. **o Gemini decide a composição** (1 lanche por pessoa variando sabor, pizza grande serve ~3, refri de 2
+   litros pra cada ~4, batata pra cada ~3, o que pediram entra sempre, respeita "sem refri", "mais barato");
+   se ele falhar ou devolver bobagem, uma regra fixa monta o kit (`kit_padrao`);
+5. **o código faz a conta**: preço × quantidade + taxa de entrega da loja, e o **por pessoa arredondado pra
+   cima no centavo** (5 × R$ 36,42 cobre R$ 182,09). A fala do modelo nunca traz valor em reais.
+
+O kit aparece com *✅ Quero esse kit*, *🔄 Outra loja* (só se houver outra) e *❌ Não quero*; texto livre
+ajusta ("sem refri", "agora somos 6", "troca por guaraná", "na verdade quero pizza" = outro kit). Só no
+"Quero esse kit" o carrinho é criado (`createCart` com todas as linhas e opções); se já havia pedido de
+outra loja, o kit avisou que troca, e da mesma loja, soma. Daí é o pedido de sempre, e o **"👥 R$ X por
+pessoa"** aparece no total, no resumo e no "Pedido feito". "Vamos dividir em 3" com um pedido já montado só
+liga o "por pessoa" nele. O iFood cobra uma conta só: o bot diz quanto dá pra cada, não divide o pagamento.
+
+Validação contra o Gemini de verdade (só Gemini, nada de iFood): `modal run scripts/validar_foto_grupo.py`.
 
 ---
 

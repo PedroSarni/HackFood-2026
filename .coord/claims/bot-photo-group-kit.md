@@ -1,7 +1,7 @@
 ---
 slug: bot-photo-group-kit
 owner: Fabio
-status: active
+status: done
 started: 2026-10-17 22:30
 ---
 
@@ -25,4 +25,13 @@ quanto fica pra cada. NÃO cobre: pagamento separado por pessoa (o iFood cobra u
 
 ## Onde está (preencher ao terminar)
 
--
+- `src/bot/foto.py` — `ler(llm, estado, fotos, textos)`: prompt/esquema da foto (comida | lista | produto | outro)
+- `src/bot/grupo.py` — `montar(...)` (kit numa loja), `compor` (Gemini decide, `kit_padrao` de reserva),
+  `opcoes_automaticas`, `por_pessoa`, `pessoas_em` / `tema_em` / `bebidas_em` (regras sem IA)
+- `src/bot/fluxo.py` — `receber_fotos`, `foto_sim`, `buscar_parecidos`; `grupo`, `grupo_pessoas`, `_montar_kit`,
+  `kit_ok`, `responder_kit`, `_dividir_pedido`, `_pessoas`; fases `foto`, `kit`, `grupo_pessoas`, `grupo_tema`;
+  botões `foto:sim|nao:<id>`, `kit:ok|outra|nao:<id>`, `grupo_n:<n>`; `buscar` dividido em `_coletar` + `_mostrar_lista`
+- `src/bot/interpretar.py` — `acao=grupo` (numero = pessoas, texto = restrição); `src/bot/textos.py` — textos da foto e do kit,
+  `dividido()` no total, no resumo e no "Pedido feito"
+- `src/shared/mcp_fake.py` — Burger House (`l2`) e refri de 2 litros na lanchonete; `src/bot/ifood.py` — `taxa_entrega` na oferta
+- `tests/test_foto_grupo.py`; `scripts/validar_foto_grupo.py` (prompts contra o Gemini real); `docs/como-funciona.md` §9.1 e §9.2
