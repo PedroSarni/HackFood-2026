@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChartNoAxesColumn, Clock3, Gauge, RefreshCw, Sparkles, Target, X } from 'lucide-react';
+import { ChartNoAxesColumn, Clock3, Download, Gauge, RefreshCw, Sparkles, Target, X } from 'lucide-react';
 import { groupBy, isSale, metrics, ratio } from './data.js';
+import { downloadInsightsPdf } from './report-download.js';
 
 // Botão de IA das páginas Conversão, Clientes e Mercado: a Sofia (src/agentes/analista.py) lê os números
 // AGREGADOS da página e devolve insights por time do iFood. Nenhum nome ou telefone de cliente sai daqui.
@@ -92,12 +93,13 @@ export function InsightsFab({ page, rows, previous, filters, source }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState({ status: 'idle' });
   const [phase, setPhase] = useState(null);
+  const [pdf, setPdf] = useState('');   // '' | 'gerando' | 'erro'
   const run = useRef(0);
   useEffect(() => { run.current += 1; setOpen(false); setState({ status: 'idle' }); setPhase(null); }, [page, source]);
 
   const generate = async (fresh = false) => {
     const id = ++run.current;
-    setOpen(true); setState({ status: 'loading' }); setPhase('sweep');
+    setOpen(true); setState({ status: 'loading' }); setPhase('sweep'); setPdf('');
     const sweepDone = new Promise(resolve => setTimeout(resolve, SWEEP_MS));
     setTimeout(() => { if (run.current === id) setPhase(p => p === 'sweep' ? 'thinking' : p); }, SWEEP_MS * 0.55);
     let result;
@@ -115,6 +117,11 @@ export function InsightsFab({ page, rows, previous, filters, source }) {
     setTimeout(() => { if (run.current === id) setPhase(null); }, 900);
   };
   const toggle = () => { if (open && state.status !== 'loading') { setOpen(false); return; } if (state.status !== 'loading') generate(); };
+  const baixar = async () => {   // o mesmo que está na tela, pra levar pros times do iFood
+    setPdf('gerando');
+    try { await downloadInsightsPdf({ page, data: state.data, filters, source, teamColors: TEAM_COLORS }); setPdf(''); }
+    catch { setPdf('erro'); }
+  };
   const loading = state.status === 'loading';
   const error = state.status === 'error' && (ERRORS[state.code] || ERRORS.modelo);
   const data = state.data;
@@ -137,7 +144,9 @@ export function InsightsFab({ page, rows, previous, filters, source }) {
           {data.insights.map((item, i) => <Card key={`${item.titulo}-${i}`} item={item} index={i} />)}
         </>}
       </div>
-      {data && !loading && <footer className="ai-panel-foot"><span>{source === 'demo' ? 'Feito com os dados simulados da demonstração.' : 'Feito só com os números agregados desta página.'} Confira antes de agir.</span><button className="text-button" onClick={() => generate(true)}><RefreshCw size={13} />Gerar de novo</button></footer>}
+      {data && !loading && <footer className="ai-panel-foot"><span>{source === 'demo' ? 'Feito com os dados simulados da demonstração.' : 'Feito só com os números agregados desta página.'} Confira antes de agir.</span>
+        <span className="ai-panel-actions"><button className="text-button" onClick={baixar} disabled={pdf === 'gerando'}><Download size={13} />{pdf === 'gerando' ? 'Gerando PDF…' : pdf === 'erro' ? 'PDF falhou: tentar de novo' : 'Baixar PDF'}</button>
+          <button className="text-button" onClick={() => generate(true)}><RefreshCw size={13} />Gerar de novo</button></span></footer>}
     </section>}
   </>;
 }

@@ -658,3 +658,17 @@ estava feita (U11/U16 643c477, U14 71e2001 da outra sessão, M2/U20 44b1aad). Co
 - **Mantidos de propósito:** U12, U18 (só áudio, tem teste), C1, U27, O1/O2, M1. A tabela do que mudou ficou no fim
   do `docs/qa-18-10.md`, pro reteste do Davi. 500 testes.
 
+## 2026-10-18 ~07h20 — PDF dos insights da Sofia e o interruptor do mock
+
+**Prompt:** "adicione a funcionalidade de exportar os dados que a sofia gera, pra pdf. cade o botao de switch pra
+mock ou little aviso, ja ta setado pra quando switcha?"
+
+**Resposta:**
+- **PDF:** "Baixar PDF" no pé do painel da Sofia (Conversão, Clientes, Mercado). Mesmo cabeçalho do relatório,
+  período, filtros e modelo, o resumo e um cartão por insight (time com a cor dele, impacto, evidência, ação, métrica
+  e prazo); quebra página quando não cabe, e emoji que a fonte não tem sai. O jsPDF só carrega no toque.
+- **Interruptor do mock:** existe (71e2001, da outra sessão), no pé da barra lateral: "Modo palco" e "Catálogo de
+  reserva". Não aparecia porque o servidor local do dash era de antes da rota `/api/mock`; reiniciei. O modo palco
+  está desligado: com ele armado, no 1º erro do iFood o mock liga sozinho, o sino avisa e quem tinha carrinho recebe
+  o "precisei recomeçar seu pedido". 54 testes no front.
+

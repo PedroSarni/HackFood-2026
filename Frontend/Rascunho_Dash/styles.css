@@ -283,6 +283,8 @@
 .ai-card-foot span{display:inline-flex;align-items:center;gap:5px}
 .ai-panel-foot{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 16px 13px;border-top:1px solid #f1f1f4;font-size:9.5px;color:#a1a1ab}
 .ai-panel-foot .text-button{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:#6d4fe0;white-space:nowrap}
+.ai-panel-foot .text-button:disabled{opacity:.6;cursor:progress}
+.ai-panel-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px}
 .ai-skeletons{display:grid;gap:10px}
 .ai-skeleton{border:1px solid var(--line);border-radius:11px;padding:14px;display:grid;gap:8px;animation:ai-card-in .4s both}
 .ai-skeleton i{display:block;height:9px;border-radius:5px;background:linear-gradient(90deg,#f1f1f5 0%,#e9defe 20%,#dcecff 35%,#dff7ef 50%,#f1f1f5 70%);background-size:300% 100%;animation:ai-shimmer 1.6s linear infinite}

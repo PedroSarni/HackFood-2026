@@ -4,6 +4,9 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../app.jsx';
+import { downloadInsightsPdf } from '../report-download.js';
+
+vi.mock('../report-download.js', () => ({ downloadAnalyticsPdf: vi.fn(), downloadInsightsPdf: vi.fn(async () => {}) }));
 
 const insights = { resumo: 'Muita gente para no pagamento.', modelo: 'gemini-3.8-flash', segundos: 3.2, insights: [
   { titulo: 'Pagamento derruba o funil', time: 'Produto', evidencia: '52 de 140 abandonos no pagamento', acao: 'Testar Pix como 1ª opção', impacto: 'alto', prazo: 'esta semana', metrica: 'abandono no pagamento' },
@@ -26,6 +29,20 @@ const mount = path => render(<MemoryRouter initialEntries={[path]}><App /></Memo
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Insights com IA', () => {
+  it('baixa em PDF os insights que estão na tela', async () => {
+    localStorage.setItem('hackfood-mode', 'advanced');
+    const user = userEvent.setup();
+    stubInsights();
+    mount('/conversao');
+    await user.click(screen.getByRole('button', { name: 'Gerar insights com IA desta página' }));
+    await screen.findByText('Pagamento derruba o funil', {}, { timeout: 4000 });
+    await user.click(screen.getByRole('button', { name: /Baixar PDF/ }));
+    expect(downloadInsightsPdf).toHaveBeenCalledWith(expect.objectContaining({
+      page: 'conversao', source: 'real', data: expect.objectContaining({ resumo: insights.resumo, insights: insights.insights }),
+      teamColors: expect.objectContaining({ Produto: expect.any(String) }),
+    }));
+  });
+
   it('o botão só aparece em Conversão, Clientes e Mercado', () => {
     localStorage.setItem('hackfood-mode', 'advanced');
     mount('/dinheiro');

@@ -1,13 +1,13 @@
 import { jsPDF } from 'jspdf';
 import { REFERENCE_DATE, dateKey, groupBy, metrics, money, number, percent, ratio } from './data.js';
 
-const COLORS = {
+export const COLORS = {   // o PDF dos insights (insights-pdf.js) usa as mesmas
   red: [234, 29, 44], ink: [48, 48, 57], muted: [112, 112, 124],
   line: [231, 231, 236], light: [247, 247, 249], blush: [255, 240, 241],
 };
 const MARGIN = 16;
 const WIDTH = 178;
-const pdfText = value => String(value).replace(/[\u00a0\u202f]/g, ' ').replace(/[\u2010-\u2015]/g, '-');
+export const pdfText = value => String(value).replace(/[\u00a0\u202f]/g, ' ').replace(/[\u2010-\u2015]/g, '-');
 
 export function reportContext(filters, advanced, referenceDate = REFERENCE_DATE) {
   const end = new Date(`${referenceDate}T12:00:00-03:00`);
