@@ -1,10 +1,10 @@
 # Estado do projeto
 
 > Atualizar a cada ~1h ou depois de entrega importante. Quem terminou o trabalho atualiza.
-> Última atualização: 17/10 21h34 por Davi
+> Última atualização: 17/10 23h15 por Davi
 
 ## Ideia escolhida
-Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital): botões sempre, 3 opções por vez com Mais opções, texto, áudio e foto, várias mensagens seguidas, e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência, usando o MCP do iFood como agente externo. Ainda a decidir: pedido em grupo e áudio de saída (item B2).
+Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital): botões sempre, 3 opções por vez com Mais opções, texto, áudio e foto, várias mensagens seguidas, e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência, usando o MCP do iFood como agente externo. Pedido em grupo (kit pra dividir com os amigos) e foto vira pedido já estão no bot (e821eef), assim como a resposta em áudio (51ef4ff) (item B2).
 
 ## Pronto
 - Regras do time (AGENTS.md), hooks e CI de autoria
@@ -12,8 +12,20 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - Resumo do MCP do iFood em "regras da api/"
 - Agente "HackFood Agent" aprovado no portal do iFood em menos de 1h
 - QA do MCP real concluído (conta de teste): achados no contexto-evento.md §8
+- Foto vira pedido e kit pra dividir com os amigos (e821eef)
+- Resposta por áudio com ElevenLabs, só quando a pessoa pede (51ef4ff)
+- OpenRouter de reserva quando o Gemini cai (764c617)
+- Sugestão pra fechar o pedido mínimo (123d7c7)
+- Carrinho pela fala: "quero esse e pode fechar" vai direto pro checkout (2b5e513)
+- Fixes do endereço, complemento/bairro e "cancelar pedido" (d0b0c3c, 59d4abe, 62fefce, 3a13b42)
+- Sessão ociosa: 30 min parado no meio de uma pergunta volta pro menu (4797590)
+- Dash do Pedro lê o diário do bot ao vivo (Fabio, claim `dash-live-data`, done) e ganhou mascote no perfil (Breno, claim `dash-profile-mascot`, done)
 
-## No ar agora (17/10 ~17h10) — MODO REAL
+## No ar agora (17/10 23h15) — MOCK LIGADO
+- Mock no lugar do iFood desde ~21h25 (Fabio, `scripts/modo.py --mock on`, sem deploy), porque o iFood real "tende a cair com
+  frequência" (docs/prompts/fabio.md). Se a demo roda em mock ou no iFood real: a decidir (H3).
+- Último deploy: 17/10 23h00, do main em bbfd811 (foto, kit, voz e os fixes até 3a13b42), segundo docs/prompts/fabio.md.
+  Fora dele: 99c2c31 (follow-up e carrinho abandonado no app.py).
 - Agente "Compras pelo WhatsApp" APROVADO no portal. Credenciais reais no secret `hackathon-ifood`
   (`IFOOD_CLIENT_ID`/`IFOOD_CLIENT_SECRET`, sem `IFOOD_MOCK`). O número já atende pelo deploy novo.
 - OAuth verificado de ponta a ponta: o botão "Entrar no iFood" leva ao login REAL do iFood (client,
@@ -21,15 +33,13 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
   Importante: o escopo `openid` NÃO é permitido pro nosso cliente — a string é só `mcp.*`.
 - Pedido completo testado no mock (login, endereço, 3 cards, "Mais opções", carrinho, pagamento, resumo,
   confirmação, rastreio, lembrete). Pra demo sem conta iFood, voltar ao mock: `IFOOD_MOCK=1` no secret.
-- Como tudo funciona: `docs/como-funciona.md`. 137 testes passando em 17/10 21h34 (`.venv/Scripts/python.exe -m pytest`).
+- Como tudo funciona: `docs/como-funciona.md`. 344 testes passando em 17/10 23h15 (`.venv/Scripts/python.exe -m pytest`).
 
 ## Em andamento
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
 - Fabio: 2º agente "Compras pelo WhatsApp" (criado às ~16h05) já APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
-- Pedro: dash em `Frontend/Rascunho_Dash` saiu do rascunho: lê o diário de eventos do bot ao vivo (Fabio, claim `dash-live-data`, done) e ganhou mascote no perfil (Breno, claim `dash-profile-mascot`)
-- Breno, claim `dash-profile-mascot` (done): mascote como foto de perfil do workspace no dash
 - Painel com seletor dados reais ou demonstração (aad024d); diário de prompts em `docs/prompts/` (regra do Fabio, 6bbeb88)
-- Fabio: stub `src/shared/voz.py` (texto -> nota de voz), áudio de saída em preparação (d22fa3d)
+- Follow-up aos 3 min e carrinho abandonado aos 5 min: lado do bot (ec68f28) e do app.py (99c2c31) commitados; falta deploy (a confirmar com o Fabio)
 - Rascunho do 06 (Davi): em andamento, fora do repo
 
 ## Bloqueado ou esperando
@@ -57,8 +67,9 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 - [ ] A4 Combinar canal do time e divisão dos entregáveis — Davi
 ### Produto
 - [ ] B1 Regra da ordem de prioridade dos itens (ranking). Davi decide, Fabio implementa em src/bot/ranking.py
-- [ ] B2 Decidir se pedido em grupo, áudio de saída e foto entram ou ficam fora — time
+- [x] B2 Decidir se pedido em grupo, áudio de saída e foto entram ou ficam fora — time
   - voz.py (stub do Fabio) sugere que áudio de saída pode voltar; confirmar com Fabio
+  - entraram: foto e kit em grupo (e821eef), áudio de saída (51ef4ff)
 - [ ] B3 (futuro) Mockar cupom e clube, se der tempo — time
 ### MCP real
 - [x] C1 Credenciais reais funcionando no bot (2º agente do Fabio) — Fabio
@@ -80,3 +91,8 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 - [ ] F1 Segredos fora do repo; estado.md a cada 1h; /redundancia a cada 2h; cada um na própria conta de IA; Fabio preenche META_APP_SECRET
 ### Fechamento
 - [ ] G1 11h30 tudo travado, 12h30 submissão, 13h pitches
+### Pendências da noite
+- [ ] H1 Confirmar com o Fabio a versão do deploy que tem os fixes e a foto (fabio.md: deploy das 23h00 do bbfd811)
+- [ ] H2 Follow-up de 3 min e carrinho abandonado aos 5 min no app.py (Davi): código em 99c2c31, falta deploy
+- [ ] H3 Decidir antes do pitch se a demo roda em mock ou no iFood real
+- [ ] H4 Perguntar ao Fabio se o rastreio deve parar quando a pessoa apaga os dados (no mock ele continua)

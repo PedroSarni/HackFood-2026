@@ -127,3 +127,14 @@ src/app.py [...] PARTE B: carrinho abandonado (src/bot/fluxo.py) [...]"
 (follow-up aos 180 s, abandono aos 300 s, mesma trava da rodada, envio pelo `contexto_producao` com o diário)
 disparada no fim da `rodada`. Em fluxo.py: `ABANDONO_SEG`, `marca_abandono()`, `abandonar_carrinho()` e o
 `marca_followup()` valendo na fase pedido com itens. 7 testes novos (344 passando). Sem deploy.
+
+## 2026-10-17 23:15 — estado.md fiel ao repo depois da noite
+
+**Prompt:** "TAREFA: deixar docs/estado.md fiel ao repo agora. Edição mínima. [...] contagem de testes pelo número
+real do pytest [...] Sobre o modo (mock ou real): confirme em docs/prompts/fabio.md [...] acrescente [...] o que
+entrou desde as 21h34 [...] marque B2 como [x] [...] Acrescente [...] H1 [...] H2 [...] H3 [...] H4 [...]"
+
+**Resposta:** 344 testes. Mock ligado desde ~21h25 porque o iFood real cai muito (o Fabio não disse "só pra
+testes", então não escrevi "voltar ao modo da demo"). Deploy das 23h00 (bbfd811) já tem foto, kit, voz e os
+fixes; fora dele só 99c2c31 (app.py do follow-up), que está commitado e não "em andamento". Pronto ganhou as
+features da noite, dash/mascote saíram de Em andamento, B2 [x], H1–H4 acrescentados.
