@@ -2446,7 +2446,8 @@ class Bot:
         if not rec:
             return False
         self.ctx.recorrencias.avisado(self.wa, rec['id'])
-        self.perguntar(T.lembrete(rec, self.u.get('endereco')), botoes_lembrete(rec), fase='lembrete')
+        self.perguntar(T.lembrete(rec, self.u.get('endereco'), (self.u.get('pagamento_preferido') or {}).get('nome')),
+                       botoes_lembrete(rec), fase='lembrete')
         return True
 
     # ================================================================== foto vira pedido

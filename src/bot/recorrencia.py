@@ -164,7 +164,7 @@ def disparar_vencidos(estado, wpp, dic_rec=None, agora=None, so=None):
         u = estado.get(f'u:{wa_id}') or {}
         try:
             if agora - float(u.get('ultima_msg') or 0) < JANELA:
-                texto = T.lembrete(rec, u.get('endereco'))
+                texto = T.lembrete(rec, u.get('endereco'), (u.get('pagamento_preferido') or {}).get('nome'))
                 wpp.botoes(wa_id, texto, botoes_lembrete(rec))
                 u['fase'] = 'lembrete'
                 u['pergunta'] = {'texto': texto,

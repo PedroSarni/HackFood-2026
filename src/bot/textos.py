@@ -498,17 +498,19 @@ def _abertura_lembrete(rec):
     return 'Tá com fome de quê? A gente já sabe. 😋'
 
 
-def lembrete(rec, endereco=None):
-    """No dia: pergunta se pode pedir, mostrando tudo que vai ser cobrado. O "sim" é a confirmação."""
+def lembrete(rec, endereco=None, pagamento=None):
+    """No dia: pergunta se pode pedir, mostrando tudo que vai ser cobrado. O "sim" é a confirmação.
+    `pagamento`: o nome da forma preferida, quando o lembrete não guardou uma (automático sem pedido)."""
     if isinstance(rec, str):
         rec = {'resumo': rec}
+    pagamento = rec.get('pagamento') or pagamento
     linhas = [f'🔔 Chegou o dia! {_abertura_lembrete(rec)}', '', f'🧾 {rec.get("resumo") or ""}']
     if rec.get('loja'):
         linhas.append(f'🏪 {rec["loja"]}')
     if endereco:
         linhas.append(f'🏠 {endereco.get("apelido") or "Endereço"}: {endereco.get("texto") or ""}'.rstrip(': '))
-    if rec.get('pagamento'):
-        linhas.append(f'💳 {rec["pagamento"]}')
+    if pagamento:
+        linhas.append(f'💳 {pagamento}')
     from src.bot.recorrencia import preco_da_ultima_vez
     campo, valor = preco_da_ultima_vez(rec)
     if valor and campo == 'total':
@@ -516,7 +518,8 @@ def lembrete(rec, endereco=None):
     elif valor:  # automático que ainda não saiu: a entrega só se sabe no dia
         linhas.append(f'💰 Itens: {reais(valor)} + entrega (pode variar um pouquinho)')
     linhas += ['', '*Podemos pedir aqui pra enviar na sua casa?*',
-               'Se tocar em *Sim, pode pedir*, eu faço o pedido agora nessa forma de pagamento.']
+               'Se tocar em *Sim, pode pedir*, eu faço o pedido agora'
+               + (f', pagando com *{pagamento}*.' if pagamento else '.')]
     return '\n'.join(linhas)
 
 
