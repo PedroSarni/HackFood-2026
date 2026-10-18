@@ -489,3 +489,14 @@ de pagamento; o Fabio ajustou e, desde 05:30:28, nenhuma falha de entrega nos lo
 
 **Resposta:** Mock desligado (`scripts/modo.py --mock off`, sem deploy): o bot volta ao MCP real do iFood, com
 lojas fechadas aparecendo na busca (`--fechadas` ligado).
+
+## 2026-10-18 ~02h40 — o iFood caiu?
+
+**Prompts:**
+- "o ifood caiu? ele n ta conseguindo respostas"
+- "ligue o mock enquanto investigamos isso"
+
+**Resposta:** Não caiu: os logs mostram 403 "Access Denied" do Akamai do iFood (firewall) no container do bot, e o
+disjuntor pausou as chamadas por 300 s. A `scripts/sondar_403.py`, saindo de outro IP do Modal, teve 200 com os
+tokens válidos, então parece barreira por IP/volume e não token. Redeploy (containers novos, mesma URL),
+disjuntor zerado e mock religado enquanto investigamos. O Gemini também deu 429 (cota); o OpenRouter cobriu.
