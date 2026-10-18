@@ -7,40 +7,35 @@ import { App } from '../app.jsx';
 
 const mount = (path = '/') => render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>);
 
-describe('Divulgação progressiva e navegação', () => {
-  it('abre básico, revela detalhes no mesmo funil e preserva modo ao navegar', async () => {
-    const user = userEvent.setup(); mount('/conversao');
-    expect(screen.getByRole('switch', { name: 'Modo avançado' }).checked).toBe(false);
-    expect(screen.getAllByRole('button', { name: /Ver conversas/ }).length).toBe(3);
-    expect(screen.queryByText('Por que os clientes desistem?')).toBeNull();
-    expect(document.querySelectorAll('.kpi').length).toBe(3);
-    await user.click(screen.getByRole('switch', { name: 'Modo avançado' }));
+describe('Navegação enxuta e mais análises', () => {
+  it('menu começa pelo time, depois MCP e dinheiro; mais análises revela o resto', async () => {
+    const user = userEvent.setup(); mount('/dinheiro');
+    const links = () => [...document.querySelectorAll('nav .nav-link')].map(a => a.textContent.replace(/\d+$/, ''));
+    expect(links()).toEqual(['Agentes', 'Uso do MCP', 'Dinheiro', 'Conversas']);
+    expect(screen.getByRole('heading', { name: 'Vendas por dia' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Para onde foi o dinheiro' })).toBeTruthy();
+    await user.click(screen.getByRole('switch', { name: 'Mais análises' }));
+    expect(links()).toEqual(['Agentes', 'Uso do MCP', 'Dinheiro', 'Conversas', 'Conversão', 'Clientes', 'Mercado', 'Relatórios']);
+    expect(screen.getByLabelText('Restaurante')).toBeTruthy();
+    await user.click(screen.getByRole('link', { name: 'Conversão' }));
     expect(screen.getAllByRole('button', { name: /Ver conversas/ }).length).toBe(10);
     expect(screen.getByText('Por que os clientes desistem?')).toBeTruthy();
-    expect(screen.getByLabelText('Restaurante')).toBeTruthy();
-    await user.click(screen.getByRole('link', { name: /Conversas/ }));
-    expect(screen.queryByText('A jornada completa de compra')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Todas as conversas' })).toBeTruthy();
     expect(localStorage.getItem('hackfood-mode')).toBe('advanced');
-    await user.click(screen.getByRole('switch', { name: 'Modo avançado' }));
-    expect(screen.queryByLabelText('Restaurante')).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Financeiro' })).toBeNull();
-  });
-
-  it('restaura modo avançado e retorna à visão geral ao simplificar módulo exclusivo', async () => {
-    localStorage.setItem('hackfood-mode', 'advanced');
-    const user = userEvent.setup(); mount('/financeiro');
-    expect(screen.getByRole('heading', { name: 'Composição financeira' })).toBeTruthy();
-    await user.click(screen.getByRole('switch', { name: 'Modo avançado' }));
-    expect(screen.getByRole('heading', { name: 'Evolução das vendas' })).toBeTruthy();
+    await user.click(screen.getByRole('switch', { name: 'Mais análises' }));
+    expect(screen.getByRole('heading', { name: 'Agentes.' })).toBeTruthy();   // saiu da página que só existe em mais análises
     expect(localStorage.getItem('hackfood-mode')).toBe('basic');
   });
 
+  it('endereços antigos levam pras telas novas', () => {
+    mount('/financeiro');
+    expect(screen.getByRole('heading', { name: 'Dinheiro.' })).toBeTruthy();
+  });
+
   it('filtra por etapa sem empilhar as páginas', async () => {
+    localStorage.setItem('hackfood-mode', 'advanced');
     const user = userEvent.setup(); mount('/conversao');
     await user.click(screen.getByRole('button', { name: /Pedido confirmado:.*Ver conversas/ }));
     expect(screen.getByRole('button', { name: /Alcançou: Pedido confirmado/ })).toBeTruthy();
-    expect(screen.queryByText('Da conversa ao pedido')).toBeNull();
     const rows = document.querySelectorAll('tbody tr');
     expect(rows.length).toBeGreaterThan(0);
     expect([...rows].every(r => /Concluída|Recuperada/.test(r.textContent))).toBe(true);
@@ -67,22 +62,19 @@ describe('Conversas e fonte dos dados', () => {
   });
 
   it('pode fechar com Escape e mostra estado vazio para pesquisa sem resultados', async () => {
-    const user = userEvent.setup(); mount('/');
+    const user = userEvent.setup(); mount('/conversas');
     await user.click(screen.getAllByRole('button', { name: /Abrir conversa de/ })[0]);
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { bubbles: false, cancelable: true }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    await user.click(screen.getByRole('link', { name: /Conversas/ }));
     await user.type(screen.getByRole('textbox', { name: 'Buscar cliente ou conversa' }), 'cliente inexistente');
     expect(screen.getByText('Nenhum resultado neste recorte')).toBeTruthy();
     expect(document.querySelector('tbody')).toBeNull();
   });
 
-  it('cartão de demonstração troca a fonte pra Demonstração', async () => {
-    const user = userEvent.setup(); mount('/');
+  it('a fonte dos dados só tem real e demonstração', async () => {
+    const user = userEvent.setup(); mount('/dinheiro');
     expect(screen.getByLabelText('Fonte dos dados').value).toBe('real');
-    expect(screen.queryByRole('button', { name: 'Simular compra' })).toBeNull();
-    await user.click(screen.getByRole('button', { name: /Explorar demonstração/ }));
-    expect(screen.getByLabelText('Fonte dos dados').value).toBe('demo');
+    await user.selectOptions(screen.getByLabelText('Fonte dos dados'), 'demo');
     expect([...screen.getByLabelText('Fonte dos dados').options].map(o => o.value)).toEqual(['real', 'demo']);
   });
 

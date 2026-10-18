@@ -97,35 +97,112 @@ const agentes = (conversa = null) => ({
   ] : null,
 });
 
-describe('Agentes', () => {
-  it('mostra a arquitetura, o uso por agente e as regras sem IA à parte', async () => {
-    const calls = stubFetch(() => agentes());
-    mount('/agentes');
-    expect(await screen.findByRole('heading', { name: 'Uso por agente' })).toBeTruthy();
-    expect(calls[0]).toBe('/api/agentes?fonte=real&dias=30');
-    expect(screen.getByText('Orquestrador')).toBeTruthy();
-    expect(screen.getByText(/não conversam entre si/)).toBeTruthy();
-    const row = screen.getByRole('cell', { name: 'Relevância e sugestão' }).closest('tr');
-    expect(within(row).getByText('66,7%')).toBeTruthy();
-    expect(within(row).getByText('4,0 s')).toBeTruthy();
-    expect(within(row).getByText('gemini-3.1-flash-lite (1)')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Regras sem IA' })).toBeTruthy();
-    expect(within(screen.getByText('Follow-up').closest('tr')).getByText('2')).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Linha do tempo da conversa' })).toBeNull();
+// Resposta de /api/equipe (src/agentes.fichas) e /api/ao-vivo (servidor.Painel.ao_vivo).
+const ficha = (id, nome, cargo, extra = {}) => ({
+  id, nome, cargo, emoji: '🤖', cor: '#7a5af8', bordao: `Sou ${nome}.`, faz: `${nome} trabalha.`, planoB: `Plano B de ${nome}.`,
+  arquivos: [`src/agentes/${id}.py`, `src/bot/${id}.py`], tipo: 'ia', essencial: false, ligado: true, modeloEscolhido: null,
+  modelos: [{ modelo: 'gemini-3.5-flash-lite', prazo: 6, pensamento: '' }, { modelo: 'gemini-3.8-flash', prazo: 9, pensamento: 'low' }],
+  modelosNoAr: null, keys: [{ nome: 'GEMINI_API_KEY', secret: 'hackathon-gemini', configurada: true, final: '····a91F' }], keysDoAr: true,
+  prompts: [`PROMPT DE ${nome.toUpperCase()}`], versaoPrompt: 'abc12345', versaoNoAr: 'abc12345', ...extra,
+});
+const equipe = (cfg = {}) => ({
+  fonte: 'real', agora: 1, conhecidos: ['gemini-3.5-flash-lite', 'gemini-3.8-flash'], arQuando: 1,
+  agentes: [ficha('entendimento', 'Lia', 'Intérprete', { essencial: true, ...cfg.entendimento }), ficha('relevancia', 'Duda', 'Curadora', cfg.relevancia),
+    ficha('foto', 'Íris', 'Leitora de fotos', cfg.foto), ficha('ouvido', 'Otto', 'Ouvinte', { tipo: 'servico', prompts: [], ...cfg.ouvido })],
+});
+const passos = [{ ts: 100, tipo: 'entrada', conversa: 'aa', formato: 'Texto' }, { ts: 101, tipo: 'ia', conversa: 'aa', agente: 'relevancia', ok: true, ms: 900, mantidas: 3 }];
+
+function stubTeam({ conversa = false } = {}) {
+  const posts = [];
+  let cfg = {};
+  vi.stubGlobal('fetch', vi.fn(async (url, options = {}) => {
+    const u = new URL(url, 'http://x');
+    let body;
+    if (options.method === 'POST') {
+      const id = u.pathname.split('/').pop(), pedido = JSON.parse(options.body);
+      posts.push([id, pedido]);
+      cfg = { ...cfg, [id]: { ...(cfg[id] || {}), ...('ligado' in pedido ? { ligado: pedido.ligado } : {}), ...(pedido.modelo ? { modeloEscolhido: pedido.modelo } : {}) } };
+      body = equipe(cfg);
+    } else if (u.pathname === '/api/equipe') body = equipe(cfg);
+    else if (u.pathname === '/api/ao-vivo') body = { agora: 200, passos: u.searchParams.get('desde') ? [] : passos };
+    else body = agentes(conversa ? u.searchParams.get('conversa') : null);
+    return { ok: true, json: async () => body };
+  }));
+  return posts;
+}
+
+describe('Agentes (a 1ª tela)', () => {
+  it('abre no time: cada agente com desempenho, e as rotinas sem IA à parte', async () => {
+    stubTeam();
+    mount('/');
+    const duda = await screen.findByRole('button', { name: /Abrir a ficha de Duda/ });
+    expect(await within(duda).findByText('50,0%')).toBeTruthy();   // 1 erro em 2 chamadas
+    expect(within(duda).getByText('2,6 s')).toBeTruthy();
+    expect(screen.getByText('Follow-up · 2 disparos')).toBeTruthy();
+    expect(screen.queryByText('Exportar')).toBeNull();      // a tela do time não tem exportação de vendas
+    expect([...document.querySelectorAll('nav .nav-link')].map(e => e.textContent).slice(0, 3)).toEqual(['Agentes', 'Uso do MCP', 'Dinheiro']);
   });
 
-  it('abre a linha do tempo da conversa: mensagem, entendimento, código chamando o iFood, resposta', async () => {
+  it('o palco conta o que o time fez, sem texto de ninguém', async () => {
+    stubTeam();
+    mount('/');
+    expect((await screen.findAllByText('Fiquei com 3 ofertas', { exact: false }, { timeout: 4000 })).length).toBeGreaterThan(0);
+    expect(document.querySelector('.stage-bubble')?.textContent).toContain('Duda');
+  });
+
+  it('filtra por situação e por tipo', async () => {
     const user = userEvent.setup();
-    const calls = stubFetch(url => agentes(url.searchParams.get('conversa')));
-    mount('/agentes');
+    stubTeam();
+    mount('/');
+    await screen.findByRole('button', { name: /Abrir a ficha de Duda/ });
+    await screen.findByText('50,0%');
+    await user.selectOptions(screen.getByLabelText('Tipo de agente'), 'servico');
+    expect(screen.queryByRole('button', { name: /Abrir a ficha de Duda/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Abrir a ficha de Otto/ })).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText('Tipo de agente'), '');
+    await user.click(screen.getByRole('button', { name: 'Com erro' }));
+    expect(screen.getByRole('button', { name: /Abrir a ficha de Duda/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Abrir a ficha de Íris/ })).toBeNull();
+  });
+
+  it('a ficha mostra modelo, key mascarada e prompt, e o interruptor desliga', async () => {
+    const user = userEvent.setup();
+    const posts = stubTeam();
+    mount('/');
+    await user.click(await screen.findByRole('button', { name: /Abrir a ficha de Duda/ }));
+    const sheet = screen.getByRole('dialog');
+    await user.click(within(sheet).getByRole('tab', { name: 'Configuração' }));
+    expect(within(sheet).getByText('····a91F')).toBeTruthy();
+    expect(within(sheet).getAllByText('src/agentes/relevancia.py').length).toBeGreaterThan(0);
+    await user.selectOptions(within(sheet).getByRole('combobox'), 'gemini-3.8-flash');
+    expect(posts.at(-1)).toEqual(['relevancia', { modelo: 'gemini-3.8-flash' }]);
+    await user.click(within(sheet).getByRole('tab', { name: 'System prompt' }));
+    expect(within(sheet).getByText('PROMPT DE DUDA')).toBeTruthy();
+    await user.click(within(sheet).getByRole('switch'));
+    expect(posts.at(-1)).toEqual(['relevancia', { ligado: false }]);
+    expect(await within(sheet).findByText('Desligado')).toBeTruthy();
+  });
+
+  it('desligar um agente essencial pede confirmação antes', async () => {
+    const user = userEvent.setup();
+    const posts = stubTeam();
+    mount('/');
+    await user.click(await screen.findByRole('button', { name: /Abrir a ficha de Lia/ }));
+    const sheet = screen.getByRole('dialog');
+    await user.click(within(sheet).getByRole('switch'));
+    expect(posts).toEqual([]);
+    expect(within(sheet).getByText('Lia é essencial pra conversa.')).toBeTruthy();
+    await user.click(within(sheet).getByRole('button', { name: 'Desligar mesmo assim' }));
+    expect(posts).toEqual([['entendimento', { ligado: false }]]);
+  });
+
+  it('abre a linha do tempo de uma conversa: mensagem, entendimento, código chamando o iFood, resposta', async () => {
+    const user = userEvent.setup();
+    stubTeam({ conversa: true });
+    mount('/');
     await user.selectOptions(await screen.findByLabelText('Conversa'), 'WA-AAA111-001');
-    expect(await screen.findByRole('heading', { name: 'Linha do tempo da conversa' })).toBeTruthy();
-    expect(calls.at(-1)).toBe('/api/agentes?fonte=real&dias=30&conversa=WA-AAA111-001');
+    await screen.findByText('ação: comprar');
     const lanes = [...document.querySelectorAll('.agent-timeline li .lane')].map(l => l.textContent);
     expect(lanes).toEqual(['Pessoa', 'IA', 'Código → iFood', 'IA', 'Regra', 'Bot']);
-    const timeline = document.querySelector('.agent-timeline');
-    expect(within(timeline).getByText('ação: comprar')).toBeTruthy();
-    expect(within(timeline).getByText('reserva')).toBeTruthy();
-    expect(within(timeline).getByText('sem IA')).toBeTruthy();
   });
 });

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Bot, Clock3, Info, MessagesSquare, Network, Search, Zap } from 'lucide-react';
+import { Activity, MessagesSquare, Network, Search, Zap } from 'lucide-react';
 import { DOMAINS, clock, day, latency, pct, useSummary } from './telemetria.js';
 
-// Uso do MCP e rastro dos agentes. Tudo vem agregado do servidor local (telemetria.js):
-// aqui só desenha. Fonte 'demo' = clientes simulados, sempre com o rótulo de demonstração.
+// Uso do MCP e as peças da linha do tempo que a página do time (equipe.jsx) reusa. Tudo vem agregado do
+// servidor local (telemetria.js): aqui só desenha. Fonte 'demo' = clientes simulados, sempre com o rótulo de demonstração.
 
 function Stat({ label, value, icon: Icon, caption }) {
   return <article className="kpi"><div className="kpi-label">{label}<Icon size={17} /></div><strong>{value}</strong><div className="kpi-caption">{caption}</div></article>;
@@ -67,29 +67,9 @@ export function McpPage({ source, period }) {
   </>;
 }
 
-// A arquitetura que esta aba mostra, do jeito que o bot é: a IA de entendimento só lê a mensagem e
-// devolve JSON; quem decide, chama os especialistas e chama o iFood é o código (src/bot/fluxo.py).
-const ARCHITECTURE = [
-  { kind: 'mensagem', title: 'Mensagem', text: 'Texto, áudio, foto ou botão' },
-  { kind: 'ia', title: 'Entendimento', text: 'IA: entende e devolve JSON' },
-  { kind: 'codigo', title: 'Orquestrador', text: 'Código: decide cada passo' },
-  { kind: 'especialista', title: 'Especialistas e MCP', text: 'IA de foto, kit, sugestão, voz · tools do iFood · regras' },
-  { kind: 'resposta', title: 'Resposta', text: 'Sempre com botões' },
-];
-
 const SUMMARY_LABELS = { acao: 'ação', itens: 'itens', foto: 'foto', parecidos: 'parecidos', mantidas: 'mantidas', listas: 'listas', tentativas: 'tentativas' };
 
-function Architecture() {
-  return <div className="agent-flow" aria-label="Como os agentes se organizam">{ARCHITECTURE.map(step => <div key={step.kind} className={`agent-flow-step ${step.kind}`}><strong>{step.title}</strong><span>{step.text}</span></div>)}
-    <p className="chart-note"><Info size={13} />Os agentes não conversam entre si: tudo passa pelo orquestrador e pelo estado da conversa.</p></div>;
-}
-
-function models(list) {
-  if (!list.length) return '—';
-  return list.slice(0, 2).map(m => `${m.modelo} (${m.n})`).join(' · ') + (list.length > 2 ? ` +${list.length - 2}` : '');
-}
-
-function Step({ step }) {
+export function Step({ step }) {
   const when = <span className="timeline-when">{clock(step.at)}</span>;
   if (step.tipo === 'mensagem') return <li className="lane-customer">{when}<span className="lane">Pessoa</span><strong>Mensagem · {step.formato}{step.botao ? ' (botão)' : ''}</strong></li>;
   if (step.tipo === 'ia') return <li className={`lane-ia ${step.ok ? '' : 'failed'}`}>{when}<span className="lane">IA</span><strong>{step.nome}</strong>
@@ -100,39 +80,4 @@ function Step({ step }) {
     <span className="step-meta"><span>{latency(step.ms)}</span>{!step.ok && <span className="badge red"><i />{step.erro || 'erro'}</span>}</span></li>;
   if (step.tipo === 'regra') return <li className="lane-rule">{when}<span className="lane">Regra</span><strong>{step.nome}</strong><span className="step-meta"><span className="subtle-pill">sem IA</span></span></li>;
   return <li className="lane-answer">{when}<span className="lane">Bot</span><strong>Resposta · {step.formato}</strong></li>;
-}
-
-export function AgentsPage({ source, period }) {
-  const [conversation, setConversation] = useState('');
-  useEffect(() => setConversation(''), [source]);
-  const state = useSummary('agentes', { source, period, conversation });
-  const data = state.data;
-  if (!data) return <><Status state={state} source={source} /><Architecture />{state.status === 'loading' && <Nothing title="Carregando o rastro dos agentes" text="Somando as chamadas de IA do período no servidor do painel." />}</>;
-  const errors = data.agentes.reduce((n, a) => n + a.erros, 0);
-  const backup = data.agentes.reduce((n, a) => n + a.reserva, 0);
-  const timed = data.agentes.filter(a => a.msMedio !== null);
-  const avg = timed.length ? timed.reduce((n, a) => n + a.msMedio * a.chamadas, 0) / Math.max(1, timed.reduce((n, a) => n + a.chamadas, 0)) : null;
-  return <>
-    <Status state={state} source={source} />
-    <Architecture />
-    <div className="filter-bar telemetry-filters"><ConversationPicker list={data.conversasLista} value={conversation} onChange={setConversation} /><span className="sample-label">{conversation ? 'Uma conversa' : 'Todas as conversas'} · período do filtro global</span></div>
-    <div className="simple-stats">
-      <Stat label="Chamadas de IA" value={data.total} icon={Bot} caption="Todos os agentes, no recorte" />
-      <Stat label="Latência média" value={latency(avg)} icon={Clock3} caption="Ponderada pelas chamadas" />
-      <Stat label="Taxa de erro" value={pct(data.total ? errors / data.total * 100 : 0)} icon={Zap} caption={`${errors} chamadas com erro`} />
-      <Stat label="Caiu pro reserva" value={backup} icon={Activity} caption="Respondeu outro modelo da fila" />
-    </div>
-    <Section title="Uso por agente" subtitle="Cada agente de IA, quanto foi usado, quanto demorou e qual modelo respondeu">
-      <div className="table-scroll"><table><thead><tr><th>Agente</th><th className="align-right">Chamadas</th><th>Uso</th><th className="align-right">% de erro</th><th className="align-right">Latência média</th><th className="align-right">Latência máx.</th><th>Modelos</th><th className="align-right">Reserva</th><th className="align-right">Conversas</th></tr></thead>
-        <tbody>{data.agentes.map(a => <tr key={a.agente}><td><strong>{a.nome}</strong></td><td className="align-right">{a.chamadas}</td><td><span className="usage-cell"><UsageBar value={a.pct} />{pct(a.pct)}</span></td><td className="align-right">{a.erros ? <span className="badge red"><i />{pct(a.pctErro)}</span> : pct(0)}</td><td className="align-right">{latency(a.msMedio)}</td><td className="align-right">{latency(a.msMax)}</td><td className="cell-secondary">{models(a.modelos)}</td><td className="align-right">{a.reserva}</td><td className="align-right">{a.conversas}</td></tr>)}</tbody></table></div>
-    </Section>
-    <Section title="Regras sem IA" subtitle="Disparadas pelo código, sem modelo nenhum: contam à parte">
-      <div className="table-scroll"><table><thead><tr><th>Regra</th><th className="align-right">Disparos</th><th className="align-right">Conversas</th></tr></thead>
-        <tbody>{data.regras.map(r => <tr key={r.agente}><td><strong>{r.nome}</strong> <span className="subtle-pill">regra</span></td><td className="align-right">{r.disparos}</td><td className="align-right">{r.conversas}</td></tr>)}</tbody></table></div>
-    </Section>
-    {conversation && <Section title="Linha do tempo da conversa" subtitle="Mensagem, entendimento, especialistas e iFood pelo código, resposta. Sem o texto da conversa.">
-      {data.linha?.length ? <ol className="agent-timeline">{data.linha.map((step, i) => <Step key={`${step.at}-${i}`} step={step} />)}</ol>
-        : <Nothing title="Nada registrado nesta conversa" text="Conversas de antes do rastro dos agentes só têm mensagens e MCP." />}
-    </Section>}
-  </>;
 }

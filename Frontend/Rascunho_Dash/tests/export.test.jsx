@@ -9,7 +9,7 @@ import { filterSessions } from '../data.js';
 import { createSeed, FIXTURE_DATE } from './fixtures.js';
 
 vi.mock('../report-download.js', () => ({ downloadAnalyticsPdf: vi.fn() }));
-const mount = (path = '/') => render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>);
+const mount = (path = '/dinheiro') => render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>);
 beforeEach(() => vi.clearAllMocks());
 
 describe('Exportação de relatórios na interface', () => {
