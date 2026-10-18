@@ -644,3 +644,20 @@ def test_12_ovos_na_lista_e_uma_duzia_nao_12_bandejas():
     item = m.estado()['carrinho']['itens'][-1]
     assert 'Ovos' in item['nome'] and item['qtd'] == 1
     assert 'Coloquei *1 bandeja de Ovos brancos* no seu pedido. (dá os 12 que você pediu)' in ' '.join(m.wpp.textos())
+
+
+def test_ranking_poe_o_produto_simples_antes_da_variacao():
+    """18/10: "pão de queijo" trazia o Waffle na frente do tradicional."""
+    from src.bot import ranking
+    ofertas = [{'nome': 'Pão de Queijo Waffle Congelado Forno de Minas 200g', 'loja_id': 'a'},
+               {'nome': 'Pão de Queijo Tradicional Forno de Minas 400g', 'loja_id': 'a'},
+               {'nome': 'Pão de Queijo Forno de Minas 1kg', 'loja_id': 'a'},
+               {'nome': 'Pão de Queijo Recheado Catupiry', 'loja_id': 'a'}]
+    nomes = [o['nome'] for o in ranking.ordenar(ofertas, {'termo': 'pão de queijo'})]
+    assert nomes[0].startswith('Pão de Queijo Tradicional') and nomes[1].startswith('Pão de Queijo Waffle')  # o resto na ordem
+    # pediu a variação: ela não desce
+    nomes = [o['nome'] for o in ranking.ordenar(ofertas, {'termo': 'pão de queijo waffle'})]
+    assert nomes[0].startswith('Pão de Queijo Waffle')
+    # empate mantém a ordem do iFood
+    iguais = [{'nome': 'Leite A', 'loja_id': 'a'}, {'nome': 'Leite B', 'loja_id': 'a'}]
+    assert [o['nome'] for o in ranking.ordenar(iguais, {'termo': 'leite'})] == ['Leite A', 'Leite B']
