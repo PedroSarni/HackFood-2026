@@ -161,3 +161,84 @@ def test_catalogo_novo_no_volume_entra_sem_deploy(tmp_path):
         assert mcp_fake.recarregar(str(arq)) is False             # mesma versão: não relê à toa
     finally:
         importlib.reload(mcp_fake)
+
+
+# --- ops-ifood-reroll: IP barrado vai pela ponte, erro de negócio não ---------------------------------------
+
+def _cliente_que_responde(monkeypatch, resposta):
+    import httpx
+    from src.shared import ifood_mcp as M
+    postou = []
+    real = M.ClienteMCP.__init__
+
+    def init(self, token, url=M.GATEWAY, http=None, **kw):
+        real(self, token, url, **kw, http=httpx.Client(transport=httpx.MockTransport(
+            lambda req: postou.append(req) or resposta(req))))
+    monkeypatch.setattr(M.ClienteMCP, '__init__', init)
+    monkeypatch.setattr(M, '_freio', {'proxima': 0.0, 'bloqueado_ate': 0.0})
+    return postou
+
+
+def _armazem_logado():
+    import time
+    return {'tok:1': {'access_token': 'tok-abc', 'refresh_token': 'r', 'expira_em': time.time() + 3600}}
+
+
+def test_ip_barrado_refaz_a_chamada_pela_ponte_e_aposenta_o_container(monkeypatch):
+    import httpx
+    from src.bot.contexto import chamador_real
+    from src.shared import ifood_mcp as M
+    postou = _cliente_que_responde(monkeypatch, lambda req: httpx.Response(403, text='<HTML>Access Denied</HTML>'))
+    aposentou = []
+    monkeypatch.setattr(M, 'APOSENTAR_SE_BARRADO', True)
+    monkeypatch.setattr(M, '_aposentar_container', lambda: aposentou.append(1))
+    pela_ponte = []
+
+    def ponte(token, ferramenta, args):
+        pela_ponte.append((token, ferramenta, args))
+        return {'results': ['da outra máquina']}
+    armazem = _armazem_logado()
+    r = chamador_real(armazem, '1', ponte=ponte)('searchOffers', query='pão', pageSize=5)
+    assert r == {'results': ['da outra máquina']}
+    assert pela_ponte == [('tok-abc', 'searchOffers', {'query': 'pão', 'pageSize': 5})]
+    assert aposentou and postou                      # tentou daqui, viu o 403, se aposentou e foi pela ponte
+    # 2ª chamada: o freio local já sabe que este IP está barrado: nem bate no iFood, vai direto pela ponte
+    n = len(postou)
+    chamador_real(armazem, '1', ponte=ponte)('getItem', itemId='x')
+    assert len(postou) == n and pela_ponte[-1][1] == 'getItem'
+
+
+def test_erro_de_negocio_e_sem_a_flag_nao_mexem_na_ponte_nem_aposentam(monkeypatch):
+    import httpx
+    from src.bot.contexto import chamador_real
+    from src.shared import ifood_mcp as M
+    _cliente_que_responde(monkeypatch, lambda req: httpx.Response(
+        200, json={'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text':
+                   '{"error": {"code": "ITEM_NOT_AVAILABLE", "message": "esgotou", "userFriendlyMessage": "Acabou."}}'}]}}))
+    with pytest.raises(M.ErroMCP) as e:
+        chamador_real(_armazem_logado(), '1', ponte=lambda *a: pytest.fail('não era pra ir pela ponte'))('getItem', itemId='x')
+    assert 'ITEM_NOT_AVAILABLE' in str(e.value.codigo)
+    # o container do webhook (flag desligada) nunca se aposenta, mesmo vendo o 403
+    aposentou = []
+    monkeypatch.setattr(M, 'APOSENTAR_SE_BARRADO', False)
+    from modal import experimental
+    monkeypatch.setattr(experimental, 'stop_fetching_inputs', lambda: aposentou.append(1), raising=False)
+    M._aposentar_container()
+    assert not aposentou
+
+
+def test_ponte_barrada_tambem_sobe_o_erro_e_com_modo_palco_vai_pro_mock(monkeypatch):
+    import httpx
+    from src.bot.contexto import chamador_real, com_reserva
+    from src.shared import ifood_mcp as M
+    _cliente_que_responde(monkeypatch, lambda req: httpx.Response(403, text='<HTML>Access Denied</HTML>'))
+    monkeypatch.setattr(M, '_aposentar_container', lambda: None)
+
+    def ponte_barrada(token, ferramenta, args):
+        raise M.ErroMCP('HTTP_403', 'Access Denied na ponte também')
+    real = chamador_real(_armazem_logado(), '1', ponte=ponte_barrada)
+    with pytest.raises(M.ErroMCP):
+        real('getUser')
+    estado = Armazem()
+    assert com_reserva(estado, real, lambda f, **a: {'mock': f})('getUser') == {'mock': 'getUser'}
+    assert estado['cfg:mock'] is True

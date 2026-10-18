@@ -315,25 +315,29 @@ def test_ritmo_espaca_as_chamadas(monkeypatch):
     assert len(esperas) == 3 and all(s > 0 for s in esperas)
 
 
-def test_disjuntor_e_compartilhado_entre_containers(monkeypatch):
-    """Um container viu o 403 do Akamai: o armazém avisa e o outro nem chega a chamar."""
+def test_bloqueio_visto_por_outro_container_nao_para_este(monkeypatch):
+    """ops-ifood-reroll: o Akamai barra por IP e cada container do Modal tem o seu. O carimbo no armazém é só
+    informativo: este container, com IP bom, continua chamando o iFood normalmente."""
     import time
     import httpx
-    import pytest
     from src.bot.contexto import chamador_real
     from src.shared import ifood_mcp as M
     armazem = {'tok:1': {'access_token': 'a', 'refresh_token': 'r', 'expira_em': time.time() + 3600},
                'ifood_bloqueado_ate': time.time() + 120}
+    monkeypatch.setattr(M, '_freio', {'proxima': 0.0, 'bloqueado_ate': 0.0})
     postou = []
     real = M.ClienteMCP.__init__
 
+    def responder(req):  # JSON-RPC de verdade: initialize, notificação e o tools/call com o getUser
+        postou.append(req)
+        return httpx.Response(200, json={'jsonrpc': '2.0', 'id': 1, 'result': {'protocolVersion': '2025-06-18', 'content': [
+            {'type': 'text', 'text': '{"success": true, "data": {"fullName": "Teste"}}'}]}})
+
     def init(self, token, url=M.GATEWAY, http=None, **kw):
-        real(self, token, url, **kw, http=httpx.Client(transport=httpx.MockTransport(
-            lambda req: postou.append(1) or httpx.Response(200, json={}))))
+        real(self, token, url, **kw, http=httpx.Client(transport=httpx.MockTransport(responder)))
     monkeypatch.setattr(M.ClienteMCP, '__init__', init)
-    with pytest.raises(M.ErroMCP) as e:
-        chamador_real(armazem, '1')('getUser')
-    assert 'pausa' in str(e.value) and not postou
+    r = chamador_real(armazem, '1')('getUser')
+    assert postou and r.get('data', {}).get('fullName') == 'Teste'   # chamou mesmo com o carimbo de outro container no armazém
 
 
 def test_bloqueio_visto_aqui_vai_pro_armazem(monkeypatch):
@@ -349,9 +353,10 @@ def test_bloqueio_visto_aqui_vai_pro_armazem(monkeypatch):
         real(self, token, url, **kw, http=httpx.Client(transport=httpx.MockTransport(
             lambda req: httpx.Response(403, text='Access Denied'))))
     monkeypatch.setattr(M.ClienteMCP, '__init__', init)
+    monkeypatch.setattr(M, '_freio', {'proxima': 0.0, 'bloqueado_ate': 0.0})
     with pytest.raises(M.ErroMCP):
-        chamador_real(armazem, '1')('getUser')
-    assert armazem['ifood_bloqueado_ate'] > time.time() + 200
+        chamador_real(armazem, '1')('getUser')   # sem ponte: o erro sobe
+    assert armazem['ifood_bloqueado_ate'] > time.time() + 200   # carimbo informativo (scripts/modo.py)
 
 
 def test_interruptor_do_modo_demo_vale_sem_deploy(monkeypatch):

@@ -128,6 +128,11 @@ def _resultado(res):
 #    enquanto está barrado é o que estica o bloqueio). 403 nunca entra em retry.
 INTERVALO_MIN = 0.35
 PAUSA_BLOQUEIO = 300
+# ops-ifood-reroll (18/10): o bloqueio do Akamai é por IP DE SAÍDA, e o Modal tem vários (8 containers em 5 IPs,
+# 1 barrado). Então o freio é só deste container, e o container barrado se aposenta: para de pegar mensagens
+# novas e o Modal levanta outro, quase sempre em outra máquina. Só os containers do bot ligam a flag; o do
+# webhook nunca (src/bot/contexto.py liga em contexto_producao, src/app.py na ponte_mcp).
+APOSENTAR_SE_BARRADO = False
 _FREIO_LOCK = threading.Lock()
 _freio = {'proxima': 0.0, 'bloqueado_ate': 0.0}
 
@@ -148,7 +153,29 @@ def _esperar_vez():
 def _ver_bloqueio(r):
     if r.status_code == 403 and 'Access Denied' in r.text:
         _freio['bloqueado_ate'] = time.time() + PAUSA_BLOQUEIO
-        print(f'iFood (Akamai) barrou: sem chamadas por {PAUSA_BLOQUEIO}s')
+        print(f'iFood (Akamai) barrou o IP deste container: sem chamadas daqui por {PAUSA_BLOQUEIO}s')
+        _aposentar_container()
+
+
+def bloqueio_akamai(e):
+    """É o firewall do iFood barrando ESTE IP (403 Access Denied, ou o freio local dele)? Aí a chamada vale ser
+    refeita de outro container (ponte); erro de negócio, token vencido e 5xx não."""
+    return (isinstance(e, ErroMCP) and not isinstance(e, SemAutorizacao) and str(e.codigo) == 'HTTP_403'
+            and ('Access Denied' in str(e.mensagem) or 'barrou' in str(e.mensagem)))
+
+
+def _aposentar_container():
+    """Para de pegar mensagens novas (a atual termina) pro Modal levantar outro container, em outro IP. A chamada
+    é gRPC no loop interno do Modal: tem que ir pelo synchronize_api deles, não por asyncio.run."""
+    if not APOSENTAR_SE_BARRADO:
+        return
+    try:
+        from modal import experimental
+        from modal._utils.async_utils import synchronize_api
+        synchronize_api(experimental.stop_fetching_inputs)()
+        print('container aposentado: não pega mais mensagem nova, o Modal levanta outro (outro IP)')
+    except Exception as e:  # noqa: BLE001 - fora do Modal (testes) ou API mudou: segue só com o freio local
+        print(f'aposentar container falhou, segue só com o freio local: {e!r:.160}')
 
 
 _SESSOES = {}  # hash do token -> (Mcp-Session-Id, quando): evita initialize a cada chamada

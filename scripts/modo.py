@@ -40,4 +40,5 @@ def main(mock: str = '', rapido: str = '', fechadas: str = '', palco: str = '', 
           + (' (entrou sozinho: o iFood caiu)' if estado.get('cfg:mock') and motivo.get('auto') else ''))
     print(f'modo palco (iFood caiu -> mock sozinho): {"ARMADO" if estado.get("cfg:reserva_auto") is True else "desligado"}')
     print(f'tempo rápido (recorrência em 1 min): {"LIGADO" if estado.get("cfg:demo_rapido") else "desligado"}')
-    print(f'disjuntor do iFood: {"pausado por mais %ds" % barrado if barrado > 0 else "liberado"}')
+    print('último container barrado pelo iFood: ' + ('há %ds (só informativo: cada container tem o seu IP e o seu freio, '
+          'e o barrado se aposenta sozinho)' % (300 - barrado) if barrado > 0 else 'nenhum nos últimos 5 min'))

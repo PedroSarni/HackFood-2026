@@ -193,6 +193,24 @@ def acompanhar_pedido(wa_id: str, pedido_id: str):
     acompanhar(contexto_producao(estado, WhatsApp(), wa_id, origem='rastreio'), wa_id, pedido_id)
 
 
+@app.function(image=imagem, secrets=segredos, timeout=90, scaledown_window=30, max_containers=10)
+def ponte_mcp(token: str, ferramenta: str, args: dict):
+    """ops-ifood-reroll (18/10): o Akamai do iFood bloqueia por IP de saída e o Modal tem vários (8 containers
+    caíram em 5 IPs, 1 barrado). Quando o IP do container da conversa está barrado, a chamada é refeita daqui, outro
+    container, quase sempre em outra máquina. Barrado aqui também: este se aposenta e o próximo nasce em outro lugar.
+    Vive pouco (scaledown 30 s) de propósito, pra não ficar preso num IP ruim. O erro volta por valor."""
+    from src.shared import ifood_mcp
+    ifood_mcp.APOSENTAR_SE_BARRADO = True
+    try:
+        resultado = ifood_mcp.ClienteMCP(token, prazo=12, tentativas=1).chamar(ferramenta, **args)
+        return {'ok': True, 'resultado': resultado}
+    except ifood_mcp.ErroMCP as e:
+        print(f'ponte: {ferramenta} falhou aqui também: {e!r:.160}')
+        return {'ok': False, 'auth': isinstance(e, ifood_mcp.SemAutorizacao), 'codigo': e.codigo,
+                'mensagem': str(e.mensagem)[:300], 'tentar_de_novo': e.tentar_de_novo, 'para_usuario': e.para_usuario,
+                'bruto': e.bruto if isinstance(e.bruto, (dict, list)) else None}
+
+
 @app.function(image=imagem, secrets=segredos, volumes=VOLUMES, timeout=120)
 def ferramentas_reais(wa_id: str):
     """Diagnóstico: tools/list do gateway real com o token de quem já entrou. A doc não traz

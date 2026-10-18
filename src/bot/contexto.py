@@ -177,7 +177,7 @@ def com_reserva(estado, real, reserva):
     return chamar
 
 
-def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2):
+def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2, ponte=None):
     """Função chamar(tool, **args) com o token da pessoa, renovando quando precisa.
     Token recusado no meio do caminho: renova uma vez e tenta de novo."""
     cid, segredo = _cfg('IFOOD_CLIENT_ID'), _cfg('IFOOD_CLIENT_SECRET')
@@ -201,14 +201,6 @@ def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2):
         return tok
 
     def chamar(ferramenta, **args):
-        # disjuntor COMPARTILHADO: se qualquer container viu o firewall do iFood barrar, todos param
-        # (cada container tem o seu IP e o seu freio; sem isso os outros seguiam batendo na porta)
-        try:
-            barrado_ate = float(armazem.get('ifood_bloqueado_ate') or 0)
-        except Exception:  # noqa: BLE001
-            barrado_ate = 0
-        if barrado_ate > ifood_mcp._freio['bloqueado_ate']:
-            ifood_mcp._freio['bloqueado_ate'] = barrado_ate
         tok = tokens_validos()
         try:
             try:
@@ -218,11 +210,24 @@ def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2):
                 tok = tokens_validos(forcar=True)
                 return ifood_mcp.ClienteMCP(tok['access_token'], prazo=prazo, tentativas=tentativas).chamar(
                     ferramenta, **args)
-        except ifood_mcp.ErroMCP:
-            local = ifood_mcp._freio['bloqueado_ate']
-            if local > barrado_ate:
-                armazem['ifood_bloqueado_ate'] = local
-            raise
+        except ifood_mcp.ErroMCP as e:
+            if not ifood_mcp.bloqueio_akamai(e):
+                raise
+            # ops-ifood-reroll (18/10): o Akamai barra por IP de saída e o Modal tem vários. O freio é só deste
+            # container (ele já se aposentou em _ver_bloqueio); os outros seguem. A chamada vai pela ponte, outro
+            # container em outra máquina. O carimbo no armazém é só informativo (scripts/modo.py mostra).
+            try:
+                armazem['ifood_bloqueado_ate'] = ifood_mcp._freio['bloqueado_ate']
+            except Exception:  # noqa: BLE001
+                pass
+            if not ponte:
+                raise
+            print(f'MCP {wa_id}: o IP deste container está barrado, {ferramenta} vai pela ponte')
+            try:
+                return ponte(tok['access_token'], ferramenta, args)
+            except ifood_mcp.SemAutorizacao:
+                tok = tokens_validos(forcar=True)
+                return ponte(tok['access_token'], ferramenta, args)
 
     return chamar
 
@@ -251,13 +256,25 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
     diario = painel.diario_producao()
     wpp = painel.EspiaoWhatsApp(wpp, diario, origem)
     rec = Recorrencias(modal.Dict.from_name('hackfood-recorrencias', create_if_missing=True))
+    ifood_mcp.APOSENTAR_SE_BARRADO = True  # container da conversa (nunca o do webhook) pode se aposentar se o IP for barrado
+
+    def ponte(token, ferramenta, args):
+        """A chamada refeita de outra máquina do Modal (outro IP de saída), ver ponte_mcp em src/app.py.
+        O erro volta por valor: exceção nossa não atravessa a fronteira do Modal."""
+        r = modal.Function.from_name(modulo_app.APP, 'ponte_mcp').remote(token, ferramenta, args)
+        if r.get('ok'):
+            return r['resultado']
+        classe = ifood_mcp.SemAutorizacao if r.get('auth') else ifood_mcp.ErroMCP
+        raise classe(r.get('codigo') or 'PONTE', r.get('mensagem') or '', tentar_de_novo=bool(r.get('tentar_de_novo')),
+                     para_usuario=r.get('para_usuario') or '', bruto=r.get('bruto'))
+
     def chamador(wid):  # decide a cada uso: o interruptor do modo demo vale sem deploy
         mock = McpFake(armazem=estado, chave=f'mock:{wid}').chamar
         if modo_mock(estado):
             return painel.espiar_mcp(mock, diario, wid)
         if not reserva_armada(estado):
-            return painel.espiar_mcp(chamador_real(estado, wid), diario, wid)
-        real = chamador_real(estado, wid, prazo=PRAZO_COM_RESERVA, tentativas=1)
+            return painel.espiar_mcp(chamador_real(estado, wid, ponte=ponte), diario, wid)
+        real = chamador_real(estado, wid, prazo=PRAZO_COM_RESERVA, tentativas=1, ponte=ponte)
         return painel.espiar_mcp(com_reserva(estado, real, mock), diario, wid)
 
     def rastrear(wid, pedido_id):
