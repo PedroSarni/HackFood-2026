@@ -1,7 +1,7 @@
-# src/: bot de WhatsApp que faz pedidos no iFood (EM CONSTRUÇÃO)
+# src/: bot de WhatsApp que faz pedidos no iFood (NO AR)
 
-> 🚧 **Ainda em construção pelo Fabio (claim `bot-ifood-agent`).** O que está marcado como
-> pronto já roda; o resto está sendo escrito e testado agora. Antes de mexer aqui, combine no
+> ✅ **No ar e com o pedido completo testado** (claim `bot-ifood-agent`, do Fabio). OAuth do iFood
+> verificado de ponta a ponta; rastreio e lembrete funcionando. Antes de mexer aqui, combine no
 > claim pra não duplicar.
 
 Python no [Modal](https://modal.com), reaproveitando o setup do handwrite_bot (número da Meta,
@@ -31,12 +31,12 @@ WhatsApp → POST /whatsapp (webhook, responde 200 na hora)
 | Cliente WhatsApp (texto, botões, lista, link, foto, "digitando...") | `shared/whatsapp.py` | ✅ pronto |
 | Gemini com JSON garantido + modelo reserva | `shared/llm.py` | ✅ pronto |
 | Junta rajada de mensagens (idoso manda 5 mensagens seguidas) | `shared/buffer.py` | ✅ pronto |
-| Cliente MCP (JSON-RPC, sessão, 3 formatos de erro) + OAuth PKCE | `shared/ifood_mcp.py` | ✅ pronto, falta testar com credencial real |
+| Cliente MCP (JSON-RPC, sessão, 3 formatos de erro) + OAuth PKCE | `shared/ifood_mcp.py` | ✅ pronto, OAuth verificado de ponta a ponta com credencial real |
 | App Modal: webhook, login do iFood, páginas públicas | `app.py`, `web/` | ✅ no ar (o número já entrega no `/whatsapp`, via `scripts/virar_webhook.py`) |
-| Fluxo da conversa (login, endereço, busca com 3 cards, "Mais opções", opções do item, carrinho, entrega, pagamento, cupom, CPF, resumo, confirmação) | `bot/fluxo.py` | 🚧 escrito, em teste |
-| Tradutor MCP ↔ fluxo (formatos da doc do portal) | `bot/ifood.py` | 🚧 escrito, em teste |
-| MCP falso pra demo/teste sem credencial | `shared/mcp_fake.py` | ✅ pronto, formato igual ao da doc (pedido completo roda nele; liga com `IFOOD_MOCK=1`) |
-| Rastreio (segue agentHints) e lembretes de recorrência | `bot/rastreio.py`, `bot/recorrencia.py` | 🚧 escrito, em teste |
+| Fluxo da conversa (login, endereço, busca com 3 cards, "Mais opções", opções do item, carrinho, entrega, pagamento, cupom, CPF, resumo, confirmação) | `bot/fluxo.py` | ✅ pronto, pedido completo testado |
+| Tradutor MCP ↔ fluxo (formatos da doc do portal) | `bot/ifood.py` | ✅ pronto, pedido completo testado |
+| MCP falso pra demo/teste sem credencial | `shared/mcp_fake.py` | ✅ pronto, formato igual ao da doc (pedido completo roda nele; liga com `IFOOD_MOCK=1` ou `scripts/modo.py --mock on`) |
+| Rastreio (segue agentHints) e lembretes de recorrência | `bot/rastreio.py`, `bot/recorrencia.py` | ✅ funcionando |
 | Ordem de prioridade dos itens | `bot/ranking.py` | ⏳ esperando a regra do time |
 
 ## Decisões que valem saber

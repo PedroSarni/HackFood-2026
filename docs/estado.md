@@ -1,7 +1,7 @@
 # Estado do projeto
 
 > Atualizar a cada ~1h ou depois de entrega importante. Quem terminou o trabalho atualiza.
-> Última atualização: 18/10 02h20 por Davi
+> Última atualização: 18/10 05h10 por Davi
 
 ## Ideia escolhida
 Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital): botões sempre, 3 opções por vez com Mais opções, texto, áudio e foto, várias mensagens seguidas, e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência, usando o MCP do iFood como agente externo. Pedido em grupo (kit pra dividir com os amigos) e foto vira pedido já estão no bot (e821eef), assim como a resposta em áudio (51ef4ff) (item B2).
@@ -28,6 +28,9 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - B4: aviso de botão antigo não empilha mais (53e8466)
 - Dash de uso do MCP e rastro dos agentes de IA (Davi, claim `dash-agentes-mcp`, done; 051ea08 a 2a348f7)
 - Dash de controle dos agentes: crachá, interruptor e modelo por agente (Fabio, claim `dash-agents-control`, done)
+- 2º agente "Compras pelo WhatsApp" (Fabio, criado às ~16h05) APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
+- Analista Sofia: lê a página do dash e diz qual time mexe no quê (Fabio, 9626e97)
+- Botão de insights com IA no dash, por time do iFood (Fabio, claim `dash-ai-insights`, done; 054d7d2)
 
 ## No ar agora (18/10 02h20) — MOCK LIGADO
 - Mock ligado de novo às ~02h00 (Fabio, `scripts/modo.py --mock on`, sem deploy); às ~01h45 ele tinha voltado ao iFood real.
@@ -47,7 +50,6 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 
 ## Em andamento
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
-- Fabio: 2º agente "Compras pelo WhatsApp" (criado às ~16h05) já APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
 - Painel com seletor dados reais ou demonstração (aad024d); diário de prompts em `docs/prompts/` (regra do Fabio, 6bbeb88)
 - Claim `docs-vivos` (Davi) segue ativo; `bot-ifood-agent` (Fabio) segue ativo
 - Teste manual da noite (QA): ver H5 a H12

@@ -212,3 +212,21 @@ do modo [...] 4. 'Em andamento' [...] 5. Lista do projeto: não apague nada. Mar
 **Resposta:** estado.md atualizado (428 testes, mock ligado às ~02h00, deploys de ~01h31 e ~02h30, H2 e H6 [x], H5 a
 H12 acrescentados). Divergências com o repo: B1/B2 da lista são outros itens (ranking e decisão de grupo/áudio), então
 não marquei; os bugs B1/B2/B4 estão em "Pronto". B2 e B4 sem deploy comprovado.
+
+## 2026-10-18 05:10 — varredura de lixo e docs alinhados ao que foi provado
+
+**Prompts:**
+- "Faça uma varredura de LIXO: só o que realmente sobrou para trás. Se não achar, diga 'nada encontrado' e pare.
+  [...] FASE 1: SÓ LISTAR [...] 1. Arquivos rastreados que não deveriam estar no git [...] 7. Segredos ou dados
+  pessoais [...] Mostre a lista numerada no chat e PARE. [...] FASE 2: só depois da minha resposta [...]"
+- "Fase 2, aprovado só isto (nada foi aprovado para apagar): itens 6, 7 e 11 [...] Item 6: em src/README.md,
+  corrija só o cabeçalho e a tabela de status [...] Cite scripts/modo.py ao lado de IFOOD_MOCK=1, também em
+  docs/como-funciona.md:397 [...] Item 7: em docs/estado.md, ajuste 'Em andamento' [...] e acrescente as entregas
+  das 02h20 em diante (dash-ai-insights, analista) [...] Item 11: remova a linha de docs/prompts/fabio.md:208 com o
+  endereço residencial. Não reescreva o histórico do git. [...] Um commit: 'docs: alinha README e estado ao que foi
+  provado' [...]"
+
+**Resposta:** Varredura listou 11 itens no chat (sem arquivo rastreado indevido, sem chave nem token no repo nem no
+histórico; CPFs e telefones só de exemplo). Nada apagado. Aplicados só os itens 6, 7 e 11: status do src/README.md e
+modo demo com `scripts/modo.py`, 2º agente movido pra "Pronto" e Sofia/insights (9626e97, 054d7d2) no estado.md, linha
+do print com endereço removida do fabio.md (continua no histórico do git). 440 passando. Sem deploy.

@@ -205,8 +205,6 @@ com o Gemini de verdade nas duas frases. O mock ganhou uma cafeteria.
 
 ## 2026-10-17 23:40 — endereço e complemento falados viravam a frase inteira; chave nova do Gemini
 
-**Prompt:** [print: "Pode mandar pra minha casa, que é na Rua Adolfo Catani, 676" virou o nome da rua e "Eu moro no apartamento quatorze." virou o complemento] ele ta literalmente transcrevendo meu audio pro complemento do app, mas as vezes nem é isso, olha esse exemplo / acho que o gemini estourou cadastre a nova chave: [key do Gemini]
-
 **Resposta:** O atalho sem IA (frase com "rua" ou "apartamento") mandava a frase inteira. Agora sai só o dado: `so_endereco` corta antes do logradouro e `so_complemento` monta "Apto 14", "Bloco B, Apto 32", "2º andar" (número por extenso vira dígito). Key nova no secret `hackathon-gemini`; testando, o 3.1-flash-lite (1º da fila) estourava 6 s e o 3.5-lite responde em ~1,2 s, então o 3.5 foi pra frente.
 
 ## 2026-10-17 23:55 — OpenRouter de quebra-galho quando o Gemini estoura
