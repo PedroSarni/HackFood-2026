@@ -134,3 +134,10 @@ Implementação pendente da publicação obrigatória do claim (§1.2 de AGENTS.
 **Resposta:** O push voltou a falhar por falta de autenticação. Interpretei a resposta à pergunta anterior como autorização para continuar com commits locais e informei essa interpretação antes de editar.
 Centralizei cálculos de vendas diárias, resultados, clientes, IA e financeiro em `metrics`, reutilizados pelas telas e pelo relatório; 16 testes da interface e métricas passaram.
 Reestruturação e verificação visual do PDF em andamento; envio dos commits permanece pendente.
+
+## 2026-10-17 21:59 — continuar a revisão do relatório
+
+**Prompt:** continua o que você estava fazendo
+
+**Resposta:** Continuei a reestruturação do PDF: visão geral, conversão, follow-ups e clientes agregados, rankings de mercado e financeiro/IA, sem registros individuais.
+Preservei fonte, filtros, data e período anterior da tela; seis testes do PDF passaram, incluindo recorte vazio, valores filtrados e paginação de rankings. Revisão visual e verificação final em andamento.

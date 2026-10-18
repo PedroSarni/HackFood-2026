@@ -1,6 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
-import { REFERENCE_DATE, STATUSES, dateKey, dateTime, groupBy, isSale, metrics, money, number, percent, ratio } from './data.js';
+import { REFERENCE_DATE, dateKey, groupBy, metrics, money, number, percent, ratio } from './data.js';
 
 const COLORS = {
   red: [234, 29, 44], ink: [48, 48, 57], muted: [112, 112, 124],
@@ -10,8 +9,8 @@ const MARGIN = 16;
 const WIDTH = 178;
 const pdfText = value => String(value).replace(/[\u00a0\u202f]/g, ' ').replace(/[\u2010-\u2015]/g, '-');
 
-export function reportContext(filters, advanced) {
-  const end = new Date(`${REFERENCE_DATE}T12:00:00-03:00`);
+export function reportContext(filters, advanced, referenceDate = REFERENCE_DATE) {
+  const end = new Date(`${referenceDate}T12:00:00-03:00`);
   const start = new Date(end.getTime() - (Number(filters.period || 30) - 1) * 86400000);
   const format = d => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   return {
@@ -25,15 +24,17 @@ export function reportContext(filters, advanced) {
 }
 
 /** Gera o documento a partir do mesmo recorte que alimenta os KPIs do site. */
-export function createAnalyticsPdf({ rows, filters, advanced = false, generatedAt = new Date(), logo }) {
+export function createAnalyticsPdf({ rows, previous = [], filters, advanced = false, source, referenceDate = REFERENCE_DATE, generatedAt = new Date(), logo }) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
-  const data = metrics(rows);
-  const context = reportContext(filters, advanced);
+  const data = metrics(rows, { period: filters.period || 30, referenceDate });
+  const old = metrics(previous);
+  const sourceLabel = source === 'demo' || (!source && rows.length > 0 && rows.every(s => s.demo)) ? 'Demonstração' : 'Dados reais';
+  const context = reportContext(filters, advanced, referenceDate);
   const headedPages = new Set();
   const generated = generatedAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
   const moneyText = value => pdfText(money(value));
 
-  doc.setProperties({ title: 'HackFood Analytics - Relatório do canal WhatsApp', author: 'HackFood Analytics', subject: 'Relatório demonstrativo do canal WhatsApp', keywords: 'HackFood, analytics, demonstração' });
+  doc.setProperties({ title: 'HackFood Analytics - Relatório do canal WhatsApp', author: 'HackFood Analytics', subject: `Indicadores do dashboard - ${sourceLabel}`, keywords: 'HackFood, analytics, indicadores' });
   doc.setCreationDate(generatedAt);
 
   const text = (value, x, y, size = 10, color = COLORS.ink, bold = false, options) => {
@@ -60,7 +61,7 @@ export function createAnalyticsPdf({ rows, filters, advanced = false, generatedA
     text('A N A L Y T I C S', logo ? 33 : 16, 24, 7, COLORS.muted);
     doc.setFillColor(...COLORS.blush);
     doc.roundedRect(151, 14, 43, 8, 2, 2, 'F');
-    text('DADOS SIMULADOS', 172.5, 19.3, 8, COLORS.red, true, { align: 'center' });
+    text(sourceLabel === 'Demonstração' ? 'DADOS SIMULADOS' : 'DADOS REAIS', 172.5, 19.3, 8, COLORS.red, true, { align: 'center' });
     doc.setDrawColor(...COLORS.line);
     doc.line(16, 31, 194, 31);
   };
@@ -70,22 +71,46 @@ export function createAnalyticsPdf({ rows, filters, advanced = false, generatedA
     text(title, MARGIN, 43, 18, COLORS.ink, true);
     text(`Período: ${context.period}`, MARGIN, 50, 9, COLORS.muted);
   };
-  const table = ({ head, body, startY, columnStyles, fontSize = 9 }) => {
-    autoTable(doc, {
-      startY, head: [head], body,
-      margin: { top: 38, bottom: 22, left: MARGIN, right: MARGIN },
-      theme: 'grid', tableWidth: WIDTH,
-      styles: { font: 'helvetica', fontSize, textColor: COLORS.ink, lineColor: COLORS.line, lineWidth: .1, cellPadding: 3, overflow: 'linebreak', valign: 'middle' },
-      headStyles: { fillColor: COLORS.red, textColor: [255,255,255], fontStyle: 'bold', lineColor: COLORS.red },
-      alternateRowStyles: { fillColor: COLORS.light },
-      columnStyles, rowPageBreak: 'avoid', showHead: 'everyPage',
-      didDrawPage: header,
+  // Componentes de desenho específicos deste documento; os números vêm de data.js.
+  const cardsAt = (items, top, columns = 2) => {
+    const gap = 5, width = (WIDTH - gap * (columns - 1)) / columns;
+    items.forEach(([label, value], i) => {
+      const x = MARGIN + (i % columns) * (width + gap), y = top + Math.floor(i / columns) * 32;
+      doc.setFillColor(...COLORS.light); doc.roundedRect(x, y, width, 27, 2, 2, 'F');
+      text(label, x + 4, y + 7, 8, COLORS.muted);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+      const size = Math.min(16, 16 * (width - 8) / Math.max(width - 8, doc.getTextWidth(pdfText(value))));
+      text(value, x + 4, y + 20, size, COLORS.ink, true);
     });
-    return doc.lastAutoTable.finalY;
+  };
+  const bar = (label, count, total, y, color = COLORS.red) => {
+    text(label, MARGIN, y, 9);
+    text(`${number(count)} | ${percent(ratio(count, total))}`, 194, y, 9, COLORS.muted, false, { align: 'right' });
+    doc.setFillColor(...COLORS.light); doc.roundedRect(MARGIN, y + 3, WIDTH, 3, 1, 1, 'F');
+    if (count && total) { doc.setFillColor(...color); doc.rect(MARGIN, y + 3, WIDTH * count / total, 3, 'F'); }
+  };
+  const rankings = (field, title) => {
+    const groups = groupBy(rows, field);
+    // Mesma ordenação por GMV da tela. Paginar sem descartar grupos.
+    for (let start = 0; start < Math.max(1, groups.length); start += 8) {
+      newPage(title + (start ? ' (continuação)' : ''));
+      text('Mercado | compras confirmadas no mesmo recorte', MARGIN, 58, 9, COLORS.muted);
+      if (!groups.length) paragraph('Nenhum resultado neste recorte.', MARGIN, 74);
+      groups.slice(start, start + 8).forEach((g, i) => {
+        const y = 74 + i * 24;
+        doc.setFontSize(9);
+        const name = doc.splitTextToSize(pdfText(`${start + i + 1}. ${g.name}`), 120);
+        text(name.length > 1 ? [name[0], name[1].slice(0, 65)] : name, MARGIN, y, 9, COLORS.ink, true);
+        text(moneyText(g.gmv), 194, y, 10, COLORS.red, true, { align: 'right' });
+        text(`${number(g.orders)} pedidos | ${percent(g.conversion)} de conversão`, MARGIN, y + 10, 8, COLORS.muted);
+        doc.setFillColor(...COLORS.light); doc.rect(MARGIN, y + 13, WIDTH, 3, 'F');
+        if (g.gmv) { doc.setFillColor(...COLORS.red); doc.rect(MARGIN, y + 13, WIDTH * ratio(g.gmv, groups[0].gmv) / 100, 3, 'F'); }
+      });
+    }
   };
 
   header();
-  text('Relatório do canal WhatsApp', MARGIN, 45, 21, COLORS.ink, true);
+  text('Visão geral do canal WhatsApp', MARGIN, 45, 21, COLORS.ink, true);
   text(`Período: ${context.period}`, MARGIN, 54, 10, COLORS.muted);
   const filtersEnd = paragraph(context.filters, MARGIN, 62, WIDTH, 9);
   text(`Emitido em ${generated} | America/Sao_Paulo`, MARGIN, filtersEnd + 3, 8, COLORS.muted);
@@ -98,25 +123,27 @@ export function createAnalyticsPdf({ rows, filters, advanced = false, generatedA
     ['Carrinhos abandonados', number(data.abandoned)], ['Carrinhos recuperados', number(data.recovered)],
   ];
   cards.forEach(([label, value], index) => {
-    const x = MARGIN + index % 3 * 61, y = cardsTop + Math.floor(index / 3) * 29;
+    const x = MARGIN + index % 3 * 61, y = cardsTop + Math.floor(index / 3) * 33;
     doc.setFillColor(...(index === 0 ? COLORS.blush : COLORS.light));
-    doc.roundedRect(x, y, 56, 24, 2, 2, 'F');
+    doc.roundedRect(x, y, 56, 28, 2, 2, 'F');
     text(label, x + 4, y + 7, 8, COLORS.muted);
-    text(value, x + 4, y + 17, 16, index === 0 ? COLORS.red : COLORS.ink, true);
+    text(value, x + 4, y + 17, 14, index === 0 ? COLORS.red : COLORS.ink, true);
+    if (advanced) {
+      const key = ['gmv','orders','ticket','conversion','abandoned','recovered'][index];
+      const diff = old[key] ? (data[key] - old[key]) / old[key] * 100 : null;
+      text(diff === null ? 'Sem base de comparação' : `${diff >= 0 ? '+' : '-'}${percent(Math.abs(diff))} vs. anterior`, x + 4, y + 24, 7, COLORS.muted);
+    }
   });
 
-  const chartTop = cardsTop + 70;
+  const chartTop = cardsTop + 78;
   text('Evolução das vendas', MARGIN, chartTop, 12, COLORS.ink, true);
   const days = Number(filters.period || 30);
-  const last = new Date(`${REFERENCE_DATE}T12:00:00-03:00`);
+  const last = new Date(`${referenceDate}T12:00:00-03:00`);
   const dates = Array.from({ length: days }, (_, index) => new Date(last.getTime() - (days - 1 - index) * 86400000));
-  const totals = new Map();
-  for (const row of rows.filter(isSale)) {
-    const day = dateKey(row.startedAt);
-    totals.set(day, (totals.get(day) || 0) + row.amountCents);
-  }
-  const values = dates.map(date => (totals.get(dateKey(date)) || 0) / 100);
-  const max = Math.max(100, Math.ceil(Math.max(...values) / 100) * 100);
+  const values = data.dailySales.map(day => day.amountCents / 100);
+  const oldDate = dateKey(new Date(last.getTime() - days * 86400000));
+  const previousValues = metrics(previous, { period: days, referenceDate: oldDate }).dailySales.map(day => day.amountCents / 100);
+  const max = Math.max(100, Math.ceil(Math.max(...values, ...(advanced ? previousValues : [])) / 100) * 100);
   const chartX = 34, chartY = chartTop + 9, chartW = 160, chartH = 32;
   for (let i = 0; i < 3; i++) {
     const y = chartY + i * chartH / 2;
@@ -124,9 +151,14 @@ export function createAnalyticsPdf({ rows, filters, advanced = false, generatedA
     doc.line(chartX, y, chartX + chartW, y);
     text(`R$ ${number(max * (1 - i / 2))}`, 16, y + 1, 7, COLORS.muted);
   }
-  const points = values.map((value, index) => [chartX + (days === 1 ? .5 : index / (days - 1)) * chartW, chartY + chartH * (1 - value / max)]);
-  doc.setDrawColor(...COLORS.red); doc.setFillColor(...COLORS.red); doc.setLineWidth(.6);
-  points.forEach(([x,y], index) => { if (index) doc.line(...points[index - 1], x, y); else if (days === 1) doc.circle(x,y,1.2,'F'); });
+  const drawSeries = (series, color) => {
+    const points = series.map((value, index) => [chartX + (days === 1 ? .5 : index / (days - 1)) * chartW, chartY + chartH * (1 - value / max)]);
+    doc.setDrawColor(...color); doc.setFillColor(...color); doc.setLineWidth(.6);
+    points.forEach(([x,y], index) => { if (index) doc.line(...points[index - 1], x, y); else if (days === 1) doc.circle(x,y,1.2,'F'); });
+  };
+  if (advanced) drawSeries(previousValues, COLORS.muted);
+  drawSeries(values, COLORS.red);
+  text(advanced ? 'Vermelho: GMV atual | Cinza: período anterior' : 'GMV diário em R$', 194, chartTop, 7, COLORS.muted, false, { align: 'right' });
   const dateLabel = date => date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
   text(dateLabel(dates[0]), chartX, chartY + chartH + 6, 7, COLORS.muted);
   if (days > 1) text(dateLabel(last), 194, chartY + chartH + 6, 7, COLORS.muted, false, { align: 'right' });
@@ -141,36 +173,49 @@ export function createAnalyticsPdf({ rows, filters, advanced = false, generatedA
     if (stage.count) { doc.setFillColor(...COLORS.red); doc.rect(MARGIN, y + 3, WIDTH * stage.count / data.total, 3, 'F'); }
   });
 
-  newPage('Resultados e critérios');
-  text('Desempenho por restaurante', MARGIN, 63, 12, COLORS.ink, true);
-  const restaurants = groupBy(rows, 'restaurant');
-  let y = table({ startY: 68, head: ['Restaurante', 'Conversas', 'Pedidos', 'Conversão', 'GMV'], body: restaurants.length ? restaurants.map(g => [g.name, number(g.total), number(g.orders), percent(g.conversion), moneyText(g.gmv)]) : [['Nenhum resultado', '0', '0', '0%', moneyText(0)]], columnStyles: { 0: { cellWidth: 59 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', cellWidth: 33 } } });
-  text('Resultado das conversas', MARGIN, y + 13, 12, COLORS.ink, true);
-  y = table({ startY: y + 18, head: ['Status', 'Conversas', 'Participação'], body: Object.entries(STATUSES).map(([key, status]) => { const count = rows.filter(row => row.status === key).length; return [status.label, number(count), percent(ratio(count, rows.length))]; }), columnStyles: { 0: { cellWidth: 100 }, 1: { halign: 'right' }, 2: { halign: 'right' } } });
-  // Reservar uma seção de metodologia inteira, sem cortar texto em rodapés.
-  if (y > 217) { newPage('Como ler este relatório'); y = 51; }
-  text('Como ler os indicadores', MARGIN, y + 12, 12, COLORS.ink, true);
-  y = paragraph('GMV: soma das compras confirmadas e recuperadas, sem cancelamentos. Não representa lucro ou receita líquida. Ticket médio: GMV dividido pelos pedidos concluídos.', MARGIN, y + 19, WIDTH, 8.5);
-  y = paragraph('Conversão: sessões com compra confirmada divididas pelas sessões iniciadas no período. O funil conta sessões únicas que alcançaram cada etapa. Abandonados: carrinhos sem conclusão após 30 minutos, ainda não recuperados.', MARGIN, y + 3, WIDTH, 8.5);
-  paragraph(`${rows.length && rows.every(s => s.demo) ? 'Base simulada (demonstração).' : 'Dados do diário do bot no WhatsApp.'} Compras após follow-up indicam associação temporal, não causalidade. O relatório usa os filtros globais; pesquisa e filtros locais da tabela de Conversas não alteram este recorte.`, MARGIN, y + 3, WIDTH, 8.5);
+  newPage('Conversão e resultados');
+  text(advanced ? 'A jornada completa de compra' : 'Da conversa ao pedido', MARGIN, 64, 12, COLORS.ink, true);
+  const indices = advanced ? data.stages.map((_, i) => i) : [0,4,8];
+  indices.forEach((index, position) => {
+    const stage = data.stages[index], y = 75 + position * 13;
+    bar(stage.label, stage.count, data.total, y);
+    if (advanced && position > 0) {
+      const previousStage = data.stages[indices[position - 1]].count;
+      text(`${percent(ratio(stage.count, previousStage))} avançaram da etapa anterior | ${number(previousStage - stage.count)} não avançaram`, MARGIN, y + 9, 6.5, COLORS.muted);
+    }
+  });
+  const resultsY = advanced ? 214 : 124;
+  text('Resultado das conversas', MARGIN, resultsY, 12, COLORS.ink, true);
+  data.outcomes.forEach((item, i) => bar(item.label, item.count, data.total, resultsY + 10 + i * 12));
+  paragraph(`Abandono não recuperado: ${percent(data.abandonment)} dos ${number(data.carts)} carrinhos criados. Funil: sessões únicas que alcançaram cada etapa, sobre o início. Concluídas inclui compras recuperadas.`, MARGIN, advanced ? 272 : 190, WIDTH, 8);
 
-  newPage('Conversas do período');
-  paragraph('Identificadores pseudonimizados. Nomes, telefones e mensagens não são exportados. Valores do carrinho e compras confirmadas aparecem separadamente.', MARGIN, 58, WIDTH, 8.5);
-  const sorted = [...rows].sort((a,b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-  if (sorted.length) table({
-    startY: 71, fontSize: 7.5,
-    head: ['Conversa / cliente', 'Última interação', 'Status', 'Restaurante', 'Carrinho', 'Compra'],
-    body: sorted.map(s => [pdfText(`${s.id}\n${s.clientId}`), dateTime(s.updatedAt), STATUSES[s.status].label, s.restaurant, moneyText(s.amountCents), moneyText(isSale(s) ? s.amountCents : 0)]),
-    columnStyles: { 0: { cellWidth: 38 }, 1: { cellWidth: 28 }, 2: { cellWidth: 31 }, 3: { cellWidth: 33 }, 4: { cellWidth: 24, halign: 'right' }, 5: { cellWidth: 24, halign: 'right' } },
-  }); else {
-    doc.setFillColor(...COLORS.light); doc.roundedRect(MARGIN, 78, WIDTH, 28, 2, 2, 'F');
-    text('Nenhuma conversa nos filtros selecionados.', 105, 94, 11, COLORS.muted, false, { align: 'center' });
-  }
+  newPage('Follow-ups e clientes');
+  text('Retorno ao carrinho', MARGIN, 64, 12, COLORS.ink, true);
+  cardsAt([['Follow-ups registrados', number(data.recovered)], ['Compras após follow-up', number(data.recovered)], ['GMV recuperado', moneyText(data.recoveredGmv)], ['Recuperação de carrinhos', percent(data.recovery)]], 70);
+  paragraph('Mesma contagem do dashboard: follow-ups registrados correspondem às compras recuperadas. Não há amostra completa de envios nem grupo de controle; a associação temporal não comprova causalidade.', MARGIN, 139, WIDTH, 8.5);
+  text('Clientes no período', MARGIN, 163, 12, COLORS.ink, true);
+  cardsAt([['Clientes no período', number(data.clients)], ['Compradores recorrentes', number(data.recurring)], ['Taxa de recompra', percent(data.repurchase)]], 169, 3);
+  text('Perfil de compra', MARGIN, 211, 12, COLORS.ink, true);
+  bar('Recorrentes (2 ou mais compras)', data.recurring, data.clients, 223);
+  bar('Primeira compra', data.purchasing - data.recurring, data.clients, 237);
+  bar('Ainda sem compra', data.clients - data.purchasing, data.clients, 251);
+  paragraph('Taxa de recompra: compradores recorrentes / clientes com pelo menos uma compra no período.', MARGIN, 266, WIDTH, 8);
+
+  rankings('city', 'Vendas por cidade');
+  rankings('restaurant', 'Restaurantes em destaque');
+
+  newPage('Financeiro e inteligência');
+  cardsAt([['GMV do canal', moneyText(data.gmv)], ['Ticket médio', moneyText(data.ticket)], ['GMV recuperado', moneyText(data.recoveredGmv)], ['Valor em carrinhos abandonados', moneyText(data.abandonedValue)]], 64);
+  paragraph('GMV é o volume de compras confirmadas e recuperadas, sem cancelamentos; não representa lucro ou receita líquida. Receita atribuível ao iFood e custos de IA, WhatsApp e infraestrutura: não disponíveis. MRR: não se aplica à demonstração.', MARGIN, 133, WIDTH, 8.5);
+  text('Inteligência artificial', MARGIN, 161, 12, COLORS.ink, true);
+  cardsAt([['Conversas atendidas', number(data.total)], ['Resposta média', data.averageLatency === null ? '-' : `${data.averageLatency.toFixed(1)} s`], ['Primeira lista aceita', percent(data.acceptance)], ['Taxa de falhas', percent(data.failureRate)]], 168);
+  paragraph(`Primeira lista: ${number(data.accepted)} aceitações entre ${number(data.recommended)} sessões com recomendação; ${number(data.acceptedOrders)} compras confirmadas (${percent(data.firstListConversion)} das recomendações).`, MARGIN, 236, WIDTH, 8.5);
+  paragraph('Recorte dos filtros globais no instante da exportação. Pesquisa e filtros locais da tabela de Conversas não alteram os indicadores. O relatório reúne as análises agregadas das páginas do dashboard; não inclui registros individuais de clientes.', MARGIN, 253, WIDTH, 8.5);
 
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {
     doc.setPage(page); doc.setDrawColor(...COLORS.line); doc.setLineWidth(.2); doc.line(16, 280, 194, 280);
-    text('HackFood Analytics | Demonstração | America/Sao_Paulo', MARGIN, 286, 7, COLORS.muted);
+    text(`HackFood Analytics | ${sourceLabel} | America/Sao_Paulo`, MARGIN, 286, 7, COLORS.muted);
     text(`${page} / ${pages}`, 194, 286, 8, COLORS.muted, false, { align: 'right' });
   }
   return doc;
