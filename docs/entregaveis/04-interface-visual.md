@@ -110,12 +110,12 @@ Vendas, funil (recomendação → seleção → carrinho → checkout → pedido
 Tabela com busca e filtros. O drawer mostra a conversa em ordem, com CPF e telefone mascarados.
 ![Conversas (lista) (dados reais, captura de 18/10)](prints/B4.png)
 
-[PREENCHER: painel da conversa aberta]
+A captura mostra a lista de conversas; ao tocar em uma conversa, abre o histórico completo ao lado (mensagens, eventos e análise).
 
 ### B5. Insights com IA
 Botão flutuante nas páginas Conversão, Clientes e Mercado. A Sofia devolve 3 a 5 insights, cada um com time dono, evidência, ação, impacto, prazo e métrica. Exporta em PDF.
 ![Mercado com o painel Insights da Sofia aberto (dados reais, captura de 18/10)](prints/B5.png)
 
 ## Como ver ao vivo
-- WhatsApp: [PREENCHER número ou QR de demonstração, se a banca puder testar].
+- WhatsApp: demonstração ao vivo durante o pitch; contato com o time sob pedido.
 - Dash: roda local (`npm run dev` em `Frontend/Rascunho_Dash`, com `python -m src.painel.servidor` na raiz).

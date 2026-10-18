@@ -444,3 +444,11 @@ docs/entregaveis/slides/AiFood-slides.pdf [...] adicione somente esse arquivo ao
 o que vai entrar."
 
 **Resposta:** PDF movido com mv e commitado em `docs/entregaveis/slides/AiFood-slides.pdf`. Nenhum texto alterado.
+
+## 2026-10-18 13:15 — últimos [PREENCHER] fechados
+
+**Prompt:** "Fechamento dos últimos [PREENCHER] em entrega-unica.md e 04-interface-visual.md. [...] número ou QR:
+"demonstração ao vivo durante o pitch; contato com o time sob pedido" [...] B4: apague a linha [PREENCHER: painel da
+conversa aberta] e acrescente uma frase curta abaixo da imagem [...] rode grep e me liste o que sobrar."
+
+**Resposta:** Os dois [PREENCHER] trocados nos dois arquivos; grep de PREENCHER e [PRINT sem sobras.

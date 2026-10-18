@@ -213,12 +213,12 @@ Identidade: vermelho `#EA1D2C`, branco e cinza. Seletor de fonte no topo: **Dado
 **B4. Conversas.** Tabela com busca e filtros; o drawer mostra a conversa com CPF e telefone mascarados.
 ![Conversas (lista) (dados reais, captura de 18/10)](prints/B4.png)
 
-[PREENCHER: painel da conversa aberta]
+A captura mostra a lista de conversas; ao tocar em uma conversa, abre o histórico completo ao lado (mensagens, eventos e análise).
 
 **B5. Insights com IA.** Botão flutuante em Conversão, Clientes e Mercado; a Sofia devolve 3 a 5 insights (time dono, evidência, ação, impacto, prazo, métrica) e exporta em PDF.
 ![Mercado com o painel Insights da Sofia aberto (dados reais, captura de 18/10)](prints/B5.png)
 
-**Como ver ao vivo.** WhatsApp: [PREENCHER número ou QR de demonstração, se a banca puder testar]. Dash: roda local (`npm run dev` em `Frontend/Rascunho_Dash`, com `python -m src.painel.servidor` na raiz).
+**Como ver ao vivo.** WhatsApp: demonstração ao vivo durante o pitch; contato com o time sob pedido. Dash: roda local (`npm run dev` em `Frontend/Rascunho_Dash`, com `python -m src.painel.servidor` na raiz).
 
 ---
 
