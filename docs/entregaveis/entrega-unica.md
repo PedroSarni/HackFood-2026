@@ -199,19 +199,25 @@ Regras visuais: frases curtas, um emoji por ideia (🛒 pedido, 🏠 endereço, 
 Identidade: vermelho `#EA1D2C`, branco e cinza. Seletor de fonte no topo: **Dados reais** (diário do bot ao vivo) e **Demonstração** (conversas simuladas, sempre com esse rótulo). Menu: **Agentes → Uso do MCP → Dinheiro → Conversas**, e "Mais análises" (Conversão, Clientes, Mercado, Relatórios).
 
 **B1. Agentes.** Palco ao vivo (cada passo vira um recado entre cliente, Maestro, agente e iFood); time com crachá (Lia, Íris, Duda, Beto, Tungs, Vina, Otto; a Sofia fica fora do palco, no painel); ficha de cada agente com modelo, prompt, keys mascaradas e interruptor; rotinas automáticas (cutucada, carrinho esquecido, lembrete, rastreio).
-[PRINT B1]
+![Agentes: time e cards dos agentes (dados reais, captura de 18/10)](prints/B1.png)
+
+![Lia, aba System prompt (dados reais, captura de 18/10)](prints/B7.png)
 
 **B2. Uso do MCP.** Cada chamada ao iFood: tool, tempo, sucesso ou erro, e as tools da doc nunca chamadas.
-[PRINT B2]
+![Uso do MCP (dados reais, captura de 18/10)](prints/B2.png)
 
 **B3. Dinheiro e Conversão.** Vendas, funil (recomendação → seleção → carrinho → checkout → pedido → entrega), abandono e recuperação.
-[PRINT B3]
+![Dinheiro (dados reais, captura de 18/10)](prints/B3.png)
+
+![Conversão: funil de 10 etapas (dados reais, captura de 18/10)](prints/B6.png)
 
 **B4. Conversas.** Tabela com busca e filtros; o drawer mostra a conversa com CPF e telefone mascarados.
-[PRINT B4]
+![Conversas (lista) (dados reais, captura de 18/10)](prints/B4.png)
+
+[PREENCHER: painel da conversa aberta]
 
 **B5. Insights com IA.** Botão flutuante em Conversão, Clientes e Mercado; a Sofia devolve 3 a 5 insights (time dono, evidência, ação, impacto, prazo, métrica) e exporta em PDF.
-[PRINT B5]
+![Mercado com o painel Insights da Sofia aberto (dados reais, captura de 18/10)](prints/B5.png)
 
 **Como ver ao vivo.** WhatsApp: [PREENCHER número ou QR de demonstração, se a banca puder testar]. Dash: roda local (`npm run dev` em `Frontend/Rascunho_Dash`, com `python -m src.painel.servidor` na raiz).
 

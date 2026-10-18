@@ -372,3 +372,13 @@ reverta só essas menções [...] Commit "docs(entregaveis): nome AiFood" e push
 
 **Resposta:** Nome do produto nos entregáveis 01, 02 e 03 agora é "AiFood, compras pelo WhatsApp" (04 a 06 não tinham o
 nome antigo). "AiFood Agent" voltou a "HackFood Agent" em contexto-evento.md, estado.md e entrega-unica.md. Sem deploy.
+
+## 2026-10-18 11:10 — prints do dash nos entregáveis
+
+**Prompt:** "Os prints do dash já estão em docs/entregaveis/prints/ (B1.png a B9.png) [...] troque cada marcador
+[PRINT B1] ... [PRINT B5] pela imagem correspondente [...] B6, B7, B8 e B9 só onde o texto já fala de funil, system
+prompt, desempenho ou clientes [...] NÃO mexa nos A1 a A9 [...] Só substitua os marcadores. [...] liste (a), (b), (c)
+antes de commitar."
+
+**Resposta:** B1 a B5 substituídos no 04 e no entrega-unica.md; B7 entrou sob o B1 (texto fala de prompt) e B6 sob o
+B3 (texto fala de funil). B8 e B9 sem lugar natural. Nota [PREENCHER] sob o B4. A1 a A9 seguem pendentes.

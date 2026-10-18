@@ -86,23 +86,29 @@ Menu: **Agentes → Uso do MCP → Dinheiro → Conversas**, e "Mais análises" 
 - Time de agentes com crachá: Lia (intérprete), Íris (fotos), Duda (curadora), Beto (kits), Tungs (tutor), Vina (voz), Otto (ouvinte); Sofia (analista) trabalha só no dash.
 - Ficha de cada agente: modelo, prompt (com aviso de deploy pendente), keys mascaradas e interruptor.
 - Rotinas automáticas: cutucada, carrinho esquecido, lembrete de recompra e rastreio, com disparos e desfecho.
-[PRINT B1]
+![Agentes: time e cards dos agentes (dados reais, captura de 18/10)](prints/B1.png)
+
+![Lia, aba System prompt (dados reais, captura de 18/10)](prints/B7.png)
 
 ### B2. Uso do MCP
 Cada chamada ao iFood: tool, tempo, sucesso ou erro. Mostra onde o gateway falha.
-[PRINT B2]
+![Uso do MCP (dados reais, captura de 18/10)](prints/B2.png)
 
 ### B3. Dinheiro e Conversão
 Vendas, funil (recomendação → seleção → carrinho → checkout → pedido → entrega), abandono e recuperação.
-[PRINT B3]
+![Dinheiro (dados reais, captura de 18/10)](prints/B3.png)
+
+![Conversão: funil de 10 etapas (dados reais, captura de 18/10)](prints/B6.png)
 
 ### B4. Conversas
 Tabela com busca e filtros. O drawer mostra a conversa em ordem, com CPF e telefone mascarados.
-[PRINT B4]
+![Conversas (lista) (dados reais, captura de 18/10)](prints/B4.png)
+
+[PREENCHER: painel da conversa aberta]
 
 ### B5. Insights com IA
 Botão flutuante nas páginas Conversão, Clientes e Mercado. A Sofia devolve 3 a 5 insights, cada um com time dono, evidência, ação, impacto, prazo e métrica. Exporta em PDF.
-[PRINT B5]
+![Mercado com o painel Insights da Sofia aberto (dados reais, captura de 18/10)](prints/B5.png)
 
 ## Como ver ao vivo
 - WhatsApp: [PREENCHER número ou QR de demonstração, se a banca puder testar].
