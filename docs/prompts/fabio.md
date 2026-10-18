@@ -362,3 +362,13 @@ testes do dash passam e o build também. Commitei a seção "Status da conta" do
 reconferir o número na Graph API (só leitura): TIER_250, qualidade GREEN, sem Official Business Account. Corrigi
 o nome, que não está "não aprovado": é AVAILABLE_WITHOUT_REVIEW. O erro 141006 do template não foi retestado,
 porque exigiria enviar mensagem.
+
+## 2026-10-18 ~01h45 — bot que atende ligação e iFood real de volta
+
+**Prompt:** "mano, com muito cuidado, vamos analisar a possibilidade de montarmos um bot/agente que tria LIGACOES feitas por usuarios, temos essa possibilidade? apenas de uma olhada, fazendo isso, podmos ser banidos? nao podemos perder esse deploy no wpp. assim que me responder, rapidamente desligue o mock do wpp e ligue o acesso ao MCP do ifood."
+
+**Resposta:** A Calling API oficial da Meta existe e vale no Brasil, mas pede limite de 1–2 mil conversas/24h (o
+número está em TIER_250) e um servidor de voz WebRTC/SIP, que não cabe no Modal sem gambiarra. Nada foi ligado.
+Banimento não vem de usar a API oficial, vem de bloqueio e denúncia de usuário; o risco real é mexer nas
+configurações do número emprestado do handwrite. Mock desligado (`scripts/modo.py --mock off`, sem deploy): o bot
+volta ao MCP real do iFood na próxima mensagem. Disjuntor liberado; o "tempo rápido" segue LIGADO.
