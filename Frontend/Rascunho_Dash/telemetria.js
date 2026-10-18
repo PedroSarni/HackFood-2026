@@ -77,7 +77,7 @@ export function useTeam(source) {
   return { ...state, update };
 }
 
-export const LIVE_MS = 1200;
+export const LIVE_MS = 700;
 
 // Os passos mais recentes do time (sem texto de ninguém), pra animação. Na 1ª leitura pega só os
 // últimos poucos, pra não "reprisar" um minuto inteiro ao abrir a página.

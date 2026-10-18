@@ -163,7 +163,7 @@ function usePlayer(source) {
         const who = item.tipo === 'ia' ? item.agente : item.tipo === 'mcp' ? 'ifood' : 'cliente';
         setHistory(h => ({ ...h, [who]: [item, ...(h[who] || [])].slice(0, 6), todos: [item, ...(h.todos || [])].slice(0, 6) }));
       }
-      const wait = !item ? 400 : queue.current.length > 12 ? 280 : queue.current.length > 4 ? 650 : 1250;
+      const wait = !item ? 200 : queue.current.length > 8 ? 180 : queue.current.length > 2 ? 380 : 800;
       if (alive) timer = setTimeout(next, wait);
     };
     next();

@@ -48,6 +48,10 @@ class DictTravado(dict):
         super().__init__()
         self.trava = threading.Lock()
 
+    def get(self, chave, padrao=None):
+        with self.trava:
+            return super().get(chave, padrao)
+
     def update(self, *a, **kw):
         with self.trava:
             super().update(*a, **kw)
@@ -65,13 +69,32 @@ class DictTravado(dict):
 
 
 class FonteReal:
+    """Diário do bot. Listar o modal.Dict inteiro leva ~15 s daqui, então o caminho rápido lê só a chave
+    `recentes` (os últimos eventos, ~1 s) e a varredura completa roda em segundo plano a cada minuto,
+    pra não perder nada que tenha caído fora dos recentes."""
     nome = 'real'
+    VARREDURA = 60
 
     def __init__(self):
         self.dic = None
         self._armazem = None
         self.versao = object()
         self.estado = 'conectando'
+        self._cheia = {}
+        self._varrendo = False
+        self._ultima_varredura = 0.0
+        self._trava = threading.Lock()
+
+    def _varrer(self):
+        try:
+            tudo = {k: v for k, v in self.dic.items() if k.startswith('ev:')}
+            with self._trava:
+                self._cheia.update(tudo)
+        except Exception as e:  # noqa: BLE001 - o caminho rápido segue; tenta de novo na próxima
+            print(f'painel real: varredura falhou: {e!r}')
+        finally:
+            self._ultima_varredura = time.time()
+            self._varrendo = False
 
     def armazem(self):
         """O armazém do bot (hackfood-estado): onde o dash liga/desliga agentes e lê a ficha do ar."""
@@ -84,15 +107,18 @@ class FonteReal:
         if self.dic is None:
             import modal
             self.dic = modal.Dict.from_name(painel.NOME_DICT, create_if_missing=True)
-        versao = self.dic.get('versao')
+        if not self._ultima_varredura:      # 1ª carga: tudo de uma vez
+            self._varrer()
+        elif time.time() - self._ultima_varredura > self.VARREDURA and not self._varrendo:
+            self._varrendo = True
+            threading.Thread(target=self._varrer, daemon=True).start()
+        recentes = self.dic.get(painel.RECENTES) or {}
         self.estado = 'pronto'
-        if versao == self.versao:
-            return {}
-        self.versao = versao
-        if not vistos:  # 1ª carga: tudo de uma vez
-            return {k: v for k, v in self.dic.items() if k.startswith('ev:')}
-        chaves = [k for k in self.dic.keys() if k.startswith('ev:') and k not in vistos]
-        return {k: self.dic.get(k) for k in chaves}
+        saida = {k: v for k, v in (recentes if isinstance(recentes, dict) else {}).items() if k not in vistos}
+        with self._trava:
+            saida.update({k: v for k, v in self._cheia.items() if k not in vistos})
+            self._cheia = {}
+        return saida
 
 
 class FonteDemo:

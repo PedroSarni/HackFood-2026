@@ -358,3 +358,29 @@ def test_servidor_responde_agentes_da_jornada_de_verdade():
     aberta = json.loads(p.consulta('agentes', conversa=r['conversasLista'][0]['id']))
     tipos = [x['tipo'] for x in aberta['linha']]
     assert tipos[0] == 'mensagem' and 'ia' in tipos and 'mcp' in tipos and tipos[-1] == 'resposta'
+
+
+def test_diario_guarda_os_recentes_e_o_dash_le_sem_varrer_tudo():
+    from src.painel.servidor import FonteReal
+
+    class DictContado(dict):
+        varreduras = 0
+
+        def items(self):
+            DictContado.varreduras += 1
+            return super().items()
+    dic = DictContado()
+    relogio = iter(range(1000, 9000))
+    d = painel.Diario(dic, agora=lambda: next(relogio), intervalo=None)
+    for i in range(painel.MAX_RECENTES + 30):
+        d.anotar('1', 'entrada', texto=f'msg {i}')
+    assert len(dic[painel.RECENTES]) == painel.MAX_RECENTES        # não cresce sem limite
+    assert max(dic[painel.RECENTES]) == dic['versao'] == max(k for k in dic if k.startswith('ev:'))
+
+    f = FonteReal()
+    f.dic = dic
+    primeira = f.novos(set())                                      # 1ª carga: varre tudo uma vez
+    assert len(primeira) == painel.MAX_RECENTES + 30 and DictContado.varreduras == 1
+    d.anotar('1', 'entrada', texto='nova')
+    novos = f.novos(set(primeira))                                 # depois: só a chave dos recentes
+    assert [v['texto'] for v in novos.values()] == ['nova'] and DictContado.varreduras == 1

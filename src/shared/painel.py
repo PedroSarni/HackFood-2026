@@ -27,6 +27,8 @@ import time
 from datetime import datetime, timezone
 
 NOME_DICT = 'hackfood-painel'
+RECENTES = 'recentes'       # chave com os últimos eventos: o dash lê só ela (listar o Dict leva ~15 s)
+MAX_RECENTES = 120
 INATIVIDADE = 6 * 3600      # 6h sem falar: a próxima mensagem abre uma sessão nova
 ABANDONO = 30 * 60          # carrinho parado há 30 min = abandonado (mesma regra do rascunho do Pedro)
 
@@ -74,7 +76,13 @@ class Diario:
         if not lote:
             return
         try:
-            lote['versao'] = max(lote)
+            try:  # containers diferentes podem se atropelar aqui: perde-se só a pressa, a varredura do dash cobre
+                antes = self.dic.get(RECENTES) or {}
+            except Exception:  # noqa: BLE001
+                antes = {}
+            juntos = {**(antes if isinstance(antes, dict) else {}), **lote}
+            lote[RECENTES] = {k: juntos[k] for k in sorted(juntos)[-MAX_RECENTES:]}
+            lote['versao'] = max(k for k in lote if k.startswith('ev:'))
             self.dic.update(lote)
         except Exception as e:  # noqa: BLE001
             print(f'painel: gravar {len(lote)} evento(s) falhou: {e!r}')
