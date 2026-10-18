@@ -31,7 +31,6 @@ Pedir do iFood deve parecer mandar mensagem para alguém de confiança. Cada dec
 
 **Decisão:** mostrar 3 opções em cards com foto e botão "Quero esse", mais um "Mais opções" que reaproveita a lista já buscada.
 **Por quê:** uma lista longa cansa e a foto reduz o erro de escolha. A pessoa pode tocar ou dizer "o do meio", "a segunda".
-**Limite conhecido:** o MCP real devolve até 10 ofertas; o carrossel mostra de 3 em 3.
 
 ## 5. O bot escolhe o que dá para escolher por ela
 
@@ -59,7 +58,7 @@ Pedir do iFood deve parecer mandar mensagem para alguém de confiança. Cada dec
 
 ## 9. Segurança e limites visíveis
 
-- **CPF fora da IA.** O CPF só é pedido quando necessário, validado no código e enviado ao iFood apenas no fechamento.
+- **CPF fora da IA.** O bot usa o CPF da conta iFood; se não houver, pede uma vez (a pessoa pode pular, salvo loja que exige). Validado no código, nunca enviado a modelo e enviado ao iFood apenas no fechamento.
 - **Aviso de maioridade** para bebida alcoólica.
 - **Papo fora do assunto é recusado com educação** e a conversa volta ao pedido, em parte por causa da política da Meta contra chatbot genérico.
 - **Controle dos dados:** "sair" desconecta a conta; "apagar meus dados" apaga tudo.

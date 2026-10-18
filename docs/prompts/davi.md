@@ -324,3 +324,9 @@ keys com 4 últimos. Corrigido: testes (510/512 → 521), confirmação ("sim" r
 9e861a3 do Fabio; "já pode passar no pix" fecha direto), CPF da nota pedido se não estiver na conta, papel e plano B
 da Duda, foto sem relação nos cards, "Anotei sua lista" numerado, botões do resumo, kit ainda em andamento, "dinheiro
 em centavos" e "diário sem texto". Não confirmado: "MCP real devolve até 10 ofertas", "leite falado". Sem deploy.
+
+## 2026-10-18 10:05 — D3: sai o limite de 10 ofertas, CPF ajustado
+
+**Prompt:** "Mande o Claude Code tirar a frase do limite de 10 ofertas do D3 e ajustar a do CPF."
+
+**Resposta:** Em `docs/entregaveis/03-racional-da-experiencia.md`, removida a linha "Limite conhecido: o MCP real devolve até 10 ofertas…" (§4) e a frase do CPF (§9) passou a dizer que usa o CPF da conta iFood, pede uma vez se não houver (pode pular, salvo loja que exige), nunca vai a modelo e só segue ao iFood no fechamento. Sem mudança de código.
