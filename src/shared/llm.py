@@ -28,6 +28,7 @@ import httpx
 
 GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
 CLAUDE = 'claude-sonnet-5-5'
+CLAUDE_FORTE = 'claude-fable-5-1'   # 18/10 09h30: só o Beto (kit em grupo) vai de Fable, a pedido do Fabio
 CLAUDE_RAPIDO = 'claude-haiku-5-5'  # 18/10 08h40: quem tem pressa (roteiro da voz, filtro de relevância) vai de Haiku
 # 17/10 23h: o 3.1-lite passou a estourar 6 s seguidos e o 3.5-lite responde em ~1,2 s: o 3.5 vai na frente
 MODELOS = [(CLAUDE, 8.0, ''), ('gemini-3.5-flash-lite', 6.0, ''), ('gemini-3.1-flash-lite', 4.0, ''),

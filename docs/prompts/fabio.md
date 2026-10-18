@@ -783,3 +783,12 @@ QUE ERA 14, DE ONDE?"
 `pessoas_em`) somava quem fala em "com N amigos" (= N+1), igual ao "eu e mais 3". Agora o número dito é o grupo:
 "com 13 amigos" = 13; só "eu e mais 3" / "com mais 3 amigos" somam quem fala (quem quiser corrige com "agora
 somos 14"). Prompt, regra, testes, script de validação e docs atualizados; deploy.
+
+## 2026-10-18 ~09h30 — Beto no Fable
+
+**Prompt:** "COLOQUE O BETO NO FABLE ELE É BURRO DEMAIS" / "o fable deve ser o agente dele, nada mais"
+
+**Resposta:** Medido com a key do Modal: o Fable 5.1 responde o prompt do Beto em 8–13 s com kits coerentes (picanha +
+linguiça + carvão + bebida + o que pediram, dentro do orçamento). Fila SÓ do Beto (`src/agentes/grupo.py`): Fable 5.1
+na frente (effort medium, prazo 30 s), Sonnet e Gemini de reserva; Lia, Duda e Vina seguem como estavam.
+`claude-fable-5-1` entrou nas opções do dash. Deploy.
