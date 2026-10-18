@@ -275,7 +275,7 @@ QUAL_ENTREGA = 'Quando você quer receber? 🛵'
 LOJA_FECHADA = 'Essa loja não está entregando agora. 😕'
 
 
-def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None):
+def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None, sugestao=None):
     linhas = ['🧾 *Confira seu pedido:*', '']
     for it in carrinho['itens']:
         linhas.append(f'• {it["qtd"]}x {it["nome"]} — {reais(it.get("preco_total"))}')
@@ -295,8 +295,10 @@ def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None):
         linhas.append(f'🏠 {endereco.get("apelido") or "Endereço"}: {endereco.get("texto") or ""}'.rstrip(': '))
     if pagamento:
         linhas.append(f'💳 {pagamento["nome"]}')
-    linhas += ['', f'*Total: {reais(carrinho.get("total"))}*' + dividido(carrinho.get('total'), pessoas, linha=True),
-               '', 'Posso fazer o pedido?']
+    linhas += ['', f'*Total: {reais(carrinho.get("total"))}*' + dividido(carrinho.get('total'), pessoas, linha=True)]
+    if sugestao:  # uma sugestão do que acompanha, sem passo a mais: é só falar
+        linhas += ['', f'💡 Quer *{sugestao}* pra acompanhar? É só falar que eu coloco.']
+    linhas += ['', 'Posso fazer o pedido?']
     return '\n'.join(linhas)
 
 

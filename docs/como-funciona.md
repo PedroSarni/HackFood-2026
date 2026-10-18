@@ -307,6 +307,11 @@ Validação contra o Gemini de verdade (só Gemini, nada de iFood): `modal run s
   do endereço vira o pedido, "cancelar" cancela, papo é respondido e a pergunta volta). A resposta sempre
   oferece botões, mas só os que levam a algo ("Meu pedido" só com pedido feito). Quem digita o número de
   uma opção é atendido igual a quem toca. Nada em inglês chega na tela.
+- **Escolha falada adiciona certeiro.** Com os cards na tela, "quero esse", "essa tá boa", "a de
+  calabresa grande" escolhem o card (pelo número, pelo único da tela ou pelo nome) sem perguntar
+  quantidade (a dita, senão 1) nem opção (a dita, senão a padrão da loja). "Pode fechar" junto vai
+  direto pro fim do checkout: total, pagamento e uma sugestão do que acompanha. Pagamento dito antes
+  ("no pix") não é perguntado de novo. Número solto ("2") continua igual a tocar o botão.
 - **Uma loja por pedido.**
 - **Pedido mínimo não trava ninguém.** O aviso de mínimo (e o "O que mais você quer?" abaixo dele)
   vem com **💡 Me sugere algo**: na loja do carrinho, o bot oferece 1º o que acompanha o pedido

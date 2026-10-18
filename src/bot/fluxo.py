@@ -608,6 +608,12 @@ class Bot:
             else:
                 self.repetir_pergunta(T.NAO_ENTENDI)
                 return
+        self._anotar_pagamento(intent.get('pagamento'), texto)
+        # fala de verdade (passou pelo Gemini; número solto e botão não): escolha sem travar em quantidade
+        # nem opção, e "pode fechar" vai direto pro fim do checkout
+        self._falado = {'texto': normalizar(texto),
+                        'qtd': next((i['quantidade'] for i in intent.get('itens') or [] if i.get('quantidade')), None),
+                        'fechar': bool(intent.get('fechar')) or bool(FECHAR.search(normalizar(texto)))}
         if intent.get('transcricao'):
             print(f'transcrição {self.wa}: {intent["transcricao"][:200]}')
         self.intencao(intent)
@@ -650,12 +656,8 @@ class Bot:
                 self.definir_qtd(str(n))
             elif fase == 'grupo_pessoas' and n:  # "6" é 6 pessoas, não o 6º botão
                 self.grupo_pessoas(n)
-            elif n and fase == 'escolhendo':
-                visiveis = self._visiveis()
-                if 1 <= n <= len(visiveis):
-                    self.botao(visiveis[n - 1])
-                else:
-                    self._rodape_cards(f'Escolha entre 1 e {len(visiveis)}, ou toque em *Quero esse*. 🙂')
+            elif fase == 'escolhendo' and (n or a == 'escolher'):
+                self._escolha_por_fala(it)
             elif n and 1 <= n <= len(botoes):
                 self.botao(botoes[n - 1][0])
             else:
@@ -663,6 +665,8 @@ class Bot:
         elif a == 'sim':
             if fase == 'confirmar':
                 self.botao(botoes[0][0] if botoes else 'nada')
+            elif fase == 'escolhendo' and self._visiveis():  # "sim, quero esse" com os cards na tela
+                self._escolha_por_fala(it)
             elif fase == 'apagar':
                 self.apagar()
             elif fase == 'mais':
@@ -710,7 +714,12 @@ class Bot:
             else:
                 self.perguntar_pedido()
         elif a == 'finalizar':
-            self.finalizar()
+            if fase == 'escolhendo' and self._visiveis() and not (u.get('carrinho') or {}).get('itens'):
+                if getattr(self, '_falado', None):  # "quero esse e pode fechar" com o carrinho ainda vazio
+                    self._falado['fechar'] = True
+                self._escolha_por_fala(it)
+            else:
+                self.finalizar()
         elif a == 'ver_pedido':
             self.mostrar_carrinho()
         elif a == 'tirar_item':
@@ -1298,6 +1307,64 @@ class Bot:
 
     # ================================================================== escolha do item
 
+    def _escolha_por_fala(self, it):
+        """"quero esse", "essa tá boa", "o de calabresa": escolhe o card pela fala, pelo mesmo caminho do
+        toque em "Quero esse". Sem como saber qual, pergunta qual (em vez de "não entendi")."""
+        pid = self._oferta_falada(it.get('numero'), it, self._visiveis())
+        if not pid:
+            self._rodape_cards('Qual deles? Diga o número ou o nome, ou toque em *Quero esse*. 🙂')
+            return
+        self.botao(pid)
+
+    def _oferta_falada(self, n, it, visiveis):
+        """Qual card a pessoa escolheu falando: o número; o único da tela ("quero esse"); o nome, inteiro ou
+        pela palavra que só ele tem ("a de calabresa"). None = não deu pra saber."""
+        if n and 1 <= n <= len(visiveis):
+            return visiveis[n - 1]
+        if len(visiveis) == 1:
+            return visiveis[0]
+        falado = normalizar(' '.join([self._disse or ''] + [i['termo'] for i in it.get('itens') or []]))
+        nomes = {}
+        for pid in visiveis:
+            _, lid, idx = pid.split(':')
+            try:
+                nomes[pid] = normalizar(self.u['listas'][lid]['ofertas'][int(idx)]['nome'])
+            except (KeyError, IndexError, ValueError):
+                continue
+        inteiros = [pid for pid, nome in nomes.items() if nome and nome in falado]
+        if len(inteiros) == 1:
+            return inteiros[0]
+        palavras = {w for w in falado.split() if len(w) > 2}
+        pontos = {pid: len(palavras & set(nome.split())) for pid, nome in nomes.items()}
+        melhor = max(pontos.values(), default=0)
+        empate = [pid for pid, p in pontos.items() if p == melhor]
+        return empate[0] if melhor and len(empate) == 1 else None
+
+    def _opcoes_faladas(self, g, texto, esc, so_ditas=False):
+        """Grupo de opções pela fala: as que a pessoa disse ("grande", "catupiry"). Obrigatório não dito: as
+        primeiras, o padrão da loja. Opcional não dito fica de fora."""
+        palavras = set(texto.split())
+
+        def chave(op):
+            return next((w for w in normalizar(op['nome']).split()
+                         if w.isalpha() and len(w) > 2 and w not in ('sem', 'com')), '')
+        ops = g.get('opcoes') or []
+        ditas = [op for op in ops if chave(op) in palavras]
+        if so_ditas:
+            escolhidas = ditas[:g.get('max') or 1]
+        else:
+            escolhidas = (ditas + [op for op in ops if op not in ditas])[:max(1, g['min'] - esc['feitas'])]
+            esc['feitas'] = g['min']
+        esc['opcoes'] += [{'grupo_id': g.get('id'), 'opcao_id': op['id'], 'nome': op['nome'],
+                           'preco': op.get('preco')} for op in escolhidas]
+
+    def _anotar_pagamento(self, dito, texto):
+        """"vou pagar no pix", "é no vale-refeição": vira a forma preferida e o checkout não pergunta de novo."""
+        t = normalizar(texto or '')
+        tipo = PAGAMENTO_DITO.get(dito) or next((tp for r, tp in PAGAMENTO_NO_TEXTO if r.search(t)), None)
+        if tipo:
+            self.u['pagamento_preferido'] = {'tipo': tipo, 'nome': NOME_PAGAMENTO_DITO[tipo]}
+
     def escolher_oferta(self, arg):
         u = self.u
         try:
@@ -1324,17 +1391,28 @@ class Bot:
         u = self.u
         esc = u['escolha']
         grupos = [g for g in esc['item'].get('grupos') or [] if g.get('min', 0) > 0]
+        falado = getattr(self, '_falado', None)
         while esc['grupo'] < len(grupos):
             g = grupos[esc['grupo']]
             if esc['feitas'] < g['min']:
+                if falado:  # escolha falada não trava em opção: o que a pessoa disse ("grande"), senão o padrão
+                    self._opcoes_faladas(g, falado['texto'], esc)
+                    continue
                 self._perguntar_opcao(g, esc['feitas'] + 1, g['min'])
                 return
             esc['grupo'] += 1
             esc['feitas'] = 0
+        if falado and not esc.get('opcionais'):  # opcional só se ela disse ("borda de catupiry")
+            esc['opcionais'] = True
+            for g in esc['item'].get('grupos') or []:
+                if not g.get('min'):
+                    self._opcoes_faladas(g, falado['texto'], esc, so_ditas=True)
         if not esc.get('qtd'):
-            nome = esc['item'].get('nome') or esc['oferta']['nome']
-            self.perguntar(T.quantos(nome), [('qtd:1', '1'), ('qtd:2', '2'), ('qtd:3', '3')], fase='quantidade')
-            return
+            if not falado:
+                nome = esc['item'].get('nome') or esc['oferta']['nome']
+                self.perguntar(T.quantos(nome), [('qtd:1', '1'), ('qtd:2', '2'), ('qtd:3', '3')], fase='quantidade')
+                return
+            esc['qtd'] = falado.get('qtd') or 1
         self.adicionar()
 
     def _perguntar_opcao(self, grupo, n, total):
@@ -1422,6 +1500,9 @@ class Bot:
         car = u.get('carrinho') or {}
         if not car.get('itens'):
             self.perguntar_pedido()
+            return
+        if (getattr(self, '_falado', None) or {}).get('fechar'):  # "quero esse e pode fechar": direto pro fim
+            self.finalizar()
             return
         self.perguntar(T.mais_alguma(car.get('total') or car.get('subtotal'), self._pessoas()),
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
@@ -1632,8 +1713,11 @@ class Bot:
             if 'NOT_FOUND' in str(e.codigo):
                 raise
             print(f'getCart antes do resumo falhou: {e!r}')
+        mais = complementos([i.get('nome') or '' for i in car.get('itens') or []],
+                            (u.get('atual') or {}).get('tipo_loja') or 'MERCADO')
+        # fim do checkout: total, pagamento e uma sugestão do que acompanha (é só falar), sem passo a mais
         texto = T.resumo(car, u.get('endereco'), car.get('entrega'), car.get('pagamento'), car.get('cupom'),
-                         pessoas=self._pessoas())
+                         pessoas=self._pessoas(), sugestao=mais[0] if mais else None)
         direto, self._direto = self._direto, None
         if direto is not None:
             # a pessoa já disse "sim" no lembrete vendo valor, endereço e pagamento: fecha na hora,
@@ -2350,6 +2434,13 @@ ENCHIMENTO = {'quero', 'queria', 'quer', 'gostaria', 'pode', 'me', 've', 'manda'
 # categoria (recorrencia.categoria) que só restaurante vende: sem Gemini, a busca vai pra vertical certa
 DE_RESTAURANTE = {'hambúrguer', 'pizza', 'açaí', 'sushi', 'pastel', 'esfiha', 'marmita', 'lanche', 'frango',
                   'sorvete'}
+# "quero esse e pode fechar", "é só isso": a escolha falada vai direto pro fim do checkout
+FECHAR = re.compile(r'\b(pode fechar|ja fecha|fecha (o pedido|ai|isso|tudo)|fechar|finaliza\w*|e so isso|so isso)\b')
+# "vou pagar no pix": vira a forma preferida (o Gemini manda no campo pagamento; sem ele, pelo texto)
+PAGAMENTO_DITO = {'PIX': 'PIX', 'VALE_REFEICAO': 'MEAL_VOUCHER', 'VALE_ALIMENTACAO': 'FOOD_VOUCHER'}
+PAGAMENTO_NO_TEXTO = [(re.compile(r'\bpix\b'), 'PIX'), (re.compile(r'\b(vale refeicao|vr)\b'), 'MEAL_VOUCHER'),
+                      (re.compile(r'\bvale alimentacao\b'), 'FOOD_VOUCHER')]
+NOME_PAGAMENTO_DITO = {'PIX': 'PIX', 'MEAL_VOUCHER': 'Vale-refeição', 'FOOD_VOUCHER': 'Vale-alimentação'}
 
 
 def _em_portugues(texto):

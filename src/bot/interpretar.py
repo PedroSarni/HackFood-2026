@@ -36,6 +36,10 @@ ESQUEMA = {
         'transcricao': {'type': 'STRING', 'nullable': True},
         'resposta': {'type': 'STRING', 'nullable': True},
         'hora': {'type': 'STRING', 'nullable': True, 'description': 'quando agendar: horário dito, HH:MM 24h'},
+        'fechar': {'type': 'BOOLEAN', 'nullable': True,
+                   'description': 'true se a pessoa pediu pra fechar o pedido junto ("quero esse e pode fechar")'},
+        'pagamento': {'type': 'STRING', 'nullable': True, 'enum': ['PIX', 'VALE_REFEICAO', 'VALE_ALIMENTACAO'],
+                      'description': 'como a pessoa disse que vai pagar, se disse'},
     },
     'required': ['acao'],
 }
@@ -70,6 +74,10 @@ sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebi
 - hora: quando agendar e a pessoa disse horário, "HH:MM" 24h ("às 18h" = "18:00", "meio-dia" = \
 "12:00", "8 da noite" = "20:00"); senão null. Quando escolher (1, 2 ou 3, entre as opções que estão na tela; "o primeiro"=1, \
 "o do meio"=2, "o último" = o último da tela) ou quando quantidade.
+- fechar: true se a pessoa pediu pra fechar o pedido junto ("quero esse e pode fechar", "já pode \
+finalizar", "é só isso"); senão null.
+- pagamento: PIX, VALE_REFEICAO ou VALE_ALIMENTACAO se a pessoa disse como vai pagar ("no pix", "vale \
+refeição"); senão null.
 - texto: quando endereco, o endereço como a pessoa disse. Quando grupo, SÓ as restrições e ajustes \
 ("um é vegetariano", "até 30 reais cada", "sem refri", "troca a coca por guaraná"), nunca a comida nem o \
 número de pessoas; sem restrição = null.
@@ -87,6 +95,9 @@ iFood está instável). Nunca diga que fez algo que não fez. O assistente SABE 
 Regras:
 - Lista de compras (escrita, falada ou foto de papel) vira acao=comprar com todos os itens.
 - "quero mais", "tem outro", "mostra mais", "outras" com opções na tela = mais_opcoes.
+- "quero esse", "essa tá boa", "pode ser essa", "esse mesmo", "vou querer o X-Salada", com opções na tela \
+= escolher, e numero = a opção que ela indicou (se falou o nome, o número dele na lista; se só tem uma \
+na tela, 1). Se ela disse quantidade, vai em itens.
 - "sim", "pode", "isso", "confirma", "fechou", "ok" = sim. "não", "nao quero", "errado" = nao.
 - "acabou", "só isso", "pode fechar", "terminei" = finalizar.
 - "cadê meu pedido", "já saiu?", "vai demorar?" = acompanhar.

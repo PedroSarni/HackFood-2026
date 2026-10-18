@@ -1041,6 +1041,50 @@ def test_sem_gemini_tira_o_quero_jantar_hj_e_busca_pizza_no_restaurante():
     assert busca['query'] == 'pizza' and busca['merchantType'] == 'RESTAURANT'
 
 
+def test_quero_esse_e_pode_fechar_adiciona_sem_perguntar_e_vai_pro_checkout():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('quero um x burger')                          # 1 card só: X-Burger da lanchonete
+    m.wpp.limpar()
+    m.llm.resposta = {'acao': 'escolher', 'fechar': True, 'itens': [
+        {'termo': 'x-burger', 'busca': 'x-burger', 'tipo_loja': 'RESTAURANTE', 'quantidade': 2}]}
+    m.enviar('eu quero dois desse ja pode adicionar ao carrinho e fechar')
+    m.llm.resposta = None
+    ids = m.wpp.todos_ids()
+    assert not any(i.startswith('qtd:') for i in ids)                  # não perguntou quantidade
+    assert m.estado()['carrinho']['itens'][0]['qtd'] == 2
+    assert 'Quer mais alguma coisa' not in ' '.join(m.wpp.textos())    # foi direto pro checkout
+    assert any(i.startswith(('pag:', 'ok:')) for i in ids)
+
+
+def test_pagamento_dito_pula_a_pergunta_e_o_resumo_sugere_o_que_acompanha():
+    m = Mundo()
+    endereco_pronto(m)
+    u = m.armazem[f'u:{m.wa}']
+    u['cpf'] = '52998224725'
+    m.armazem[f'u:{m.wa}'] = u
+    m.enviar('quero um x burger')
+    m.wpp.limpar()
+    m.llm.resposta = {'acao': 'escolher', 'fechar': True, 'pagamento': 'PIX', 'itens': [
+        {'termo': 'x-burger', 'busca': 'x-burger', 'tipo_loja': 'RESTAURANTE', 'quantidade': 2}]}
+    m.enviar('quero dois desse, pode fechar, vou pagar no pix')
+    m.llm.resposta = None
+    ids = m.wpp.todos_ids()
+    assert not any(i.startswith('pag:') for i in ids) and any(i.startswith('ok:') for i in ids)
+    assert 'pra acompanhar' in ' '.join(m.wpp.textos())
+
+
+def test_a_de_calabresa_grande_escolhe_pelo_nome_e_pelo_tamanho_falados():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('quero pizza')
+    m.llm.resposta = {'acao': 'escolher'}
+    m.enviar('a de calabresa grande ta boa')
+    m.llm.resposta = None
+    linha = m.estado()['carrinho']['itens'][0]
+    assert 'calabresa' in linha['nome'].lower() and any('Grande' in o['nome'] for o in linha.get('opcoes') or [])
+
+
 def test_audio_vira_pedido():
     m = Mundo()
     endereco_pronto(m)
