@@ -471,7 +471,10 @@ class Bot:
                 self._rodape_cards(prefixo)
                 return
             texto = (prefixo + '\n\n' if prefixo else '') + p.get('texto', '')
+            original = p.get('texto')
             self.perguntar(texto, [tuple(b) for b in p['botoes']])
+            if original is not None and self.u.get('pergunta'):
+                self.u['pergunta']['texto'] = original  # o aviso é de uma vez só, não vira a pergunta
         else:
             self.menu(prefixo)
 

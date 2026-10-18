@@ -1628,3 +1628,13 @@ def test_sugestao_que_a_loja_nao_tem_volta_pro_resumo_sem_ela(monkeypatch):
     m.tocar('acomp')
     assert m.estado()['fase'] == 'confirmar' and not m.mcp.chamadas_de('submitOrder')
     assert 'manteiga' not in m.estado()['pergunta']['texto'].split('Total')[-1]   # não oferece de novo
+
+
+def test_aviso_de_botao_velho_nao_empilha_a_cada_toque():
+    from src.bot import textos as T
+    m = pedido_ate_o_resumo(Mundo())
+    original = m.estado()['pergunta']['texto']
+    for _ in range(3):
+        m.enviar(('botao', 'xyz:velho'))
+    assert m.wpp.saida[-1][1]['texto'].count(T.BOTAO_VELHO) == 1
+    assert m.estado()['pergunta']['texto'] == original and m.estado()['fase'] == 'confirmar'

@@ -191,3 +191,13 @@ src/agentes/ nem em telemetria.js. Sem deploy. Registre isto em docs/prompts/dav
 
 **Resposta:** claim dash-agentes-mcp como done, com a fase 2 anotada como cancelada (coberta pelo
 dash-agents-control do Fabio). Nenhum código tocado, sem deploy.
+
+## 2026-10-18 02:30 — B4: aviso de botão antigo empilhava
+
+**Prompt:** "BUG B4 em src/bot/fluxo.py, repetir_pergunta (~linha 467): o aviso 'Esse botão é de uma conversa
+antiga' empilha a cada toque. [...] Correção mínima: depois de perguntar(), restaurar em u['pergunta'] o
+'texto' original [...] Teste: chamar repetir_pergunta(T.BOTAO_VELHO) 3 vezes seguidas e conferir que a última
+mensagem tem o aviso UMA vez. Não mexa em mais nada. [...] sem deploy [...]"
+
+**Resposta:** repetir_pergunta restaura o texto original da pergunta depois de reenviar. Teste novo (3 toques
+em botão velho no resumo, aviso 1 vez, pergunta intacta) falha sem a correção. 428 passando. Sem deploy.
