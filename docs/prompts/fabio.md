@@ -237,3 +237,27 @@ cancela (antes virava busca) e "quero jantar pizza hj" busca pizza no restaurant
 **Prompt:** abra /hackathon leia o projeto com calma, preciso criar algumas funcionalidades pro nosso bot fazer, primeiro, se a pessoa mandar a foto de uma comida pergunte se ela quer algo parecido e depois sugira de fato algo parecida (processo com nosso llm), garanta que a pessoa consiga fazer pedidos enviando fotos também, entende? pode ser foto de lista de compras tbm, cabe ao llm entender o que a foto diz, fato é que uma foto mandada em qualquer momento, inclusive como primeira mensagem, deve ser interpretada como pedido de foto, entendeu?? a outra feature é (MUITO CUIDADO AO FAZER ESSA AQUI): feature de dividir com os amigos, é uma feature demorada que deve ser feita com cuidado, se a pessoa falar que quer lanchar em 5 pessoas hamburguer, ele vai montar um kit com coca, hamburguer e boas opçoes, entende? e dizer quanto ficaria pra cada, acho que fica bom nosso modelo processar isso no meio, entende? tome decisoes boas que garanta um bom funcionamento e pense nos casos de borda desse modo amigo, gaste o tempo necessario, apenas garanta bom funcionamento de tudo
 
 **Resposta:** Claim `bot-photo-group-kit`. Foto em qualquer etapa (até antes do login) vai pro Gemini (`src/bot/foto.py`): comida pergunta "quer algo parecido?" e busca os parecidos num carrossel só; lista/produto vira a lista do pedido; no CPF a foto nem abre. Kit em grupo (`src/bot/grupo.py`): loja única, o Gemini decide o que entra e quantos, o código escolhe as opções obrigatórias e faz a conta (por pessoa arredondado pra cima), com Outra loja, ajuste falado ("sem refri", "agora somos 6") e o "por pessoa" no total, no resumo e no pedido feito. 50+ testes novos e validação no Gemini real (`scripts/validar_foto_grupo.py`, TUDO CERTO). Deploy pendente do ok do Fabio.
+
+## 2026-10-17 ~22h45 — adicionar ao carrinho falando, sem botão
+
+**Prompt:** "o processo de adição no carrinho esta muito bugado, eu falo (SEM APERTAR EM BOTOES) precocemente
+que ta bom ja, ou seja, antes dele esperar que eu ja terminei, to falando que essa pizza ta boa, entao ele ja
+deve finalizar e adicionar ao carrinho, coisa que ele tem errado muito. ele deve adicionar mais certeiramente
+ao carrinho é isso, se depois de ele mandar a foto de um hamburguer, eu falar, "eu quero esse ja pode
+adicionar ao carrinho e fechar" O PROXIMO PASSO É O FIM DO CHECKOUT só recomendar adicicoes ao carrinho
+mostrar total e como vai pagar, se ja tiver dito o meio em algum momento anterior é só pular essa etapa
+tambem e colocar na funcao o meio que ja foi dito no momento anterior (recente)"
+
+**Resposta:** "quero esse" sem número caía no "não entendi". Agora a fala escolhe o card (pelo número, pelo
+único da tela ou pelo nome) e adiciona sem perguntar quantidade nem opção (usa a que foi dita, senão 1 e a
+padrão da loja). "Pode fechar" vai direto pro fim: total, pagamento e uma sugestão do que acompanha. Pagamento
+dito ("no pix") não é perguntado de novo. Número solto continua igual a tocar o botão.
+
+## 2026-10-17 ~22h46 — a recomendação dava "travadinha"
+
+**Prompt:** "eu pedi uma recomendação e ele n conseguiu ele ficou falando que "deu uma travadinha""
+
+**Resposta:** Bug desta sessão: sem carrinho, o código da sugestão dava KeyError (log de produção das 22h44 e
+22h45). Corrigido, com teste. Sem carrinho, a recomendação agora é o que a pessoa costuma levar ou algo da hora
+do dia (pão de manhã, marmita no almoço, pizza à noite), e não "refrigerante" do nada. De carona: o teto de
+resposta do Gemini subiu, porque o 3.5-flash-lite parou em MAX_TOKENS às 22h38.
