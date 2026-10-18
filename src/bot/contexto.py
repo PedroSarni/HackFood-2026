@@ -9,6 +9,7 @@ pula o OAuth. Serve pra demo e pro time trabalhar enquanto o agente está em an�
 import os
 import time
 
+from src import agentes
 from src.bot.ifood import Ifood, PrecisaLogin
 from src.bot.recorrencia import Recorrencias
 from src.shared import geocoder, ifood_mcp, llm, scribe, voz
@@ -212,16 +213,22 @@ def contexto_producao(estado, wpp, wa_id=None, origem=None):
     def gerar(s, p, e, **kw):
         return llm.gerar_json(s, p, e, **kw)
 
-    transcritor = scribe.transcrever if scribe.ligado() else None
-    locutor = voz.falar if voz.ligado() else None
+    # a ficha de cada agente (src/agentes/): liga/desliga e modelo principal escolhidos no dash, sem deploy
+    cfg = agentes.config(estado)
+    agentes.publicar_ar(estado, time.time())
+    transcritor = scribe.transcrever if scribe.ligado() and agentes.ligado(cfg, 'ouvido') else None
+    locutor = voz.falar if voz.ligado() and agentes.ligado(cfg, 'voz') else None
+    pular = None
     if wa_id:  # rastro dos agentes no painel: quem pensou, com qual modelo, quanto demorou
         gerar = painel.espiar_ia(gerar, diario, wa_id, primeiro=_primeiro_modelo)
+        pular = lambda ag: diario.anotar(wa_id, 'ia', agente=ag, ok=False, ms=0, erro='desligado')  # noqa: E731
         if transcritor:
             transcritor = painel.espiar_servico(transcritor, diario, wa_id, 'ouvido',
                                                 'elevenlabs:' + scribe._cfg('SCRIBE_MODELO', 'scribe_v2'))
         if locutor:
             locutor = painel.espiar_servico(locutor, diario, wa_id, 'voz',
                                             'elevenlabs:' + voz._cfg('VOZ_MODELO', voz.MODELO_PADRAO))
+    gerar = agentes.roteador(gerar, cfg, ao_pular=pular)  # por fora do espião: ele já vê a fila do agente
     ctx = Contexto(wpp=wpp, armazem=estado, chamador_mcp=chamador, gerar_json=gerar,
                     link_login=modulo_app.novo_link_login, iniciar_rastreio=rastrear,
                     recorrencias=rec, revogar=revogar, geocoder=geocoder.normalizar,

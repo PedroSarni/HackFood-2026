@@ -203,17 +203,10 @@ def espiar_mcp(chamar, diario, wa_id):
 # chama os especialistas e o MCP é o código (src/bot/fluxo.py), e os agentes só se falam por ele.
 AGENTES = {'entendimento': 'Entendimento', 'foto': 'Foto', 'grupo': 'Kit em grupo', 'voz': 'Voz',
            'ouvido': 'Ouvido', 'relevancia': 'Relevância e sugestão', 'tutor': 'Tutor'}
-_sistemas = None
-
-
 def agente_do_sistema(sistema):
-    global _sistemas
-    if _sistemas is None:
-        from src.bot import foto, grupo, interpretar, relevancia, tutor, voz
-        _sistemas = {interpretar.SISTEMA: 'entendimento', foto.SISTEMA: 'foto', grupo.SISTEMA: 'grupo',
-                     relevancia.SISTEMA: 'relevancia', relevancia.SISTEMA_VARIOS: 'relevancia',
-                     tutor.SISTEMA: 'tutor', voz.SISTEMA: 'voz'}
-    return _sistemas.get(sistema, 'outro')
+    """Quem é quem pelo prompt de sistema: a ficha de cada agente mora em src/agentes/."""
+    from src import agentes
+    return agentes.do_sistema(sistema)
 
 
 def _curto(v):
@@ -243,8 +236,9 @@ def _erro_ia(e):
     m = re.search(r'HTTP (\d{3})', s)
     if m:
         return f'HTTP {m.group(1)}'
-    for pista, nome in (('timed out', 'timeout'), ('Timeout', 'timeout'), ('finishReason', 'finishReason'),
-                        ('JSON inválido', 'JSON inválido'), ('não configurada', 'sem key')):
+    for pista, nome in (('desligado no painel', 'desligado'), ('timed out', 'timeout'), ('Timeout', 'timeout'),
+                        ('finishReason', 'finishReason'), ('JSON inválido', 'JSON inválido'),
+                        ('não configurada', 'sem key')):
         if pista in s or pista in type(e).__name__:
             return nome
     return type(e).__name__[:40]

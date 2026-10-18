@@ -18,7 +18,7 @@ NÃO cobre: editar system prompt pelo dash, trocar modelo pelo dash, criar agent
 
 ## Arquivos que vou tocar
 
-- `src/shared/agentes.py` (novo: a ficha dos agentes)
+- `src/agentes/` (novo: `__init__.py` com o roteador e o interruptor, um arquivo por agente)
 - `src/shared/painel.py` (usa a ficha; o espião marca "desligado")
 - `src/bot/contexto.py` (liga/desliga em `contexto_producao` e publica a ficha do que está no ar)
 - `src/painel/servidor.py`, `src/painel/simulador.py`
@@ -28,7 +28,7 @@ NÃO cobre: editar system prompt pelo dash, trocar modelo pelo dash, criar agent
 
 ## Peças compartilháveis que vou criar
 
-- `src/shared/agentes.py` — `FICHAS`, `ficha(id)`, `desligados(armazem)`, `ligar(armazem, id, ligado)`,
-  `chave_mascarada(nome)`, `foto_do_ar()` — stub
+- `src/agentes/__init__.py` — `TODOS`, `POR_ID`, `do_sistema()`, `roteador()`, `fila()`, `config()`, `definir()`,
+  `chave_mascarada()`, `foto_do_ar()`, `publicar_ar()`, `fichas()` — pronto
 
 ## Onde está (preencher ao terminar)

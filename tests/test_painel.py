@@ -251,7 +251,8 @@ def test_rastro_quebrado_nao_derruba_o_bot(monkeypatch):
 
 def test_modelo_reserva_e_openrouter_aparecem():
     dic = {}
-    d = painel.Diario(dic, intervalo=None)
+    relogio = iter(range(1000, 2000))   # o relógio do Windows empata eventos seguidos: aqui ele sempre anda
+    d = painel.Diario(dic, agora=lambda: next(relogio), intervalo=None)
     primeiro = lambda kw: 'gemini-3.5-flash-lite'  # noqa: E731
     painel.espiar_ia(lambda s, p, e, **kw: ({}, 'gemini-3.5-flash-lite', 1), d, '1', primeiro)('x', [], {})
     painel.espiar_ia(lambda s, p, e, **kw: ({}, 'gemini-3.1-flash-lite', 1), d, '1', primeiro)('x', [], {})
