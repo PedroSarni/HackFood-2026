@@ -564,3 +564,12 @@ ifood pode tomar, basicamente insights UTEIS"
   bot inteiro.
 - **Testes e deploy:** 433 no back e 41 no front. Deploy 9626e97.
 
+## 2026-10-18 ~04h42 — onde a meta chama o nosso back
+
+**Prompt:** "onde vejo onde a meta chama o nosso back, o url de fallback?"
+
+**Resposta:** Conferido na Graph API (`GET /{PHONE_ID}?fields=webhook_configuration`, só leitura): a Meta entrega
+os eventos no override do próprio número, o `/whatsapp` do hackfood-bot no Modal. O painel da Meta (WhatsApp →
+Configuração) mostra só a URL do app, que é a do handwrite: ela é o fallback, usada só se o override do número sair.
+Não há override na WABA. Sem mudança de código.
+
