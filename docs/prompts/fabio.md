@@ -517,3 +517,10 @@ com o contexto do hackathon, o porquê e os limites. O filtro de segurança do a
 **Resposta:** A ficha do agente ganhou o campo `foto` (arquivo em `Frontend/Rascunho_Dash/images/agentes/`; sem foto,
 fica o emoji). O Tungs usa `tutor.webp`, com zoom no rosto pra caber no círculo do palco, dos cards e da ficha. Sem
 deploy: só o dash muda.
+
+## 2026-10-18 ~05h45 — centralizar o Tungs
+
+**Prompt:** "centralize ele mais pra esquerda caralho"
+
+**Resposta:** O enquadramento da foto passou a levar o rosto pro centro do círculo (zoom de 2,3x deslocado pra
+esquerda e pra baixo). Conferido no palco.
