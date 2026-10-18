@@ -1,7 +1,7 @@
 ---
 slug: dash-agentes-mcp
 owner: Davi de Alcantara Lima
-status: active
+status: done
 started: 2026-10-18 01:00
 ---
 
@@ -30,7 +30,8 @@ fluxo da conversa, compra, CPF, confirmação ou login, e o que o `espiar_mcp` g
 
 ## Onde está (preencher ao terminar)
 
-Fase 1 (1A + 1B) pronta; fase 2 (liga/desliga) só quando o Davi pedir, por isso o claim segue ativo.
+Fase 1 (1A + 1B) pronta. Fase 2 (liga/desliga) cancelada: o claim dash-agents-control (Fabio) já cobre
+interruptor, escolha de modelo e crachá.
 
 - `src/shared/painel.py` — `espiar_ia`, `espiar_servico`, `agente_do_sistema`, `AGENTES`, `REGRAS`, `regra_da_saida`,
   `resumo_mcp`, `resumo_agentes`, `indice_conversas`, `tools_da_doc`; `montar_sessoes(..., rotulos=None)`

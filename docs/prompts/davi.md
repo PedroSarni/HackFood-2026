@@ -182,3 +182,12 @@ em uma linha por que cada um mudou. Sem sugestão no resumo, 'sim' continua conf
 "✅ Fazer pedido assim", "➕ Colocar <sugestão>" e "✏️ Mudar"; o "Colocar" põe 1 unidade da mesma loja e
 volta pro resumo. Sem sugestão, nada muda. 3 testes atualizados (o "sim" deles confirmava com sugestão na tela),
 6 novos, 418 passando. Sem deploy.
+
+## 2026-10-18 02:15 — fase 2 do dash cancelada, claim dash-agentes-mcp concluído
+
+**Prompt:** "Fase 2: não precisa. O Fabio entregou o dash-agents-control (liga/desliga, escolha de modelo,
+crachá), que cobre isso. Marque o claim dash-agentes-mcp como done, sem criar nada novo. Não toque em
+src/agentes/ nem em telemetria.js. Sem deploy. Registre isto em docs/prompts/davi.md."
+
+**Resposta:** claim dash-agentes-mcp como done, com a fase 2 anotada como cancelada (coberta pelo
+dash-agents-control do Fabio). Nenhum código tocado, sem deploy.
