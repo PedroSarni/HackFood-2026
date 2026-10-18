@@ -348,3 +348,18 @@ em centavos" e "diário sem texto". Não confirmado: "MCP real devolve até 10 o
 **Prompt:** "Em docs/entregaveis/06-feedback-mcp.md, apague a seção final '## Anexo' inteira (título e a linha que cita `achados.md`). Não mude mais nada, não crie arquivos. Registre o prompt em docs/prompts/davi.md. Commit 'docs(entregaveis): D6 sem anexo inexistente' e push (pull --rebase antes)."
 
 **Resposta:** Seção "Anexo" removida do D6 (título e a linha do `achados.md`); nada mais mudou. Sem código.
+
+## 2026-10-18 10:41 — documento único de entrega (01 a 06 + anexos)
+
+**Prompt:** "Tarefa: criar UM documento único de entrega do hackathon, juntando e conferindo o que já está documentado
+no repo. Este é o ÚNICO arquivo novo permitido: docs/entregaveis/entrega-unica.md. [...] Quem vai ler é o time do
+iFood que desenvolveu o MCP [...] 06 Feedback sobre os MCPs: a parte MAIS detalhada [...] Anexo A: cronologia [...]
+Anexo B: limitações [...] Marque cada afirmação sobre o MCP como [testado] ou [só na doc] [...] NÃO invente fatos
+[...] Quando duas fontes se contradisserem, o código atual da main é a verdade [...] Confirme contagens rodando [...]
+commit único 'docs(entregaveis): documento único de entrega' e push [...] Não rode deploy."
+
+**Resposta:** Criado `docs/entregaveis/entrega-unica.md` (~58 KB) a partir dos entregáveis, docs, prompts, claims,
+código e git log. Conferido no código: 545 testes no pytest e 54 no Vitest, 19 das 23 tools, 8 agentes, carrossel de
+até 10 cards, filas de modelo por agente. Contradições corrigidas no texto e listadas no chat (testes 521, 3 cards,
+"Sonnet em todos", MERCH-007 só em 18/10, pedido real em 18/10 vs "nunca submitOrder", horários do diário x git).
+Originais 01 a 06 intactos; sem deploy.
