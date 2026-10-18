@@ -614,3 +614,33 @@ def test_banana_no_fluxo_pergunta_quilos_e_o_carrinho_mostra_kg():
     assert 'Coloquei *2 kg de Banana' in textos or 'Coloquei *2 cachos (1 kg) de Banana' in textos, textos[-300:]
     assert '2x Banana' not in textos
     assert m.estado()['carrinho']['itens'][-1]['unidade']['tipo'] in ('kg', 'emb')
+
+
+def test_12_ovos_na_lista_e_uma_duzia_nao_12_bandejas():
+    """18/10 09h09: "12 ovos" na lista virou 12 bandejas de "Ovos de Galinha Branco Grande Dúzia" (R$ 134)."""
+    from src.bot import textos as T
+    from tests.fakes import Mundo
+    from tests.test_fluxo import endereco_pronto
+    assert T.na_embalagem('Ovos de Galinha Branco Grande Dúzia') == 12
+    assert T.na_embalagem('Ovos Extra 30 Unidades') == 30
+    assert T.na_embalagem('Dipirona 500 mg', 'Caixa com 10 comprimidos') == 10
+    assert T.na_embalagem('Leite integral', 'Caixa 1 litro') is None
+    ovos = {'termo': 'ovos', 'busca': 'ovos', 'tipo_loja': 'MERCADO', 'quantidade': 12}
+    assert T.em_embalagens(12, ovos, 'Ovos de Galinha Branco Grande Dúzia') == (1, 12)
+    assert T.em_embalagens(30, ovos, 'Ovos brancos', 'Bandeja com 12') == (3, 12)
+    assert T.em_embalagens(2, {**ovos, 'termo': 'bandeja de ovos', 'quantidade': 2}, 'Ovos brancos', 'Bandeja com 12') == (2, None)
+    assert T.em_embalagens(3, {'termo': 'leite'}, 'Leite integral', 'Caixa 1 litro') == (3, None)
+    m = Mundo()
+    endereco_pronto(m)
+    original = m.llm.__call__
+
+    def lia(sistema, partes, esquema, **kw):
+        if 'acao' in esquema['properties']:
+            return {'acao': 'comprar', 'itens': [ovos]}, 'fake', 0.01
+        return original(sistema, partes, esquema, **kw)
+    m.ctx._gerar_json = lia
+    m.enviar('quero 12 ovos')
+    m.tocar('pick:')
+    item = m.estado()['carrinho']['itens'][-1]
+    assert 'Ovos' in item['nome'] and item['qtd'] == 1
+    assert 'Coloquei *1 bandeja de Ovos brancos* no seu pedido. (dá os 12 que você pediu)' in ' '.join(m.wpp.textos())

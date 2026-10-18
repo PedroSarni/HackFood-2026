@@ -1959,7 +1959,9 @@ class Bot:
             return
         item = self.ctx.ifood(self.wa).item(of['item_id'], of['loja_id'], u['endereco'])
         item['nome'] = item.get('nome') or of['nome']
-        u['escolha'] = {'oferta': of, 'item': item, 'qtd': pedido.get('quantidade'),
+        # "12 ovos" num produto que é dúzia = 1 (18/10 09h09: entraram 12 bandejas); a quantidade dita é em unidades
+        qtd, na_emb = T.em_embalagens(pedido.get('quantidade'), pedido, item['nome'], item.get('descricao'))
+        u['escolha'] = {'oferta': of, 'item': item, 'qtd': qtd, 'pediu': pedido.get('quantidade') if na_emb else None,
                         'obs': pedido.get('observacao'), 'opcoes': [], 'grupo': 0, 'feitas': 0,
                         'termo': pedido.get('termo'), 'tipo_loja': pedido.get('tipo_loja')}
         self._proximo_passo_da_escolha()
@@ -2066,7 +2068,7 @@ class Bot:
         nome = esc['item'].get('nome') or of['nome']
         if esc['opcoes']:
             nome += ' (' + ', '.join(o['nome'] for o in esc['opcoes']) + ')'
-        self.dizer(T.colocado(esc['qtd'], nome, un))
+        self.dizer(T.colocado(esc['qtd'], nome, un, esc.get('pediu')))
         self._proximo_da_fila()
 
     def _proximo_da_fila(self, pulou=False):

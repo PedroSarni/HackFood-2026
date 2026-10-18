@@ -390,8 +390,37 @@ def escolha_opcao(grupo, n, total):
     return f'Escolha: *{grupo}* 👇'
 
 
-def colocado(qtd, nome, un=None):
-    return f'✅ Coloquei *{qtd_nome(qtd, nome, un)}* no seu pedido.'
+def colocado(qtd, nome, un=None, pediu=None):
+    aviso = f' (dá os {pediu} que você pediu)' if pediu else ''
+    return f'✅ Coloquei *{qtd_nome(qtd, nome, un)}* no seu pedido.{aviso}'
+
+
+# 18/10 09h09: "12 ovos" na lista virou 12 bandejas de "Ovos de Galinha Branco Grande Dúzia" (R$ 134). A quantidade
+# que a pessoa diz é em unidades do produto; se o produto vem em embalagem com N, o que entra no carrinho é N em N.
+_NA_EMBALAGEM = re.compile(r'\b(?:com|c/|c)\s*(\d{1,3})\b|\b(\d{1,3})\s*(?:un|unid|unidades|ovos|comprimidos|capsulas|'
+                           r'latas|garrafas|saches|rolos|folhas|fraldas|absorventes)\b')
+
+
+def na_embalagem(nome, descricao=''):
+    """Quantas unidades vêm na embalagem: "Dúzia" = 12, "Bandeja com 30" = 30, "Caixa com 10 comprimidos" = 10;
+    None se o nome e a descrição não dizem."""
+    t = _sem_acento(f'{nome} {descricao or ""}')
+    if 'meia duzia' in t:
+        return 6
+    if 'duzia' in t:
+        return 12
+    m = _NA_EMBALAGEM.search(t)
+    return int(m.group(1) or m.group(2)) if m else None
+
+
+def em_embalagens(quantidade, pedido, nome, descricao=''):
+    """'12 ovos' numa dúzia = 1; '30 ovos' em bandeja de 12 = 3; '4 dipirona' em caixa de 10 = 1. Se a pessoa já
+    falou em bandeja/caixa/pacote ("2 bandejas de ovos"), fica como disse. Devolve (qtd, N da embalagem ou None)."""
+    n = na_embalagem(nome, descricao)
+    dito = set(re.findall(r'[a-z]+', _sem_acento(' '.join(str((pedido or {}).get(k) or '') for k in ('termo', 'busca', 'observacao')))))
+    if not quantidade or not n or n < 2 or any(chave in dito or plu in dito for chave, _s, plu, _f in _EMBALAGENS):
+        return quantidade, None
+    return max(1, -(-int(quantidade) // n)), n
 
 
 def proximo_da_lista(termo):

@@ -762,3 +762,14 @@ principal, lojas, modelo recompondo tudo); tomate e cebola nem foram buscados. C
 - um acompanhamento por tipo (três pães de alho não); passou de 8 linhas, sai acompanhamento, nunca pedido/essencial;
   na busca da loja, "tomate" prefere "Tomate kg" a "Molho de tomate".
 4 testes novos reproduzindo o caso; deploy no Modal.
+
+## 2026-10-18 ~09h15 — "12 ovos" virou 12 bandejas
+
+**Prompt:** "[print: lista com 12 ovos → 'Coloquei 12 bandejas de Ovos de Galinha Branco Grande Dúzia', R$ 134] eu
+pedi 12 ovos na minha lista de compras e ele pediu 12 bandejas"
+
+**Resposta:** A quantidade da lista entrava direto como quantidade do item, sem olhar que o produto vem em dúzia/
+bandeja. Agora `textos.na_embalagem` lê quantas unidades vêm na embalagem ("Dúzia" = 12, "Bandeja com 30",
+"Caixa com 10 comprimidos") e `em_embalagens` converte o que a pessoa disse: 12 ovos numa dúzia = 1, 30 ovos em
+bandeja de 12 = 3; se ela já falou em bandeja/caixa/pacote, fica como disse. A mensagem avisa: "Coloquei *1 dúzia
+de Ovos...* (dá os 12 que você pediu)". Teste em `tests/test_pecas.py`; deploy.
