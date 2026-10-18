@@ -189,3 +189,16 @@ pedir pra pessoa fazer coisas porra" / "na vdd deixe isso pra outro agente, vou 
 **Prompt:** OUTRA COISA: [print da conversa: depois de pedir só áudio, o bot mandou a mensagem com botões E o áudio; o áudio dizia "é só tocar no botão"] eu pedi pra ela responder só por audio, até ai blz, mas ela manda texto e audio, sem contar que esse ultimo audio dela saiu cortado no final, quando ela mandar audio é só audio, e audio n deve falar sobre botao, só pedir pra pessoa fazer coisas porra
 
 **Resposta:** Modo áudio virou só áudio: botões, cards, lista e texto são segurados e viram a fala (só o link de login sai, não dá pra entrar por voz); 3 produtos por vez, ditos numerados; código de entrega falado dígito por dígito; se o áudio falha, as mensagens normais saem. O áudio não fala de botão/tela (prompt + trava que corta a frase). Fim cortado: medido 1 em 8 sem a última palavra no flash; pausa de 0,7 s no fim deixou 8 em 8 inteiros. Resposta falada "é no centro"/"pode ser no pix" agora casa com a opção. Medido também: o Gemini inventava passo (CPF, "dinheiro na entrega") em 9 de 10 quando a pessoa dizia uma coisa e a mensagem era "não entendi"; com a regra de ouro, 0 de 10.
+
+## 2026-10-17 ~22h10 — o automático repetia sempre o último pedido
+
+**Prompt:** "tem um problema na compra com recorrencia, nao sei se é por causa do mock, mas pra toda
+recorrencia diferente vem a mesma mensagem antiga [2 prints: 'todo dia as 7h peça dois paes' e 'todo dia
+as 9h dois cafes expresso' responderam 'Opa, segunda vez de 1x X-Salada, 1x Refrigerante lata 350 ml por
+aqui!']"
+
+**Resposta:** Não era o mock: o agendar jogava fora os itens ditos e oferecia o último pedido com o texto da
+2ª compra. Agora o automático é do que a pessoa disse: o bot monta o pedido uma vez (loja e produto) e
+guarda como modelo, sem pedir agora; no dia o lembrete monta o carrinho do modelo e só fecha com o sim.
+A hora dita é lida mesmo quando o Gemini não devolve (ele devolveu hora vazia pras duas frases). Conferido
+com o Gemini de verdade nas duas frases. O mock ganhou uma cafeteria.
