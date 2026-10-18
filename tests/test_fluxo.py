@@ -403,6 +403,97 @@ def test_followup_nao_mexe_em_ultima_msg_fase_nem_pergunta():
     assert depois == antes and m.estado()['followup_de'] == marca
 
 
+# --- carrinho abandonado (5 min calada) --------------------------------------------------
+
+def _carrinho_no_o_que_mais(m):
+    """Item no carrinho e a pergunta aberta "O que mais você quer?" (fase pedido)."""
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    m.tocar('add')
+    assert m.estado()['fase'] == 'pedido' and m.estado()['carrinho']['itens']
+
+
+def _abandono(m, marca=None):
+    """O que o src/app.py faz aos ABANDONO_SEG."""
+    from src.bot.fluxo import ABANDONO_SEG
+    marca = marca or m.estado()['ultima_msg']
+    m.agora += ABANDONO_SEG
+    return m.Bot(m.ctx).abandonar_carrinho(m.wa, marca)
+
+
+def test_calada_5_min_com_carrinho_esquece_e_volta_pro_menu():
+    m = Mundo()
+    _carrinho_no_o_que_mais(m)
+    m.wpp.limpar()
+    assert _abandono(m) is True
+    e = m.estado()
+    assert e['carrinho'] is None and e['fase'] == 'pedido'
+    assert 'Esvaziei seu carrinho' in m.wpp.textos()[-1]
+    assert 'pedir' in [i for i, _ in m.wpp.ultimos_botoes()]
+
+
+def test_falou_antes_do_abandono_nada_acontece():
+    m = Mundo()
+    _carrinho_no_o_que_mais(m)
+    marca = m.estado()['ultima_msg']
+    m.agora += 60
+    m.enviar('quero leite')  # falou: ultima_msg mudou
+    m.wpp.limpar()
+    assert _abandono(m, marca) is False
+    assert m.estado()['carrinho']['itens'] and not m.wpp.saida
+
+
+def test_sem_itens_no_carrinho_nao_abandona():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.wpp.limpar()
+    assert _abandono(m) is False
+    assert not m.wpp.saida
+
+
+def test_resumo_calado_esquece_e_sim_depois_nao_confirma():
+    m = pedido_ate_o_resumo(Mundo())
+    assert m.estado()['fase'] == 'confirmar'
+    assert _abandono(m) is True
+    assert m.estado()['carrinho'] is None and m.estado()['fase'] == 'pedido'
+    m.enviar('sim')
+    assert not m.mcp.chamadas_de('submitOrder')
+
+
+def test_segundo_abandono_com_a_mesma_marca_nao_faz_nada():
+    m = Mundo()
+    _carrinho_no_o_que_mais(m)
+    marca = m.estado()['ultima_msg']
+    assert _abandono(m, marca) is True
+    m.wpp.limpar()
+    assert m.Bot(m.ctx).abandonar_carrinho(m.wa, marca) is False
+    assert not m.wpp.saida
+
+
+def test_abandono_nao_chama_o_ifood_e_nao_mexe_em_ultima_msg():
+    m = Mundo()
+    _carrinho_no_o_que_mais(m)
+    marca = m.estado()['ultima_msg']
+    chamadas = len(m.mcp.chamadas)
+    assert _abandono(m, marca) is True
+    assert len(m.mcp.chamadas) == chamadas  # só esquece o carrinho local
+    assert m.estado()['ultima_msg'] == marca
+
+
+def test_marca_followup_vale_no_pedido_so_com_itens():
+    m = Mundo()
+    _carrinho_no_o_que_mais(m)
+    bot = m.Bot(m.ctx)
+    bot.wa, bot.u = m.wa, bot._carregar(m.wa)
+    assert bot.marca_followup() == m.estado()['ultima_msg']
+    m2 = Mundo()
+    m2.enviar('bom dia')  # menu: fase pedido, sem carrinho
+    bot2 = m2.Bot(m2.ctx)
+    bot2.wa, bot2.u = m2.wa, bot2._carregar(m2.wa)
+    assert bot2.u['fase'] == 'pedido' and bot2.marca_followup() is None
+
+
 # --- busca, cards e "mais opções" --------------------------------------------------------
 
 def test_mais_opcoes_reaproveita_a_lista_sem_buscar_de_novo(monkeypatch):

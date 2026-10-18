@@ -76,13 +76,47 @@ def rodada(wa_id: str, seq: int, espera: float, mid: str = ''):
         from src.shared import painel
         ctx = contexto_producao(estado, wpp, wa_id)
         painel.anotar_entrada(ctx.diario, wa_id, msgs)
+        bot = Bot(ctx)
         try:
-            Bot(ctx).processar(wa_id, msgs)
+            bot.processar(wa_id, msgs)
         finally:
             ctx.diario.descarregar()
+        try:  # calou com pergunta aberta ou carrinho cheio: follow-up aos 3 min, abandono aos 5
+            marca = bot.marca_followup() or bot.marca_abandono()
+            if marca:
+                pessoa_calada.spawn(wa_id, marca)
+        except Exception as e:  # noqa: BLE001 - o protocolo é bônus, a resposta já foi
+            print(f'agendar pessoa_calada falhou: {e!r}')
         return f'{len(msgs)} mensagem(ns)'
     finally:
         caixa.soltar_trava(wa_id, seq)
+
+
+@app.function(image=imagem, secrets=segredos, timeout=600)
+def pessoa_calada(wa_id: str, marca: float):
+    """Protocolo de quem calou (decisão do Fabio): aos FOLLOWUP_SEG cutuca uma vez; aos ABANDONO_SEG,
+    se ainda calada com itens no carrinho, esquece o carrinho. `marca` é o ultima_msg da rodada:
+    se a pessoa falou de novo, ele muda e o Bot não faz nada."""
+    from src.bot.contexto import contexto_producao
+    from src.bot.fluxo import ABANDONO_SEG, FOLLOWUP_SEG, Bot
+    from src.shared.whatsapp import WhatsApp
+    trava = f'trava:{wa_id}'
+    for limite, passo in ((FOLLOWUP_SEG, 'followup'), (ABANDONO_SEG, 'abandonar_carrinho')):
+        time.sleep(max(0.0, marca + limite - time.time()))
+        if (estado.get(f'u:{wa_id}') or {}).get('ultima_msg') != marca:
+            return 'a pessoa falou'
+        # mesma trava das rodadas: com uma resposta em andamento a pessoa falou, e não falamos por cima
+        if not estado.put(trava, {'seq': -2, 'ts': time.time()}, skip_if_exists=True):
+            return 'rodada em andamento'
+        ctx = contexto_producao(estado, WhatsApp(), wa_id, origem='followup')  # EspiaoWhatsApp + diário
+        try:
+            getattr(Bot(ctx), passo)(wa_id, marca)
+        finally:
+            ctx.diario.descarregar()
+            atual = estado.get(trava)
+            if atual and atual.get('seq') == -2:
+                estado.pop(trava, None)
+    return 'protocolo completo'
 
 
 @app.function(image=imagem, secrets=segredos, timeout=120)

@@ -49,6 +49,7 @@ FASES_QUE_EXPIRAM = {'endereco', 'complemento', 'bairro', 'cpf', 'endereco_escol
 VOLTOU = 'Faz um tempinho que você sumiu, recomeçamos? 🙂'
 # calou no meio de uma pergunta aberta: depois disso o bot cutuca uma vez (src/app.py dispara)
 FOLLOWUP_SEG = 180
+ABANDONO_SEG = 300  # continuou calada com itens no carrinho: esquece o carrinho (decisão do Fabio)
 FASES_FOLLOWUP = {'endereco', 'complemento', 'bairro', 'endereco_escolha', 'escolhendo', 'quantidade', 'opcao',
                   'mais', 'tirar', 'pagamento', 'confirmar'}
 
@@ -327,7 +328,10 @@ class Bot:
         """Depois do processar(): a rodada terminou com pergunta aberta? Devolve a marca (o ultima_msg
         desta rodada) pro src/app.py agendar o follow-up, ou None."""
         u = self.u
-        if not u or u.get('voz') or u.get('fase') not in FASES_FOLLOWUP:
+        if not u or u.get('voz'):
+            return None
+        # "O que mais você quer?" com itens no carrinho também é pergunta aberta
+        if u.get('fase') not in FASES_FOLLOWUP and not (u.get('fase') == 'pedido' and self._tem_itens()):
             return None
         if u['fase'] not in ('endereco', 'bairro') and not (u.get('pergunta') or {}).get('botoes'):
             return None  # sem pergunta guardada não há o que reapresentar
@@ -349,6 +353,32 @@ class Bot:
             self._voltar_pra_etapa(T.AINDA_AI)
         finally:
             u.update(guardado)
+            self._salvar()
+        return True
+
+    def _tem_itens(self):
+        return bool(((self.u or {}).get('carrinho') or {}).get('itens'))
+
+    def marca_abandono(self):
+        """Depois do processar(): tem itens no carrinho? Devolve a marca pro src/app.py agendar o
+        abandono (vale até no modo áudio, onde não há follow-up), ou None."""
+        return ((self.u or {}).get('ultima_msg') or None) if self._tem_itens() else None
+
+    def abandonar_carrinho(self, wa_id, marca):
+        """ABANDONO_SEG depois: continuou calada (ultima_msg == marca) com itens no carrinho e ainda
+        não esquecemos por essa marca? Esquece o carrinho como o cancelar(), SEM chamar o iFood, e
+        volta pro menu: no resumo, um "sim" tardio nunca confirma. Não mexe em ultima_msg."""
+        self.wa = wa_id
+        self.u = u = self._carregar(wa_id)
+        if not marca or u.get('ultima_msg') != marca or u.get('abandono_de') == marca or not self._tem_itens():
+            return False
+        u['abandono_de'] = marca
+        u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None, 'grupo': None,
+                  'kit': None, 'grupo_pendente': None, 'foto': None, 'fase': 'pedido'})
+        try:
+            self.menu(T.CARRINHO_ABANDONADO)
+        finally:
+            u['ultima_msg'] = marca
             self._salvar()
         return True
 

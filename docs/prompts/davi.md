@@ -115,3 +115,15 @@ pronto no chat). Sem deploy.
 **Resposta:** 6 frases novas no `COMANDOS` ('cancelar pedido', 'cancelar o pedido', 'cancelar compra',
 'cancelar a compra', 'quero cancelar', 'desistir'), sem mexer nas outras. 10 testes novos (273 passando),
 incluindo um que exige que "cancelar pedido" seja resolvido sem chamar o Gemini.
+
+## 2026-10-17 23:14 — protocolo de quem cala: follow-up aos 3 min e carrinho esquecido aos 5
+
+**Prompt:** "O Fabio (dono do claim bot-ifood-agent) pediu estas duas coisas ao Davi e liberou mexer no back. [...]
+PROTOCOLO (decisão do Fabio): pessoa calada. Aos 3 min (180 s) o bot manda UM follow-up. Aos 5 min (300 s), se
+continuar calada e houver itens no carrinho, o bot esquece o carrinho e avisa. PARTE A: ligar o follow-up no
+src/app.py [...] PARTE B: carrinho abandonado (src/bot/fluxo.py) [...]"
+
+**Resposta:** `src/app.py` não é protegido (só está no claim do Fabio, que liberou): função Modal `pessoa_calada`
+(follow-up aos 180 s, abandono aos 300 s, mesma trava da rodada, envio pelo `contexto_producao` com o diário)
+disparada no fim da `rodada`. Em fluxo.py: `ABANDONO_SEG`, `marca_abandono()`, `abandonar_carrinho()` e o
+`marca_followup()` valendo na fase pedido com itens. 7 testes novos (344 passando). Sem deploy.
