@@ -41,7 +41,7 @@ ESQUEMA = {
         'pagamento': {'type': 'STRING', 'nullable': True, 'enum': ['PIX', 'VALE_REFEICAO', 'VALE_ALIMENTACAO'],
                       'description': 'como a pessoa disse que vai pagar, se disse'},
         'sobre': {'type': 'STRING', 'nullable': True,
-                  'enum': ['status', 'codigo_entrega', 'previsao', 'itens', 'total', 'pagamento', 'endereco'],
+                  'enum': ['status', 'codigo_entrega', 'previsao', 'itens', 'total', 'minimo', 'pagamento', 'endereco'],
                   'description': 'quando acompanhar: do que a pessoa perguntou sobre o pedido'},
     },
     'required': ['acao'],
@@ -110,7 +110,8 @@ na tela, 1). Se ela disse quantidade, vai em itens.
 - "sim", "pode", "isso", "confirma", "fechou", "ok" = sim. "não", "nao quero", "errado" = nao.
 - "acabou", "só isso", "pode fechar", "terminei" = finalizar.
 - "cadê meu pedido", "já saiu?", "vai demorar?" = acompanhar. Qualquer pergunta sobre o pedido feito \
-também é acompanhar, com sobre: "qual o código de entrega" = codigo_entrega, "quanto deu" = total, "o que \
+também é acompanhar, com sobre: "qual o código de entrega" = codigo_entrega, "quanto deu" = total, "qual o \
+pedido mínimo?", "quanto é o mínimo da loja?" = minimo (pergunta o valor: não é total nem sugerir), "o que \
 eu pedi" = itens, "como paguei" = pagamento, "pra onde vai" = endereco, "que horas chega", "tá chegando?", "vai demorar?" = previsao, "o entregador \
 chegou?", "onde está meu pedido?" = status.
 - "o de sempre", "pedir igual da outra vez", "repetir" = repetir.
@@ -242,6 +243,17 @@ SUGESTAO = re.compile(r'\b(?:sugest|suger|sugir|recomend)\w*'
 
 def pede_sugestao(texto):
     return bool(SUGESTAO.search(normalizar(texto)))
+
+
+# "qual o valor minimo de pedido na drogaria?" é pergunta, não pedido de sugestão: o Gemini mandava pra
+# "quanto deu" e a pessoa recebia o carrinho (R$ 18,89) como se fosse o mínimo (R$ 20), duas vezes (18/10).
+_MINIMO = re.compile(r'\bminim[oa]\b')
+_PERGUNTA = re.compile(r'^(?:qual|quanto|quantos|tem|existe|precisa|e)\b|\b(?:qual|quanto|valor)\b')
+
+
+def pergunta_minimo(texto):
+    t = normalizar(texto)
+    return bool(_MINIMO.search(t)) and not SUGESTAO.search(t) and ('?' in str(texto) or bool(_PERGUNTA.search(t)))
 
 
 # --- endereço e complemento falados ------------------------------------------------------------

@@ -1638,3 +1638,26 @@ def test_aviso_de_botao_velho_nao_empilha_a_cada_toque():
         m.enviar(('botao', 'xyz:velho'))
     assert m.wpp.saida[-1][1]['texto'].count(T.BOTAO_VELHO) == 1
     assert m.estado()['pergunta']['texto'] == original and m.estado()['fase'] == 'confirmar'
+
+
+def test_pergunta_do_minimo_responde_o_minimo_e_nao_o_carrinho():
+    # 18/10: "qual o valor minimo de pedido na drogaria?" respondia "Seu pedido até agora: R$ 18,89" duas vezes
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')            # pão sírio do Supermercado Central, que no mock pede R$ 25
+    m.tocar('qtd:1')
+    assert 'Faltam' in m.wpp.textos()[-1]   # o "Quer mais alguma coisa?" já avisa que falta pro mínimo
+    m.wpp.limpar()
+    m.enviar('qual o valor minimo de pedido no mercado?')
+    textos = ' '.join(m.wpp.textos())
+    assert 'pedido mínimo do *Supermercado Central* é *R$ 25,00*' in textos and 'faltam' in textos
+    assert textos.count('Seu pedido até agora') == 1
+
+
+def test_pergunta_do_minimo_nao_e_sugestao_e_completar_o_minimo_continua_sendo():
+    from src.bot.interpretar import pede_sugestao, pergunta_minimo
+    assert pergunta_minimo('qual o valor minimo de pedido na drogaria?')
+    assert pergunta_minimo('quanto é o pedido mínimo')
+    assert not pergunta_minimo('me sugere algo pra completar o minimo')
+    assert pede_sugestao('me sugere algo pra completar o minimo')
+    assert not pergunta_minimo('quero 2 dipironas')

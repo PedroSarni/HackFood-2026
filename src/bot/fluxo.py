@@ -21,7 +21,7 @@ from src.bot import melhor_loja, ranking, relevancia, tutor, vitrine, voz
 from src.bot import textos as T
 from src.bot.combina import complementos
 from src.bot.ifood import PrecisaLogin
-from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, opcao_dita, pede_sugestao,
+from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, opcao_dita, pede_sugestao, pergunta_minimo,
                                  so_complemento, so_endereco,
                                  regra_rapida)
 from src.bot.recorrencia import DEMO_SEGUNDOS, botoes_lembrete, categoria
@@ -677,6 +677,9 @@ class Bot:
                 i = opcao_dita(texto, titulos)  # "é no centro": frase falada com o nome de uma opção
             if i is not None and len(texto) <= 60:
                 self.botao(u['pergunta']['botoes'][i][0])
+                return
+            if pergunta_minimo(texto):  # "qual o valor mínimo?": é pergunta, não sugestão nem "quanto deu"
+                self.acompanhar(sobre='minimo')
                 return
             if pede_sugestao(texto):  # "algo que complete esse valor": sem depender do Gemini
                 self.sugerir()
@@ -1822,7 +1825,8 @@ class Bot:
         if (getattr(self, '_falado', None) or {}).get('fechar'):  # "quero esse e pode fechar": direto pro fim
             self.finalizar()
             return
-        self.perguntar(T.mais_alguma(car.get('total') or car.get('subtotal'), self._pessoas()),
+        self.perguntar(T.mais_alguma(car.get('total') or car.get('subtotal'), self._pessoas(),
+                                     *_falta_minimo(car)),
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
 
     def mostrar_carrinho(self):
@@ -1831,7 +1835,7 @@ class Bot:
             self.perguntar(T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             return
         linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car['itens'])
-        self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"), self._pessoas())}',
+        self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"), self._pessoas(), *_falta_minimo(car))}',
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
 
     def perguntar_tirar(self, _arg=None):
@@ -2243,6 +2247,9 @@ class Bot:
         if not self.exigir_login(['botao', 'meu_pedido']):
             return
         car = self.u.get('carrinho') or {}
+        if sobre == 'minimo':  # o mínimo da loja, não o carrinho (18/10: "qual o mínimo?" respondia R$ 18,89)
+            self._responder_e_seguir(T.minimo_da_loja(car))
+            return
         if sobre == 'total' and car.get('itens'):  # "quanto deu?" montando o pedido: é o carrinho de agora
             self._responder_e_seguir(f'🧺 Seu pedido até agora: *{T.reais(car.get("total") or car.get("subtotal"))}*')
             return
@@ -2282,7 +2289,9 @@ class Bot:
         if fase in ('endereco', 'complemento', 'bairro'):
             self._voltar_pra_etapa(resposta)
         elif fase in NO_MEIO_DO_PEDIDO and (self.u.get('pergunta') or {}).get('botoes'):
-            self.repetir_pergunta(resposta)
+            # a pergunta na tela já diz isso ("Seu pedido até agora" no "quanto deu?"): não fala duas vezes
+            ja_diz = resposta and resposta in (self.u['pergunta'].get('texto') or '')
+            self.repetir_pergunta(None if ja_diz else resposta)
         else:
             self.perguntar(resposta, botoes or [T.B_MEU_PEDIDO, T.B_PEDIR], fase='acompanhando')
 
@@ -2948,3 +2957,8 @@ def _da_hora(agora):
     if 15 <= h < 18:
         return [('lanche', 'RESTAURANTE'), ('pão de queijo', 'RESTAURANTE')]
     return [('pizza', 'RESTAURANTE'), ('hambúrguer', 'RESTAURANTE')]
+
+
+def _falta_minimo(car):
+    """(falta, loja) pro aviso do "Quer mais alguma coisa?": sem ele o Finalizar parecia travado à toa."""
+    return (car.get('minimo') or 0) - (car.get('subtotal') or 0), car.get('loja')

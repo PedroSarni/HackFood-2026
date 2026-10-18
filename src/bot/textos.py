@@ -278,8 +278,23 @@ def proximo_da_lista(termo):
     return f'Agora vamos procurar *{termo}*: 👇'
 
 
-def mais_alguma(total, pessoas=None):
-    return f'🧺 Seu pedido até agora: *{reais(total)}*{dividido(total, pessoas, linha=True)}\n\nQuer mais alguma coisa?'
+def mais_alguma(total, pessoas=None, falta=None, loja=None):
+    aviso = f'\n{falta_minimo(falta, loja)}' if falta and falta > 0.005 else ''
+    return (f'🧺 Seu pedido até agora: *{reais(total)}*{dividido(total, pessoas, linha=True)}{aviso}'
+            '\n\nQuer mais alguma coisa?')
+
+
+def minimo_da_loja(carrinho):
+    """Resposta pro "qual o pedido mínimo?": o mínimo da loja, nunca o valor do carrinho."""
+    loja, minimo, sub = carrinho.get('loja'), carrinho.get('minimo'), carrinho.get('subtotal') or 0
+    if not carrinho.get('itens') or not loja:
+        return 'O pedido mínimo muda de loja pra loja. 🙂 Quando você escolher algo, eu te aviso se faltar.'
+    if not minimo:
+        return f'O *{loja}* não tem pedido mínimo. 🙂'
+    texto = f'O pedido mínimo do *{loja}* é *{reais(minimo)}*.'
+    if sub < minimo - 0.005:
+        return texto + f' Seu pedido está em {reais(sub)}: faltam *{reais(minimo - sub)}*. 🙂'
+    return texto + f' Seu pedido ({reais(sub)}) já passou do mínimo. ✅'
 
 
 # --- fechamento -------------------------------------------------------------------------
