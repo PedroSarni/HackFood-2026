@@ -864,15 +864,19 @@ class Bot:
         u = self.u
         car = u.get('carrinho') or {}
         ja = u.get('sugeridos') or {}
-        if ja.get('loja') != car.get('loja_id'):
+        if ja.get('loja') != car.get('loja_id') or 'termos' not in ja:  # sem carrinho as duas lojas são None
             ja = {'loja': car.get('loja_id'), 'termos': []}
         tipo = (u.get('atual') or {}).get('tipo_loja') or 'MERCADO'
         nomes = [i.get('nome') or '' for i in car.get('itens') or []]
         candidatos = ([{'termo': i['termo'], 'busca': i.get('busca'), 'tipo_loja': i.get('tipo_loja'),
                         'de_onde': 'combina'} for i in itens or []]
-                      + [{'termo': t, 'de_onde': 'combina'} for t in complementos(nomes, tipo)]
+                      # sem carrinho não tem o que acompanhar ("refrigerante" do nada não é recomendação):
+                      # vale o que ela costuma levar e, por último, algo da hora do dia
+                      + [{'termo': t, 'de_onde': 'combina'} for t in (complementos(nomes, tipo) if nomes else [])]
                       + [{'termo': t, 'de_onde': 'costuma'} for t in self._costuma(car)]
-                      + [{'termo': t, 'de_onde': 'parecido'} for t in self._parecidos(car)])
+                      + [{'termo': t, 'de_onde': 'parecido'} for t in self._parecidos(car)]
+                      + ([] if nomes else [{'termo': t, 'tipo_loja': lj, 'de_onde': 'hora'}
+                                           for t, lj in _da_hora(self.ctx.agora())]))
         candidatos = [c for c in candidatos if normalizar(c['termo'])]
         if candidatos and all(normalizar(c['termo']) in ja['termos'] for c in candidatos):
             ja['termos'] = []  # já sugeriu tudo: recomeça a roda
@@ -2469,3 +2473,15 @@ def _sugeridas(ofertas, s):
     if s.get('falta'):
         ofertas.sort(key=lambda o: (o['preco'] < s['falta'], abs(o['preco'] - s['falta'])))
     return ofertas
+
+
+def _da_hora(agora):
+    """Sugestão sem carrinho nem histórico: algo da hora do dia em Brasília (UTC-3, sem horário de verão)."""
+    h = time.gmtime(agora - 3 * 3600).tm_hour
+    if 5 <= h < 11:
+        return [('pão francês', 'MERCADO'), ('café', 'RESTAURANTE')]
+    if 11 <= h < 15:
+        return [('marmita', 'RESTAURANTE'), ('lanche', 'RESTAURANTE')]
+    if 15 <= h < 18:
+        return [('lanche', 'RESTAURANTE'), ('pão de queijo', 'RESTAURANTE')]
+    return [('pizza', 'RESTAURANTE'), ('hambúrguer', 'RESTAURANTE')]

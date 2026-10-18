@@ -1085,6 +1085,15 @@ def test_a_de_calabresa_grande_escolhe_pelo_nome_e_pelo_tamanho_falados():
     assert 'calabresa' in linha['nome'].lower() and any('Grande' in o['nome'] for o in linha.get('opcoes') or [])
 
 
+def test_recomendacao_sem_carrinho_nao_quebra_e_sugere_algo_da_hora():
+    m = Mundo()
+    endereco_pronto(m)                     # carrinho vazio e sem histórico (às 22h44 isso deu KeyError)
+    m.wpp.limpar()
+    m.enviar('o que voce me recomenda?')
+    textos = ' '.join(m.wpp.textos())
+    assert 'travadinha' not in textos and 'Que tal' in textos and m.wpp.cards()
+
+
 def test_audio_vira_pedido():
     m = Mundo()
     endereco_pronto(m)

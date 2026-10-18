@@ -465,3 +465,14 @@ def test_mock_tem_cafeteria_pro_cafe_expresso():
     r = mcp.chamar('searchOffers', query='café expresso', userLocation=loc, resultKind='ITEM',
                    merchantType='RESTAURANT')
     assert r['results'][0]['itemName'] == 'Café expresso'
+
+
+def test_sugestao_da_hora_do_dia_em_brasilia():
+    import calendar
+    from src.bot.fluxo import _da_hora
+
+    def em(h):  # h em Brasília = h + 3 em UTC
+        return calendar.timegm((2026, 10, 17, h + 3, 0, 0))
+    assert _da_hora(em(8))[0][0] == 'pão francês'
+    assert _da_hora(em(12))[0][0] == 'marmita'
+    assert _da_hora(em(20))[0][0] == 'pizza'

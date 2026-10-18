@@ -34,10 +34,13 @@ def falta_minimo(falta, loja=None):
 
 
 def sugestao(termo, de_onde, falta=None, loja=None):
-    """de_onde: 'combina' (acompanha o carrinho), 'costuma' (histórico nosso) ou 'parecido' (carrinho)."""
+    """de_onde: 'combina' (acompanha o carrinho), 'costuma' (histórico nosso), 'parecido' (carrinho) ou
+    'hora' (sem carrinho nem histórico: algo da hora do dia)."""
     topo = falta_minimo(falta, loja) + ' 🙂\n' if falta else ''
     if de_onde == 'combina':
         return f'{topo}Que tal *{termo}* pra acompanhar? Olha as opções 👇'
+    if de_onde == 'hora':
+        return f'{topo}Que tal *{termo}*? Separei umas opções 👇'
     motivo = 'que você costuma levar' if de_onde == 'costuma' else 'parecido com o que você já pegou'
     return f'{topo}Separei *{termo}*, {motivo}. Olha as opções 👇'
 

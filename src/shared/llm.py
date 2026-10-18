@@ -62,7 +62,8 @@ def _partes(partes):
 def _chamar(http, modelo, sistema, parts, esquema, prazo, pensamento):
     corpo = {'systemInstruction': {'parts': [{'text': sistema}]},
              'contents': [{'role': 'user', 'parts': parts}],
-             'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 2048,
+             # 2048 estourou no 3.5-flash-lite às 22h38 (MAX_TOKENS: gastou pensando); o JSON é pequeno
+             'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 4096,
                                   'responseMimeType': 'application/json',
                                   'responseSchema': esquema}}
     if pensamento:
