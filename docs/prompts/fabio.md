@@ -313,3 +313,23 @@ pedido* no lugar de *Fazer pedido*.
 **Prompt:** pra primeira mensagem deixe ela bem simplesinha e ja meta umas recomendacoes pra chamar atencao do cliente de acordo com os gostos dele, algo assim [prints do Ailo do iFood: carrossel "Tô afim de Lanches", "Quero pratos até R$ 45", "Descontos pra você"] faça essas categorias de recomendação feitas com agentes internos nossos
 
 **Resposta:** Claim `bot-welcome-showcase`. O "oi" agora é "Oi, Fabio! 😊 O que você quer pedir hoje? Pode escrever ou mandar áudio." e logo embaixo um carrossel montado por agentes internos (`src/bot/vitrine.py`): gosto (histórico nosso ou pedidos do app), hora do dia, precinho (maxItemPrice) e descontos (preço promocional real). Foto de produto real em cada card, no máximo 3 buscas por vitrine, guardada 20 min. Tocar ou falar o card busca aquilo com o mesmo teto/filtro. No modo áudio vira fotos numeradas + áudio.
+
+## 2026-10-17 ~23h20 — a lista tem que ir pro mercado que tem tudo (e o kit sem Coca)
+
+**Prompts:**
+- "quando eu estou escolhendo uma lista de mercado, sinto que ele vai pelo primeiro item e depois vai vendo se
+  tem os demais, mas ele deve selecionar um mercado que no minimo tem tudo né? assim como me deixar trocar de
+  mercado no meio, mas sempre garantir o melhor custo beneficio dentre os mercados que tem tudo que quero, o
+  mesmo pra restaurante né, gaste bastante tempo e atenção nessa feature pois é um dos coracoes do projeto,
+  muito cuidado"
+- "[print do kit pra 11 pessoas na Pizzaria Bella Napoli com o aviso "Não achei coca-cola nessa loja"] tem
+  isso aqui ele me recomendou esse lugar que nem tinha coca, nao era isso que eu queria, eu queria coca"
+
+**Resposta:** Era isso mesmo: a loja era a do 1º item escolhido e o resto da lista só era procurado nela; o
+kit escolhia a pizzaria pela pizza. Agora lista com 2+ itens (escrita, falada, de foto, e "pizza e uma coca")
+busca tudo antes e vai pra loja que tem TODOS os itens, a de menor conta entre elas (o mais barato de cada
+item x quantidade + entrega); nenhuma com tudo: a que tem mais, dizendo o que fica de fora. *Trocar de loja*
+(botão ou "tem outro mercado?") mostra as outras com quanto sai e leva o carrinho junto. O kit usa a mesma
+conta. Um filtro só do Gemini pra lista toda (um por item estourou a cota da chave: 429). Conferido com o
+Gemini real: a lista das 23h04 (8 itens) foi pro Supermercado Central em 1 s; pizza + Coca, pra Forno a
+Lenha. Mock ficou coerente (mercados com o básico todo, Coca na pizzaria).
