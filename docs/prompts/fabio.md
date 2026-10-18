@@ -279,3 +279,31 @@ resposta do Gemini subiu, porque o 3.5-flash-lite parou em MAX_TOKENS às 22h38.
 **Prompt:** quando eu peço exclusividade de audio, na hora de me enviar os lembretes sobre como pedido está ele fica enviando msg e depois para de mandar audio, apenas texto, quando peço tudo audio, deve ativar a funcao tudo audio, sabe?
 
 **Resposta:** O modo áudio desligava no "pedido feito" e o rastreio (outro processo) só mandava texto. Agora, com tudo áudio, o modo segue até o pedido chegar: cada aviso ("confirmou", "saiu pra entrega", "chegou") vira nota de voz curta, sem pergunta; acabou o rastreio, a sessão de áudio acaba. Áudio falhou, o aviso sai escrito. O rastreio espera 10 s antes da 1ª consulta pra não chegar antes do áudio do "pedido feito".
+
+## 2026-10-17 ~23h15 — perguntou o código de entrega e o bot ignorou
+
+**Prompt:** "no meio dos status do pedido eu perguntei novamente em um audio qual era o código de entrega e ele
+ignorou, isso era algo muito importante mas ele ignorou. A TODO MOMENTO AS MSGS DA PESSOA DEVEM SER
+INTERPRETADAS e tentar entender sobre o que ele esta falando e redirecionar a conversa pra isso se adaptando,
+tem que pensar em todo tipo de usuario que nao se comporta e adianta ou se atrasa em passos"
+
+**Resposta:** O Gemini entendia ("acompanhar"), mas o bot só sabia mostrar o status (23h02 e 23h03, duas
+vezes). Agora qualquer pergunta sobre o pedido feito é respondida no que foi perguntado (código de entrega,
+quanto deu, o que veio, pagamento, endereço, previsão), em qualquer etapa, e a pessoa volta pra onde estava
+(endereço, cards, pagamento). "Qual o código de entrega?" é reconhecido até sem o Gemini. Pra quem adianta ou
+atrasa passo: "a primeira foto que você mandou", "o dois" escolhem pela posição ("segunda-feira" e "arroz
+tipo um" não), CPF dito antes da hora fica guardado pra nota (e nunca vai pro Gemini), e o Gemini passou a
+saber qual foi o último pedido. Conferido com o Gemini real nas falas da produção: 10 de 11 certas (a que
+falhou, "eu já falei que quero um", pergunta "Qual deles?").
+
+## 2026-10-17 ~23h25 — "Tá chegando?" depois de confirmar não dizia nada
+
+**Prompt:** "perguntei sobre o status da entrega assim que ele confirmou e nao pareceu saber muito nao, ele
+ficou falando sobre fazer novo pedido, mensagem que só de ver ja ta mal escrita tbm ta escrito "fazer pedido"
+deveria ser no minimo, "fazer novo pedido". eu meio que nao tenho como perguntar como o pedido esta, onde
+está e etc"
+
+**Resposta:** "Tá chegando?" e "O entregador chegou?" (23h21) ganhavam uma linha de status e os botões de
+pedir de novo. Agora vem o status inteiro: onde está, quando chega em horário ("entre 23h46 e 23h56"), loja,
+número, código de entrega, o que vem e o total, com o botão *Atualizar status*. Quem já pediu vê *Fazer novo
+pedido* no lugar de *Fazer pedido*.
