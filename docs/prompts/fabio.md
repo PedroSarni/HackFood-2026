@@ -482,3 +482,10 @@ Meta exige a cobrança configurada pra entregar até o que é grátis. Passei o 
 no erro. A conta passou a aparecer com moeda BRL na Graph API (só leitura), mas às 05:30 o erro mudou pra forma
 de pagamento; o Fabio ajustou e, desde 05:30:28, nenhuma falha de entrega nos logs do Modal.
 
+
+## 2026-10-18 ~02h30 — mock desligado de novo
+
+**Prompt:** "desligue o mock"
+
+**Resposta:** Mock desligado (`scripts/modo.py --mock off`, sem deploy): o bot volta ao MCP real do iFood, com
+lojas fechadas aparecendo na busca (`--fechadas` ligado).
