@@ -139,3 +139,9 @@ os testes passam (213). Entra no ar quando aquela janela commitar e fizer o depl
 **Resposta:** Durante a conferência a outra janela publicou a voz (`51ef4ff`) e um conserto dela (`56aa1b3`).
 Deploy feito a partir do main limpo, com 215 testes passando: v24 no Modal às 21:42, com voz, mock
 consistente, sugestão do mínimo e Scribe. O que ainda estiver só na pasta, sem commit, não está no ar.
+
+## 2026-10-17 22:40 — key nova da ElevenLabs com voz
+
+**Prompt:** nova chave que funciona pra emitir voz: [key da ElevenLabs]
+
+**Resposta:** Key testada: TTS em ogg/opus mono (formato da nota de voz) e o Scribe também funciona com ela, então substituiu a antiga no secret `hackathon-elevenlabs`. Voz padrão trocada pra Roberta (pt-BR) no modelo flash: ~1 s por fala, medido contra Raquel, Ana Alice e Davi. Deploy feito; upload do ogg pra Meta conferido. Falta o teste ponta a ponta no WhatsApp ("me responde por áudio").
