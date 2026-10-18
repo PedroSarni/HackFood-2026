@@ -405,3 +405,36 @@ def test_ja_pode_passar_no_pix_fecha_direto_sem_resumo_nem_cpf():
     assert m.estado()['pedidos'][0]['total'] and m.estado()['carrinho'] is None
     assert interpretar.regra_rapida('já pode passar no pix') == {'acao': 'finalizar', 'pagamento': 'PIX'}
 
+
+
+def test_loja_que_recusa_mesmo_com_cpf_leva_a_lista_pra_outra_loja(monkeypatch):
+    """18/10: MERCH-007 com o CPF já guardado jogava a pessoa pro menu e a lista sumia. Agora o pedido vai inteiro
+    pra outra loja (o que já entrou + o item da vez + a fila), como no "Trocar de loja"."""
+    from src.shared import mcp_fake
+    from src.shared.ifood_mcp import ErroMCP
+    m = Mundo()
+    endereco_pronto(m)
+    u = m.estado()
+    u['cpf'] = '529.982.247-25'
+    m.armazem[f'u:{m.wa}'] = u
+    m.enviar('quero pao e leite')
+    assert m.estado()['fase'] == 'escolhendo' and m.estado()['fila']           # lista: pão agora, leite na fila
+    loja_a = m.estado()['plano']['escolhida']
+    original = mcp_fake.McpFake.t_createCart
+
+    def recusa(self, st, merchantId=None, **kw):
+        if merchantId == loja_a:
+            raise ErroMCP('MERCH-007', 'Este restaurante obriga a digitação do CPF', para_usuario='CPF obrigatório')
+        return original(self, st, merchantId=merchantId, **kw)
+    monkeypatch.setattr(mcp_fake.McpFake, 't_createCart', recusa)
+    n = len(m.wpp.saida)
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    textos = ' '.join(d.get('texto', '') for _, d in m.wpp.saida[n:])
+    assert 'não aceitou o pedido' in textos and 'nada se perde' in textos
+    assert 'O que você quer pedir' not in textos                               # não caiu no menu
+    e = m.estado()
+    assert e['plano']['escolhida'] != loja_a and loja_a in e['lojas_recusadas']
+    assert e['fase'] == 'escolhendo' and e['atual']['termo'] == 'pao'          # o pão de novo, na loja nova
+    assert [p['termo'] for p in e['fila']] == ['leite']                        # a fila continua
+    assert all(loja_a not in str(c) for _, d in m.wpp.saida[n:] if d.get('cards') for c in d['cards'])

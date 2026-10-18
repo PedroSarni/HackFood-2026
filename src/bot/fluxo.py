@@ -1688,6 +1688,39 @@ class Bot:
 
     # ================================================================== a loja da lista
 
+    def _loja_recusou(self):
+        """A loja não aceita o pedido nem com CPF (MERCH-007 de novo). 18/10: jogava pro menu e a lista se perdia.
+        Agora leva o pedido inteiro (carrinho + item da vez + fila) pra melhor outra loja, como o "Trocar de loja":
+        o que já entrou vai pelo equivalente de lá, e o item da vez é procurado de novo na loja nova."""
+        u = self.u
+        car = u.get('carrinho') or {}
+        recusada = car.get('loja_id') or (u.get('plano') or {}).get('escolhida')
+        recusadas = list(u.get('lojas_recusadas') or [])
+        if recusada and recusada not in recusadas:
+            recusadas.append(recusada)
+        u['lojas_recusadas'] = recusadas
+        nome = car.get('loja') or self._nome_da_loja(recusada) or 'essa loja'
+        try:
+            plano = u.get('plano')
+            if not plano or not any(lj['loja_id'] not in recusadas for lj in plano.get('lojas') or []):
+                plano = self._replanejar()
+            outras = [lj for lj in (plano or {}).get('lojas') or [] if lj['loja_id'] not in recusadas]
+            if not outras:
+                u['carrinho'] = None
+                self.menu(T.CPF_NAO_RESOLVEU)
+                return
+            self.dizer(T.loja_recusou(nome, outras[0]['loja']))
+            plano['escolhida'] = recusada
+            if not car.get('id'):   # o carrinho nem chegou a existir nessa loja: nada pra levar, só a lista
+                u['carrinho'] = None
+            if u.get('atual'):      # o item da vez (o que falhou) é procurado de novo na loja nova
+                u['troca_de'] = {'fase': 'escolhendo', 'pergunta': u.get('pergunta')}
+            self._mudar_de_loja(plano, outras[0])
+        except ErroMCP as e:  # a outra loja também não quis, ou o iFood caiu no meio: o caminho de sempre
+            print(f'loja recusou e a troca falhou: {e!r}')
+            u['carrinho'] = None
+            self.menu(T.CPF_NAO_RESOLVEU)
+
     def _tem_outra_loja(self):
         """Lista com plano e mais de uma loja: dá pra trocar de loja no meio."""
         return len((self.u.get('plano') or {}).get('lojas') or []) > 1
@@ -3049,7 +3082,7 @@ class Bot:
             if cpf_em(u.get('cpf') or ''):
                 # já temos o CPF e a loja recusou mesmo assim: pedir de novo não resolve
                 u['retomar_cpf'] = None
-                self.menu(T.CPF_NAO_RESOLVEU)
+                self._loja_recusou()
                 return
             u['cpf'] = None
             ult = u.get('ultima_acao')

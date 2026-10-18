@@ -1906,16 +1906,17 @@ def test_cpf_informado_fica_na_conversa_e_nao_e_pedido_de_novo(monkeypatch):
     _loja_exige_cpf(m, monkeypatch, vezes=2)
     m.tocar('pick:')
     m.tocar('qtd:3')
+    n0 = len(m.wpp.saida)
     m.enviar('529.982.247-25')  # a loja recusa de novo, mesmo com o CPF
-    textos = ' '.join(m.wpp.textos()[-2:])
+    textos = ' '.join(d.get('texto', '') for _, d in m.wpp.saida[n0:])
     assert 'vazio' not in textos and 'exige *CPF na nota*' not in m.wpp.textos()[-1]
-    assert 'Não consegui' in textos and m.estado()['fase'] == 'pedido'  # diz que não deu e volta pro menu
+    # 18/10: em vez de "não consegui" + menu, leva a lista pra outra loja e mostra o pão de novo lá
+    assert 'não aceitou o pedido' in textos and m.estado()['fase'] == 'escolhendo'
     assert m.estado()['cpf']  # o CPF continua guardado
-    m.wpp.limpar()
-    m.enviar('quero pao')  # 2ª tentativa: não pede o CPF de novo
-    m.tocar('pick:')
+    n = len(m.wpp.saida)
+    m.tocar('pick:')  # o pão na loja nova: não pede o CPF de novo
     m.tocar('qtd:3')
-    assert not any('exige *CPF na nota*' in t for t in m.wpp.textos())
+    assert not any('exige *CPF na nota*' in d.get('texto', '') for _, d in m.wpp.saida[n:])
     assert m.estado()['carrinho']['itens']
 
 

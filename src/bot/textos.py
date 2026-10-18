@@ -435,6 +435,11 @@ FECHANDO ='⏳ Fechando com a loja (entrega, pagamento e cupom). Já te mando o 
 CPF_OBRIGATORIO = ('🧾 Essa loja exige *CPF na nota* pra fazer o pedido.\n'
                    'Escreva seu CPF aqui (só os números), por favor. 🙂')
 
+def loja_recusou(loja, nova):
+    return (f'😕 O *{loja}* não aceitou o pedido, mesmo com o seu CPF.\n'
+            f'Sem problema: estou levando a sua lista pro *{nova}*, nada se perde. 👇')
+
+
 CPF_NAO_RESOLVEU = ('Não consegui seguir com essa loja, mesmo com o seu CPF. 😕\n'
                     'Seu CPF ficou guardado, não vou pedir de novo. Vamos tentar outra coisa?')
 NAO_RETOMEI = 'Anotei seu CPF! 🙂 Mas não consegui voltar pro que você estava fazendo.'
