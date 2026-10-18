@@ -333,3 +333,13 @@ item x quantidade + entrega); nenhuma com tudo: a que tem mais, dizendo o que fi
 conta. Um filtro só do Gemini pra lista toda (um por item estourou a cota da chave: 429). Conferido com o
 Gemini real: a lista das 23h04 (8 itens) foi pro Supermercado Central em 1 s; pizza + Coca, pra Forno a
 Lenha. Mock ficou coerente (mercados com o básico todo, Coca na pizzaria).
+
+## 2026-10-18 ~00h15 — quais são as tools do MCP do iFood
+
+**Prompt:** "quais as tools do mcp inteiro? só pra eu pensar aqui sobre"
+
+**Resposta:** Listei as 24 tools dos 4 domínios (User 3, Offer Discovery 6, Cart 13, Order Tracking 2), pelo
+resumo oficial do repo (`regras da api/ifood-mcp-developer-portal.json`), marcando as 19 que o bot já usa e as
+5 que não usa (browseOffers, listItemTaxonomy, getMerchant, updateCartItem, removeVoucher), com ideias de uso.
+Avisei que o disco C: da máquina está cheio (0 GB livres), o que pode travar git, Python e Modal locais (o bot
+no Modal não é afetado).
