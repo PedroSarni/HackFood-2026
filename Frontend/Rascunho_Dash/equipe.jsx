@@ -94,7 +94,7 @@ function Stage({ team, byId, step, offline, history, usage, mcp, picked, onPick,
         <strong>{a.nome}</strong><small>{a.cargo}</small>
       </button>;
     })}
-    {bubble && bubbleAt && <div key={`b-${step.key}`} className={`stage-bubble ${state}`} style={at(bubbleAt)} role="status"><b>{bubble.who}</b> {bubble.text}{step.ms > 0 && <small>{latency(step.ms)}</small>}</div>}
+    {bubble && bubbleAt && <div key={`b-${step.key}`} className={`stage-bubble ${state} ${bubbleAt === SPOT.maestro ? 'over-maestro' : ''}`} style={at(bubbleAt)} role="status"><b>{bubble.who}</b> {bubble.text}{step.ms > 0 && <small>{latency(step.ms)}</small>}</div>}
     {picked && <Peek id={picked} at={picked === 'cliente' ? SPOT.cliente : picked === 'maestro' ? SPOT.maestro : picked === 'ifood' ? SPOT.ifood : pos[picked]} agent={byId[picked]} usage={usage[picked]} history={history} byId={byId} mcp={mcp} onClose={() => onPick(null)} onOpenSheet={onOpenSheet} />}
     {!step && <div className="stage-idle">{offline ? 'Sem conexão com o servidor do painel.' : 'O time está esperando a próxima mensagem. Manda um “oi” pro bot no WhatsApp.'}</div>}
   </div>;

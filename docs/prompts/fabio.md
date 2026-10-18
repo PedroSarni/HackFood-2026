@@ -524,3 +524,10 @@ deploy: só o dash muda.
 
 **Resposta:** O enquadramento da foto passou a levar o rosto pro centro do círculo (zoom de 2,3x deslocado pra
 esquerda e pra baixo). Conferido no palco.
+
+## 2026-10-18 ~05h50 — balão em cima dos pauzinhos
+
+**Prompt:** "[print do balão \"Maestro Respondeu (botões)\" cobrindo os pauzinhos] o texto esta em cima dos bastoes de maestro arrume isso"
+
+**Resposta:** O balão do Maestro sobe mais que o dos agentes (84px em vez de 44px), porque o Maestro é maior e tem os
+pauzinhos por cima. Medido no navegador: o balão para 21px acima da ponta dos pauzinhos.
