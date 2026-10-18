@@ -188,6 +188,22 @@ def com_reserva(estado, real, reserva):
     return chamar
 
 
+PONTE_TENTATIVAS = 3   # 18/10 11h47: a 1ª ponte caiu num IP barrado também; cada container barrado se aposenta,
+PONTE_ESPERA = 2.0     # então a tentativa seguinte (depois de um respiro) nasce em outro lugar
+
+
+def _pela_ponte(ponte, token, ferramenta, args, dormir=time.sleep):
+    """A chamada por outro container, até PONTE_TENTATIVAS vezes se a ponte também cair em IP barrado."""
+    for tentativa in range(PONTE_TENTATIVAS):
+        try:
+            return ponte(token, ferramenta, args)
+        except ifood_mcp.ErroMCP as e:
+            if not ifood_mcp.bloqueio_akamai(e) or tentativa == PONTE_TENTATIVAS - 1:
+                raise
+            print(f'ponte {tentativa + 1}/{PONTE_TENTATIVAS} também barrada, tentando outro container')
+            dormir(PONTE_ESPERA)
+
+
 def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2, ponte=None, ponte_token=None):
     """Função chamar(tool, **args) com o token da pessoa, renovando quando precisa.
     Token recusado no meio do caminho: renova uma vez e tenta de novo."""
@@ -247,10 +263,10 @@ def chamador_real(armazem, wa_id, prazo=ifood_mcp.PRAZO, tentativas=2, ponte=Non
                 raise
             print(f'MCP {wa_id}: o IP deste container está barrado, {ferramenta} vai pela ponte')
             try:
-                return ponte(tok['access_token'], ferramenta, args)
+                return _pela_ponte(ponte, tok['access_token'], ferramenta, args)
             except ifood_mcp.SemAutorizacao:
                 tok = tokens_validos(forcar=True)
-                return ponte(tok['access_token'], ferramenta, args)
+                return _pela_ponte(ponte, tok['access_token'], ferramenta, args)
 
     return chamar
 

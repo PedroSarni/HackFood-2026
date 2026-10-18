@@ -322,3 +322,23 @@ def test_rastreio_sem_login_para_sem_quebrar():
         def ifood(self, _wa):
             return Api()
     assert acompanhar(Ctx(), 'wa', 'p1', dormir=lambda s: None) == 'sem_autorizacao'
+
+
+def test_ponte_barrada_tenta_outro_container_ate_3_vezes(monkeypatch):
+    from src.bot import contexto
+    from src.shared import ifood_mcp as M
+    monkeypatch.setattr(contexto.time, 'sleep', lambda s: None)
+    vezes = []
+
+    def ponte(token, ferramenta, args):
+        vezes.append(1)
+        if len(vezes) < 3:
+            raise M.ErroMCP('HTTP_403', 'Access Denied na ponte')
+        return {'ok': len(vezes)}
+    assert contexto._pela_ponte(ponte, 't', 'getUser', {}) == {'ok': 3} and len(vezes) == 3
+    vezes.clear()
+    with pytest.raises(M.ErroMCP):   # 3 barradas: desiste (e, com o modo palco, cai no mock)
+        contexto._pela_ponte(lambda *a: (_ for _ in ()).throw(M.ErroMCP('HTTP_403', 'Access Denied')), 't', 'getUser', {})
+    with pytest.raises(M.ErroMCP) as e:  # erro de negócio na ponte não tenta de novo
+        contexto._pela_ponte(lambda *a: (_ for _ in ()).throw(M.ErroMCP('ITEM_NOT_AVAILABLE', 'x')), 't', 'getItem', {})
+    assert e.value.codigo == 'ITEM_NOT_AVAILABLE'
