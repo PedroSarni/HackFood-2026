@@ -191,6 +191,85 @@ def pede_sugestao(texto):
     return bool(SUGESTAO.search(normalizar(texto)))
 
 
+# --- endereço e complemento falados ------------------------------------------------------------
+# Quem fala não dita o endereço, conta: "pode mandar pra minha casa, que é na Rua Adolfo Catani, 676"
+# ia inteiro pro geocode e virou o nome da rua (17/10 22h21); "eu moro no apartamento quatorze."
+# virou o complemento. Aqui sai só o dado.
+
+_LOGRADOURO_TXT = re.compile(r'\b(?:rua|r\.|av\.?|avenida|travessa|tv\.|pra[çc]a|alameda|al\.|rodovia|rod\.'
+                             r'|estrada|largo|viela|servid[ãa]o)(?=[\s.,])', re.I)
+_UNIDADES = {'zero': 0, 'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'tres': 3, 'quatro': 4, 'cinco': 5, 'seis': 6,
+             'sete': 7, 'oito': 8, 'nove': 9, 'dez': 10, 'onze': 11, 'doze': 12, 'treze': 13, 'quatorze': 14,
+             'catorze': 14, 'quinze': 15, 'dezesseis': 16, 'dezessete': 17, 'dezoito': 18, 'dezenove': 19,
+             'vinte': 20, 'trinta': 30, 'quarenta': 40, 'cinquenta': 50, 'sessenta': 60, 'setenta': 70,
+             'oitenta': 80, 'noventa': 90, 'cem': 100, 'cento': 100, 'duzentos': 200, 'trezentos': 300,
+             'quatrocentos': 400, 'quinhentos': 500, 'seiscentos': 600, 'setecentos': 700, 'oitocentos': 800,
+             'novecentos': 900}
+
+
+def numero_falado(palavras):
+    """'trinta e dois' -> 32, 'cento e quatro' -> 104, 'mil e vinte' -> 1020; None se não for número."""
+    total, parcial, achou = 0, 0, False
+    for p in normalizar(palavras).split():
+        if p == 'e' and achou:
+            continue
+        if p == 'mil':
+            total += (parcial or 1) * 1000
+            parcial, achou = 0, True
+        elif p in _UNIDADES:
+            parcial += _UNIDADES[p]
+            achou = True
+        else:
+            return None
+    return total + parcial if achou else None
+
+
+def so_endereco(texto):
+    """'pode mandar pra minha casa, que é na Rua X, 676' -> 'Rua X, 676'. Sem rua/avenida na frase
+    (só o CEP, por exemplo), devolve o texto como veio."""
+    s = ' '.join(str(texto or '').split()).strip(' .!')
+    m = _LOGRADOURO_TXT.search(s)
+    return s[m.start():].strip(' .!') if m and m.start() > 0 else s
+
+
+_NUM_FALADO = (r'(?:\d+[a-z]?|[a-z](?=\W|$)|(?:(?:zero|uma?|duas|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|onze'
+               r'|doze|treze|quatorze|catorze|quinze|dezesseis|dezessete|dezoito|dezenove|vinte|trinta|quarenta'
+               r'|cinquenta|sessenta|setenta|oitenta|noventa|cem|cento|duzentos|trezentos|quatrocentos|quinhentos'
+               r'|seiscentos|setecentos|oitocentos|novecentos|mil)(?: e |\s)?)+)')
+_PECA = re.compile(r'\b(apartamento|apto|ap|bloco|bl|casa|sala|andar|torre|lote|lt|quadra|qd|kitnet|edificio|predio)'
+                   r'\.?\s*(?:numero |n )?(' + _NUM_FALADO + r')?')
+_NOME_PECA = {'apartamento': 'Apto', 'apto': 'Apto', 'ap': 'Apto', 'bloco': 'Bloco', 'bl': 'Bloco', 'casa': 'Casa',
+              'sala': 'Sala', 'andar': 'Andar', 'torre': 'Torre', 'lote': 'Lote', 'lt': 'Lote', 'quadra': 'Quadra',
+              'qd': 'Quadra', 'kitnet': 'Kitnet', 'edificio': 'Edifício', 'predio': 'Prédio'}
+_ORDINAL = ['primeiro', 'segundo', 'terceiro', 'quarto', 'quinto', 'sexto', 'setimo', 'oitavo', 'nono', 'decimo']
+_ENCHIMENTO_COMPL = re.compile(r'^(?:(?:eu |a gente )?(?:moro|mora|fico|fica)(?: no| na| em)?|e o|e a|e no|e na|e|o|a'
+                               r'|no|na|tem|sim|sim tem|fica no|fica na)\s+')
+
+
+def so_complemento(texto):
+    """'eu moro no apartamento quatorze.' -> 'Apto 14'; 'bloco b apartamento trinta e dois' ->
+    'Bloco B, Apto 32'; 'casa dos fundos' -> 'Casa dos fundos'. Sem peça conhecida, tira só o
+    enchimento do começo ('é o 14 B' -> '14 B')."""
+    bruto = ' '.join(str(texto or '').split()).strip(' .!')
+    t = normalizar(bruto)
+    pecas = []
+    for m in _PECA.finditer(t):
+        nome, num = _NOME_PECA[m.group(1)], (m.group(2) or '').strip()
+        if num and not re.fullmatch(r'\d+[a-z]?|[a-z]', num):
+            num = str(numero_falado(num) or num)
+        pecas.append(f'{nome} {num.upper()}' if num else nome)
+    m = re.search(r'\b(\d+|primeiro|segundo|terceiro|quarto|quinto|sexto|setimo|oitavo|nono|decimo)o? andar\b', t)
+    if m:  # "segundo andar" -> "2º andar" (o _PECA só pega número DEPOIS da palavra)
+        n = m.group(1) if m.group(1).isdigit() else str(_ORDINAL.index(m.group(1)) + 1)
+        pecas = [p for p in pecas if p != 'Andar'] + [f'{n}º andar']
+    if 'fundos' in t.split():
+        pecas.append('Fundos')
+    if pecas:
+        return ', '.join(dict.fromkeys(pecas))
+    sem = _ENCHIMENTO_COMPL.sub('', t)
+    return bruto if sem == t else (bruto[len(bruto) - len(sem):] if bruto.lower().endswith(sem) else sem)
+
+
 def igual_a_botao(texto, titulos):
     """A pessoa digitou o texto de um dos botões na tela? Devolve o índice ou None."""
     t = normalizar(texto)

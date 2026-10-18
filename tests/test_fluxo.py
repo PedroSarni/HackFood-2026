@@ -192,7 +192,7 @@ def test_apto_no_complemento_continua_salvando():
     m.enviar('Rua das Flores, 120, São Carlos')
     m.tocar('cand:0')
     m.enviar('apto 12')
-    assert _salvos(m)[-1]['complement'] == 'apto 12'
+    assert _salvos(m)[-1]['complement'] == 'Apto 12'  # padronizado (src/bot/interpretar.py, so_complemento)
 
 
 def test_ola_no_bairro_nao_salva():

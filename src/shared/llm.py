@@ -23,7 +23,8 @@ import time
 import httpx
 
 GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
-MODELOS = [('gemini-3.1-flash-lite', 6.0, ''), ('gemini-3.5-flash-lite', 6.0, ''),
+# 17/10 23h: o 3.1-lite passou a estourar 6 s seguidos e o 3.5-lite responde em ~1,2 s: o 3.5 vai na frente
+MODELOS = [('gemini-3.5-flash-lite', 6.0, ''), ('gemini-3.1-flash-lite', 4.0, ''),
            ('gemini-3.8-flash', 9.0, 'low')]
 MAX_INLINE = 18 * 1024 * 1024
 

@@ -20,6 +20,7 @@ from src.bot import textos as T
 from src.bot.combina import complementos
 from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, opcao_dita, pede_sugestao,
+                                 so_complemento, so_endereco,
                                  regra_rapida)
 from src.bot.recorrencia import DEMO_SEGUNDOS, botoes_lembrete, categoria
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
@@ -529,6 +530,7 @@ class Bot:
                 elif not _parece_endereco(texto):
                     self.perguntar(T.ENDERECO_NAO_PARECE, [T.B_TENTAR, T.B_INICIO], fase='endereco')
                 else:
+                    texto = so_endereco(texto)  # "pode mandar pra minha casa, que é na Rua X, 1" -> "Rua X, 1"
                     u['ultima_acao'] = ['endereco', texto]  # "Tentar de novo" reusa o que ela digitou
                     self.receber_endereco(texto)
                 return
@@ -537,7 +539,7 @@ class Bot:
                 if (r and r['acao'] == 'nao') or normalizar(texto) in SEM_COMPLEMENTO:
                     self.sem_complemento()
                 else:
-                    self.receber_complemento(texto)
+                    self.receber_complemento(so_complemento(texto))  # "eu moro no apartamento 14" -> "Apto 14"
                 return
             if fase == 'bairro':
                 self.receber_bairro(texto)
