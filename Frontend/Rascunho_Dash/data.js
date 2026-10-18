@@ -1,5 +1,8 @@
 // Somente fixtures de demonstração. Nunca inserir registros reais neste armazenamento.
-export const REFERENCE_DATE = '2026-10-17';
+export const FIXTURE_DATE = '2026-10-17';
+// Base de exemplo usa a data fixa; ao vivo, o dia de hoje (App chama setReferenceDate).
+export let REFERENCE_DATE = FIXTURE_DATE;
+export const setReferenceDate = value => { REFERENCE_DATE = value; };
 export const STORAGE_KEY = 'hackfood-demo-sessions-v1';
 export const STATUSES = {
   completed: { label: 'Concluída', tone: 'green' },
@@ -9,6 +12,7 @@ export const STATUSES = {
   payment: { label: 'Aguardando pagamento', tone: 'purple' },
   cancelled: { label: 'Cancelada', tone: 'neutral' },
   failed: { label: 'Falha', tone: 'red' },
+  idle: { label: 'Sem carrinho', tone: 'neutral' },
 };
 export const STAGES = [
   'Conversa iniciada', 'Intenção identificada', 'Recomendação apresentada',
@@ -130,6 +134,6 @@ export function advancePitch(session) {
 
 export function csvExport(sessions) {
   const escape = value => `"${String(value ?? '').replace(/^[=+@\-\t\r]/, "'$&").replaceAll('"', '""')}"`;
-  const rows = [['Origem dos dados', 'Conversa', 'Cliente', 'Início', 'Status', 'Restaurante', 'Carrinho BRL', 'Compra confirmada BRL'], ...sessions.map(s => ['Simulado', s.id, s.clientId, s.startedAt, STATUSES[s.status].label, s.restaurant, (s.amountCents / 100).toFixed(2), (isSale(s) ? s.amountCents / 100 : 0).toFixed(2)])];
+  const rows = [['Origem dos dados', 'Conversa', 'Cliente', 'Início', 'Status', 'Restaurante', 'Carrinho BRL', 'Compra confirmada BRL'], ...sessions.map(s => [s.demo ? 'Simulado' : 'Bot WhatsApp', s.id, s.clientId, s.startedAt, STATUSES[s.status].label, s.restaurant, (s.amountCents / 100).toFixed(2), (isSale(s) ? s.amountCents / 100 : 0).toFixed(2)])];
   return '\uFEFF' + rows.map(r => r.map(escape).join(';')).join('\r\n');
 }

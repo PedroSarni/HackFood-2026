@@ -1,32 +1,7 @@
 """Diário do painel: conversa de verdade (Bot + fakes) vira sessão do dash."""
 from src.shared import painel
-from tests.fakes import Armazem, Mundo
+from src.painel.simulador import MundoAnotado
 from tests.test_fluxo import pedido_ate_o_resumo
-
-
-class MundoAnotado(Mundo):
-    """Mundo com os mesmos espiões da produção (src/bot/contexto.py e src/app.py)."""
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.painel = Armazem()
-        self.diario = painel.Diario(self.painel, agora=lambda: self.agora, intervalo=None)
-        self.ctx.wpp = painel.EspiaoWhatsApp(self.wpp, self.diario)
-        mcp = self.mcp
-        self.ctx._chamador = lambda wid: painel.espiar_mcp(mcp.chamar, self.diario, wid)
-        Bot, diario = self.Bot, self.diario
-
-        class BotAnotado(Bot):
-            def processar(self, wa_id, msgs):
-                painel.anotar_entrada(diario, wa_id, msgs)
-                return super().processar(wa_id, msgs)
-        self.Bot = BotAnotado
-
-    def eventos(self):
-        return [v for k, v in self.painel.items() if k.startswith('ev:')]
-
-    def sessoes(self, depois=0):
-        return painel.montar_sessoes(self.eventos(), agora=self.agora + depois)
 
 
 def test_compra_completa_vira_sessao_concluida_com_valor_e_historico():

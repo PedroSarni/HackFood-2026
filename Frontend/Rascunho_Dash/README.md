@@ -11,6 +11,26 @@ npm run dev
 
 Abra a URL exibida pelo Vite. `npm run build` gera `dist/`. `npm run preview` serve o build. As rotas usam o histórico do navegador: uma hospedagem estática futura deve direcionar caminhos desconhecidos a `index.html`.
 
+## Ao vivo (dados do bot em tempo real)
+
+O dash abre por padrão **ao vivo**: lê o diário do bot (`src/shared/painel.py`) por um servidor
+local que empurra as conversas por SSE. Dois terminais, na raiz do repo:
+
+```sh
+.venv/Scripts/python.exe -m src.painel.servidor             # bot de verdade (modal.Dict hackfood-painel; precisa do login do Modal)
+.venv/Scripts/python.exe -m src.painel.servidor --simular   # ou: clientes simulados conversando com o Bot de verdade, só nesta máquina
+```
+
+```sh
+cd Frontend/Rascunho_Dash && npm run dev    # o Vite repassa /api pra 127.0.0.1:8787
+```
+
+- O seletor no topo troca entre **Ao vivo** e **Base de exemplo** (as fixtures abaixo, com a data fixa de 17/10/2026). "Simular compra" usa a base de exemplo.
+- Cada mensagem que entra ou sai e cada chamada ao MCP vira evento; `montar_sessoes` transforma isso nas sessões deste painel (mesmo formato das fixtures). Etapas do funil vêm das chamadas ao MCP: `searchOffers` → recomendação, `getItem` → seleção, `createCart`/`addItemToCart` → carrinho, `getCartDeliveryMethods` → carrinho confirmado, `listPaymentMethods` → checkout, `setCartPayment` → pagamento, `submitOrder` → pedido, `trackOrder` DELIVERED → entrega.
+- Sessão nova: 6h sem falar, mensagem depois de um pedido confirmado, ou lembrete de recorrência (origem *Follow-up*). Abandono: carrinho parado 30 min; se a pessoa volta e fecha, vira *Recuperada*.
+- Privacidade: CPF digitado sai mascarado, link de login não é gravado, telefone aparece mascarado e o servidor só escuta em 127.0.0.1.
+- Compra nova chega como aviso na tela; o drawer de uma conversa aberta atualiza sozinho.
+
 ## Experiência
 
 - Modo básico como padrão; preferência de modo preservada no navegador.
