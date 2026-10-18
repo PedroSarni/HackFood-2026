@@ -1831,8 +1831,8 @@ class Bot:
 
     def mostrar_carrinho(self):
         car = self.u.get('carrinho') or {}
-        if not car.get('itens'):
-            self.perguntar(T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
+        if not car.get('itens'):  # 18/10: "mostra o meu carrinho" vazio só perguntava o que pedir, sem dizer que estava vazio
+            self.perguntar(T.CARRINHO_VAZIO + '\n\n' + T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             return
         linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car['itens'])
         self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"), self._pessoas(), *_falta_minimo(car))}',

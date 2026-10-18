@@ -1680,3 +1680,13 @@ def test_finalizar_avisa_na_hora_e_toque_repetido_nao_refaz_o_resumo():
     textos = ' '.join(m.wpp.textos()[antes:])
     assert 'resumo do pedido está aí em cima' in textos and 'Confira seu pedido' not in textos
     assert len(m.mcp.chamadas_de('getCart')) == getcart and m.estado()['fase'] == 'confirmar'
+
+
+def test_ver_carrinho_vazio_diz_que_esta_vazio():
+    # 18/10: esvaziou o carrinho, "mostra o meu carrinho" só respondeu "O que você quer pedir?"
+    m = Mundo()
+    endereco_pronto(m)
+    m.wpp.limpar()
+    m.llm.resposta = {'acao': 'ver_pedido'}
+    m.enviar('mostra o meu carrinho')
+    assert 'está vazio' in ' '.join(m.wpp.textos())
