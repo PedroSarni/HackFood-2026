@@ -151,7 +151,7 @@ def test_foto_de_outra_coisa_comenta_e_pede_o_pedido():
     m.llm.foto = {'tipo': 'outro', 'descricao': 'documento', 'resposta': '[fala] Recebi sua foto! 🙂'}
     m.enviar(('foto', 'doc1'))
     assert '[fala] Recebi sua foto' in textos(m) and 'lista de compras' in textos(m)
-    assert m.estado()['fase'] == 'escolhendo'  # e volta pra onde estava
+    assert m.estado()['fase'] == 'pedido'  # sem relação com os cards: volta pro menu (U8)
 
 
 def test_foto_de_outra_coisa_no_comeco_vai_pro_menu():
@@ -539,3 +539,17 @@ def test_lista_anotada_mostra_a_quantidade_so_quando_tem():
     assert '1. pão francês\n' in anotei and '2. 2x leite\n' in anotei
     sem_qtd = T.lista_de_compras([{'termo': 'arroz'}, {'termo': 'feijão', 'quantidade': 3}])
     assert '1. arroz\n2. 3x feijão' in sem_qtd and 'Começando por *arroz*' in sem_qtd
+
+
+def test_foto_sem_relacao_no_meio_dos_cards_limpa_os_restos():
+    m = pronto(Mundo())  # os cards do pão estão na tela
+    assert m.estado()['fase'] == 'escolhendo' and m.estado()['visiveis']
+    m.wpp.limpar()
+    m.llm.foto = {'tipo': 'outro', 'descricao': 'paisagem', 'resposta': '[fala] Que vista linda! 😍'}
+    m.enviar(('foto', 'praia1'))
+    assert 'Gostou de algum' not in textos(m) and 'Quero esse' not in textos(m)
+    assert 'outra' not in ids(m) and 'pedir' in ids(m)  # nada de "Procurar outra" sem card
+    assert m.estado()['fase'] == 'pedido' and not m.estado()['visiveis']
+    m.wpp.limpar()
+    m.enviar('sim')
+    assert 'Qual deles' not in textos(m)  # o "sim" não cai nos cards antigos

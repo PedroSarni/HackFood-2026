@@ -260,3 +260,21 @@ carrinho continua com as linhas. B: "Anotei sua lista" mostra "2x leite" quando 
 unidade, então "1 kg" só aparece se já vier no termo). C: "pagando com *PIX*", com a forma do lembrete ou a preferida.
 D: "Te chamo de novo na semana que vem/amanhã/no mês que vem". E: o aviso do menu ("cancelei") ficava guardado como
 pergunta e voltava em toda repetição; agora vale uma vez só. 8 testes novos, nenhum existente mudou. Sem deploy.
+
+## 2026-10-18 06:40 — sugestões validadas no código e foto sem relação (U13, U23, U8)
+
+**Prompts:**
+- "Três acertos nas sugestões. ANTES: git pull e git log -5 -- src/agentes/ (Pedro/Breno podem estar editando
+  agentes; se houver commit de hoje na Duda, me avise e pare). A. U13: o resumo sugere 'Quer refrigerante pra
+  acompanhar?' mesmo com Guaraná 2L no pedido [...] B. U23: o bot sugeriu 'pãozinho pra acompanhar o café' com leite
+  no carrinho. A frase só pode citar itens que realmente estão no carrinho. C. U8: foto sem relação [...] o estado
+  volta ao menu e sem esses restos. Princípio mantido: o agente só PROPÕE (JSON), o código decide e valida [...]"
+- "Sim, siga com A, B e C. [...] Pode editar src/bot/combina.py, src/bot/fluxo.py, src/bot/foto.py e
+  src/bot/textos.py [...] NÃO edite src/agentes/ nem src/bot/relevancia.py [...]"
+
+**Resposta:** Parei primeiro: a Duda (relevancia.py) tinha commits de hoje do Fabio (e31eedd 01:40, db33ba9 00:05).
+Liberado, sem tocar na Duda: `ja_tem` (combina.py) barra categoria que o carrinho já tem (Guaraná = refrigerante),
+tanto no `complementos` quanto no que a IA propõe no sugerir; `so_o_produto` tira a justificativa do termo da IA
+("pra acompanhar o café"), e a frase fica a do código, que não cita nada. Foto sem relação no meio dos cards volta
+pro menu sem os cards na memória. 1 teste existente mudou (afirmava `fase == 'escolhendo'` depois da foto sem
+relação, o oposto do pedido). 3 testes novos, 473 passando. Sem deploy.

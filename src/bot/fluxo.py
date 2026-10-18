@@ -2517,6 +2517,12 @@ class Bot:
                                [(f'{T.B_FOTO_SIM[0]}:{fid}', T.B_FOTO_SIM[1]), (f'{T.B_FOTO_NAO[0]}:{fid}', T.B_FOTO_NAO[1])],
                                fase='foto')
             return
+        if u.get('fase') == 'escolhendo':
+            # foto sem relação no meio dos cards: o rodapé "Gostou de algum?" sem card nenhum e o "sim" de
+            # depois caindo nos cards antigos confundiam; volta pro menu sem os cards na memória
+            u.update(visiveis=[], lista_atual=None)
+            self.menu(T.foto_outro(lido['resposta']))
+            return
         self._voltar_com(T.foto_outro(lido['resposta']))
 
     def _voltar_com(self, fala):
