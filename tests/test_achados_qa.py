@@ -393,11 +393,11 @@ def test_ja_pode_passar_no_pix_fecha_direto_sem_resumo_nem_cpf():
     m = Mundo()
     endereco_pronto(m)
     m.tocar('pick:')
-    m.tocar('qtd:2')
+    m.tocar('qtd:3')             # como em pedido_ate_o_resumo: passa do pedido mínimo da loja do mock
     m.wpp.limpar()
     m.enviar('já pode passar no pix')
     textos = ' '.join(m.wpp.textos())
-    assert len(m.mcp.chamadas_de('submitOrder')) == 1
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1, textos[-400:]
     assert 'Confira seu pedido' not in textos and 'CPF' not in textos and 'Como você quer pagar' not in textos
     assert 'Pedido feito' in textos and 'PIX' in textos
     pag = m.mcp.chamadas_de('setCartPayment')[-1]['paymentMethodId']
