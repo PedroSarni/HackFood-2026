@@ -439,7 +439,7 @@ A fonte "Demonstração" é simulada e vem sempre com esse rótulo.
 ### 13.2 O time de agentes: como melhorar um agente sem mexer nos outros
 
 Cada agente tem um arquivo em `src/agentes/<id>.py`: Lia (entendimento), Íris (foto), Duda (relevância), Beto
-(kit em grupo), Tito (tutor), Vina (voz) e Otto (ouvido). O arquivo guarda:
+(kit em grupo), Tungs (tutor), Vina (voz) e Otto (ouvido). O arquivo guarda:
 - o crachá do agente (nome, cargo, bordão);
 - o plano B, ou seja, o que o bot faz sem ele;
 - onde fica o prompt;
