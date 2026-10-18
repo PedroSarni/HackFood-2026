@@ -297,7 +297,7 @@ def so_endereco(texto):
     return s[m.start():].strip(' .!') if m and m.start() > 0 else s
 
 
-_NUM_FALADO = (r'(?:\d+[a-z]?|[a-z](?=\W|$)|(?:(?:zero|uma?|duas|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|onze'
+_NUM_FALADO = (r'(?:\d+[a-z]?|[a-z]{1,2}-?\d+[a-z]?(?=\W|$)|[a-z](?=\W|$)|(?:(?:zero|uma?|duas|dois|tres|quatro|cinco|seis|sete|oito|nove|dez|onze'
                r'|doze|treze|quatorze|catorze|quinze|dezesseis|dezessete|dezoito|dezenove|vinte|trinta|quarenta'
                r'|cinquenta|sessenta|setenta|oitenta|noventa|cem|cento|duzentos|trezentos|quatrocentos|quinhentos'
                r'|seiscentos|setecentos|oitocentos|novecentos|mil)(?: e |\s)?)+)')
@@ -320,7 +320,7 @@ def so_complemento(texto):
     pecas = []
     for m in _PECA.finditer(t):
         nome, num = _NOME_PECA[m.group(1)], (m.group(2) or '').strip()
-        if num and not re.fullmatch(r'\d+[a-z]?|[a-z]', num):
+        if num and not re.fullmatch(r'\d+[a-z]?|[a-z]{1,2}-?\d+[a-z]?|[a-z]', num):  # "casa j4" (18/10 virou só "Casa")
             num = str(numero_falado(num) or num)
         pecas.append(f'{nome} {num.upper()}' if num else nome)
     m = re.search(r'\b(\d+|primeiro|segundo|terceiro|quarto|quinto|sexto|setimo|oitavo|nono|decimo)o? andar\b', t)

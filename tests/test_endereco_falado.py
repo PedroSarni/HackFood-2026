@@ -83,3 +83,10 @@ def test_audio_no_cpf_vale_sem_cpf_e_segue_pro_resumo():
     assert m.estado()['fase'] == 'confirmar'    # foi pro resumo, sem CPF
     m.tocar('ok:')
     assert not m.mcp.chamadas_de('submitOrder')[-1].get('document')
+
+
+def test_complemento_com_letra_antes_do_numero():
+    # 18/10: "casa j4" virou só "Casa"
+    assert so_complemento('casa j4') == 'Casa J4'
+    assert so_complemento('apto b12') == 'Apto B12'
+    assert so_complemento('bloco a1 apto 3') == 'Bloco A1, Apto 3'
