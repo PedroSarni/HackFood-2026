@@ -54,3 +54,13 @@ def test_endereco_e_complemento_falados_no_fluxo():
     m.enviar(('audio', 'a2'))
     salvos = [c for c in m.mcp.chamadas_de('createAddress') if c.get('candidateId')]
     assert salvos[-1]['complement'] == 'Apto 14'
+
+
+def test_foto_com_gemini_fora_nao_fala_de_audio():
+    """17/10 23h: mandou foto, o Gemini estourou e o bot disse "não consegui ouvir seu áudio"."""
+    from src.bot import textos as T
+    m = Mundo()
+    m.llm.falhar = True
+    m.enviar(('foto', 'f1'))
+    textos = ' '.join(m.wpp.textos())
+    assert T.FOTO_RUIM in textos and 'ouvir' not in textos

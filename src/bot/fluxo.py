@@ -570,7 +570,7 @@ class Bot:
             if m.texto:
                 partes.append(('texto', m.texto))
         if not partes:
-            self.dizer(T.AUDIO_RUIM)
+            self.dizer(T.midia_ruim(m.tipo for m in midias))
             return
         try:
             intent = interpretar(self.ctx.llm, u, partes, aviso=self._aviso_ifood())
@@ -585,7 +585,7 @@ class Bot:
                 intent = {'acao': 'comprar', 'itens': [{'termo': termo[:60], 'quantidade': None,
                                                         'tipo_loja': loja, 'observacao': None}]}
             elif midias and not texto:
-                self.dizer(T.AUDIO_RUIM)
+                self.dizer(T.midia_ruim(m.tipo for m in midias))
                 return
             else:
                 self.repetir_pergunta(T.NAO_ENTENDI)

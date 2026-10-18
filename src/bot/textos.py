@@ -95,6 +95,16 @@ NAO_ENTENDI = ('Desculpe, não entendi. 🙏\n'
 
 AUDIO_RUIM = ('Não consegui ouvir seu áudio direito. 🙉\n'
               'Pode mandar de novo, ou escrever?')
+FOTO_RUIM = ('Não consegui ver sua foto direito. 🙈\n'
+             'Pode mandar de novo, ou me escrever o que você quer?')
+MIDIA_RUIM = ('Não consegui entender o que você mandou. 😕\n'
+              'Pode mandar de novo, ou escrever?')
+
+
+def midia_ruim(tipos):
+    """O aviso certo pro que chegou: foto não é "não consegui ouvir seu áudio" (17/10 23h)."""
+    tipos = set(tipos)
+    return FOTO_RUIM if tipos == {'imagem'} else AUDIO_RUIM if tipos == {'audio'} else MIDIA_RUIM
 
 ERRO = ('Ops, deu um probleminha aqui do meu lado. 😕\n'
         'Toque em *Tentar de novo*.')
