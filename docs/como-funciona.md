@@ -503,7 +503,8 @@ disparos do período, o gráfico por dia (ou por hora no "Último dia"), o últi
   erros e a agenda (lembretes ligados, quantos esperam a pessoa voltar, quando vence o próximo). Se a última passada
   tiver mais de ~25 min, o dash avisa que o cron atrasou.
 - **Resumo:** `painel.resumo_rotinas`, na rota `GET /api/rotinas?fonte=&dias=`. Só contagens, sem texto de ninguém.
-  Cada disparo da lista abre a conversa.
+  A lista de últimos disparos abre nos follow-ups (cutucada, carrinho e lembrete) e filtra por rotina. O rastreio
+  avisa ~6 vezes por pedido, então vira uma linha por pedido. Cada disparo abre a conversa.
 - **Ao vivo:** o `/api/ao-vivo` marca o passo com a rotina. O recado do Maestro no palco ganha a cor dela e o
   cartão da rotina acende.
 - **Demo:** o simulador roda as mesmas funções do bot (`calar` e `varrer` em `src/painel/simulador.py`): quem cala

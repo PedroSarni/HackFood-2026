@@ -82,7 +82,18 @@ def test_resumo_conta_disparos_desfechos_canais_e_a_varredura():
     assert v['aCada'] == 900 and v['esperando'] == 2 and v['ativos'] == 5 and v['avisados'] == 1 and v['proximo']
     assert r['disparos'][0]['rotina'] == 'cutucada' and r['disparos'][0]['resultado'] == 'esperando'   # mais novo primeiro
     assert any(d['nome'] == 'Dona Cida' for d in r['disparos'])
+    [aviso] = [d for d in r['disparos'] if d['rotina'] == 'rastreio']       # os avisos do pedido viram 1 linha
+    assert aviso['avisos'] == 2 and aviso['resultado'] == 'DELIVERED'
     assert T.AINDA_AI not in json.dumps(r, ensure_ascii=False)   # nenhum texto da conversa
+
+
+def test_lista_guarda_os_ultimos_de_cada_rotina_e_uma_nao_afoga_a_outra():
+    ev = [_saida(AGORA - 7200, 'z', 'lembrete')] + [_saida(AGORA - 3000 + i * 60, f'w{i}', 'followup', T.AINDA_AI)
+                                                    for i in range(20)]
+    r = painel.resumo_rotinas(ev, {}, agora=AGORA)
+    rotinas = [d['rotina'] for d in r['disparos']]
+    assert rotinas.count('cutucada') == painel.MAX_DISPAROS and rotinas.count('lembrete') == 1
+    assert rotinas[-1] == 'lembrete'          # mais novo primeiro, o lembrete (mais velho) por último
 
 
 def test_disparo_fora_do_periodo_nao_conta_mas_a_ultima_passada_do_cron_aparece():

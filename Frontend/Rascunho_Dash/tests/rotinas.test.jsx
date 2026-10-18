@@ -47,6 +47,20 @@ describe('O que o Maestro faz sozinho', () => {
     expect(screen.getAllByText('esperando').length).toBeGreaterThan(0);
   });
 
+  it('filtra a lista de disparos por rotina', async () => {
+    stub();
+    const user = userEvent.setup();
+    render(<RoutinesPanel source="real" period="30" now={NOW} onOpen={vi.fn()} />);
+    const lista = await screen.findByRole('group', { name: 'Filtrar disparos por rotina' });
+    await user.click(within(lista).getByRole('button', { name: 'Carrinho' }));
+    expect(screen.getByRole('button', { name: 'Seu Zé' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Dona Cida' })).toBeNull();
+    await user.click(within(lista).getByRole('button', { name: 'Rastreio' }));
+    expect(screen.getByText('Essa rotina não disparou no período.')).toBeTruthy();
+    await user.click(within(lista).getByRole('button', { name: 'Follow-ups' }));
+    expect(screen.getByRole('button', { name: 'Dona Cida' })).toBeTruthy();
+  });
+
   it('passo ao vivo de uma rotina acende o cartão dela na hora', async () => {
     stub();
     render(<RoutinesPanel source="real" period="30" now={NOW} step={{ tipo: 'saida', rotina: 'lembrete', key: 'p1' }} />);
@@ -54,6 +68,25 @@ describe('O que o Maestro faz sozinho', () => {
     expect(card('Lembrete de recompra').className).toContain('hot');
     expect(card('Cutucada').className).not.toContain('hot');
     expect(screen.getByRole('status').textContent).toContain('Lembrete de recompra agora');
+  });
+
+  it('rastreio conta avisos por pedido e só mostra como os pedidos terminaram', async () => {
+    const body = rotinas();
+    body.rotinas[3] = { ...body.rotinas[3], disparos: 12, conversas: 2, ultimo: new Date(NOW - 30000).toISOString(),
+      resultados: { DISPATCHED: 2, ON_THE_WAY: 2, DELIVERED: 2 }, destaque: { rotulo: 'pedidos entregues', n: 2, de: 2, pct: 100 } };
+    body.pedidosAcompanhados = 2;
+    body.disparos = [{ at: new Date(NOW - 30000).toISOString(), rotina: 'rastreio', resultado: 'DELIVERED', conversa: 'WA-CCC333-001', nome: 'Marina', avisos: 6 }];
+    stub(body);
+    const user = userEvent.setup();
+    render(<RoutinesPanel source="real" period="30" now={NOW} />);
+    await screen.findByRole('heading', { name: 'O que o Maestro faz sozinho' });
+    const rastreio = card('Rastreio do pedido');
+    expect(within(rastreio).getByText('avisos de 2 pedidos')).toBeTruthy();
+    expect(within(rastreio).getByText(/^entregue/)).toBeTruthy();
+    expect(within(rastreio).queryByText(/saiu pra entrega/)).toBeNull();
+    expect(screen.getByText('Nenhum follow-up disparou no período.')).toBeTruthy();   // a lista abre nos follow-ups
+    await user.click(screen.getByRole('button', { name: 'Rastreio' }));
+    expect(screen.getByText(/6 avisos desse pedido/)).toBeTruthy();
   });
 
   it('servidor de antes da seção: ela some em vez de mostrar zeros', async () => {

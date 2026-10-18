@@ -580,11 +580,13 @@ recorrencia, como followup e afins, algum indicativo que foram disparados, sabe?
 **Resposta:** Claim `dash-rotinas`. Na tela Agentes entrou "O que o Maestro faz sozinho":
 - **Quatro cartões:** cutucada (3 min), carrinho esquecido (5 min), lembrete de recompra (cron de 15 min) e
   rastreio. Cada um com disparos, gráfico, último disparo e o desfecho (voltou a falar, comprou, virou pedido...).
-- **Lista:** os últimos disparos, cada um abrindo a conversa. Quando uma rotina dispara ao vivo, o cartão acende e o
-  recado do Maestro no palco ganha a cor dela.
+- **Lista:** os últimos disparos, cada um abrindo a conversa. Abre nos follow-ups e filtra por rotina; o rastreio
+  vira uma linha por pedido. Quando uma rotina dispara ao vivo, o cartão acende e o recado do Maestro no palco ganha
+  a cor dela.
 - **Bot:** o abandono ganhou origem própria no diário. Cada passada do cron dos lembretes vira um evento com
   avisados, adiados, erros e a agenda, então o dash diz se o cron está vivo e quantos lembretes esperam a pessoa
-  voltar (janela de 24h fechada). Precisa de deploy pra produção gravar isso.
+  voltar (janela de 24h fechada). Sem deploy ainda: o último deploy é de antes do commit do Claude (47d3f17), e
+  subir agora levaria aquilo junto. Até o próximo deploy, a seção mostra tudo, menos a passada do cron.
 - **Demo:** cutuca, esquece carrinho, liga e responde lembrete com as mesmas funções do bot, e o cache guarda os
   clientes simulados.
 - **Erro corrigido:** os horários que eu tinha escrito em UTC neste log voltaram pro horário de Brasília.

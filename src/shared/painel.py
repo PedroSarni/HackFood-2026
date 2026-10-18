@@ -697,7 +697,7 @@ LEMBRETE_TOPO = '🔔 Chegou o dia!'   # começo de textos.lembrete(): o vencido
 VOLTOU_CUTUCADA = 10 * 60   # s: falou até 10 min depois da cutucada = voltou por causa dela
 DEPOIS_ROTINA = 24 * 3600   # s: o que a pessoa fez até 24h depois do lembrete ou do carrinho esquecido
 STATUS_RECENTE = 10 * 60    # s: o aviso do rastreio fala do último trackOrder até 10 min antes dele
-MAX_DISPAROS = 12           # últimos disparos que o dash lista
+MAX_DISPAROS = 12           # últimos disparos de cada rotina que o dash lista
 
 
 def rotina_da_saida(ev):
@@ -807,7 +807,7 @@ def resumo_rotinas(eventos, rotulos, de=None, conversa=None, agora=None, nomes=N
             ultimo[(wa, r)] = ts
             if not novo:
                 continue   # mais uma mensagem do mesmo disparo
-            d = {'rotina': r, 'ts': ts, 'resultado': None, 'no_recorte': no_recorte,
+            d = {'rotina': r, 'ts': ts, 'resultado': None, 'no_recorte': no_recorte, 'wa': wa,
                  'prazo': ts + (VOLTOU_CUTUCADA if r == 'cutucada' else DEPOIS_ROTINA)}
             if r == 'rastreio':   # o desfecho do aviso é o status que ele deu
                 st = status.get(wa)
@@ -844,6 +844,23 @@ def resumo_rotinas(eventos, rotulos, de=None, conversa=None, agora=None, nomes=N
             rotulo = {'cutucada': 'voltaram a falar', 'abandono': 'compraram em 24h'}.get(r, 'viraram pedido')
         return {'rotulo': rotulo, 'n': n, 'de': total, 'pct': _pct(n, total) if total else None}
 
+    # últimos disparos de cada rotina (o dash filtra), mais novo primeiro; o rastreio manda ~6 avisos por pedido:
+    # vira 1 linha por conversa, senão ele afoga as outras
+    disparos, rastreios, por_rotina = [], {}, {}
+    for d, conv in reversed(feed):
+        chave = conv or d['wa']
+        if d['rotina'] == 'rastreio' and chave in rastreios:
+            rastreios[chave]['avisos'] += 1
+            continue
+        if por_rotina.get(d['rotina'], 0) < MAX_DISPAROS:
+            por_rotina[d['rotina']] = por_rotina.get(d['rotina'], 0) + 1
+            item = {'at': _iso(d['ts']), 'rotina': d['rotina'], 'resultado': d['resultado'], 'conversa': conv,
+                    'nome': (nomes or {}).get(conv)}
+            if d['rotina'] == 'rastreio':
+                item['avisos'] = 1
+                rastreios[chave] = item
+            disparos.append(item)
+
     v = varredura
     return {
         'rotinas': [{'id': r, 'nome': nome, 'quando': quando, 'disparos': por[r]['n'], 'conversas': len(por[r]['conv']),
@@ -851,8 +868,7 @@ def resumo_rotinas(eventos, rotulos, de=None, conversa=None, agora=None, nomes=N
                      'resultados': por[r]['res'], 'canais': por[r]['canais'] or None, 'destaque': destaque(r)}
                     for r, (nome, quando) in rotinas.items()],
         'serie': {'baldes': baldes, 'tamanho': 'hora' if tamanho == 3600 else 'dia'},
-        'disparos': [{'at': _iso(d['ts']), 'rotina': d['rotina'], 'resultado': d['resultado'], 'conversa': conv,
-                      'nome': (nomes or {}).get(conv)} for d, conv in reversed(feed[-MAX_DISPAROS:])],
+        'disparos': disparos,
         'varredura': v and {'ultima': _iso(v['ts']), 'aCada': v.get('a_cada'), 'execucoes': varreduras,
                             'avisados': v.get('janela', 0) + v.get('template', 0), 'erros': v.get('erro', 0),
                             'esperando': v.get('vencidos', v.get('adiado', 0)), 'ativos': v.get('ativos'),

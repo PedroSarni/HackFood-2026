@@ -19,6 +19,7 @@ const STATUS = {
   DISPATCHED: 'saiu pra entrega', ON_THE_WAY: 'a caminho', DELIVERY_ARRIVED_AT_DESTINATION: 'chegou',
   READY_TO_PICKUP: 'pronto pra retirar', DELIVERED: 'entregue', CONCLUDED: 'entregue', CANCELLED: 'cancelado', CANCELED: 'cancelado',
 };
+const FINAL = new Set(['DELIVERED', 'CONCLUDED', 'CANCELLED', 'CANCELED']);   // cada pedido passa por todos os outros
 const RESULT = {
   voltou: ['voltou a falar', 'good'], comprou: ['comprou depois', 'good'], pediu: ['tocou em pedir', 'good'],
   'hoje não': ['hoje não', 'muted'], parou: ['desligou o lembrete', 'bad'], respondeu: ['respondeu', 'muted'],
@@ -65,14 +66,17 @@ function Cron({ v, now }) {
   </div>;
 }
 
-function RoutineCard({ routine: r, now, hot, size, children }) {
+function RoutineCard({ routine: r, now, hot, size, orders, children }) {
   const meta = ROUTINES[r.id] || { emoji: '⚙️', color: '#64748b' };
   const fresh = r.ultimo && now - Date.parse(r.ultimo) < 120000;
-  const results = Object.entries(r.resultados || {}).sort((a, b) => b[1] - a[1]);
+  const tracking = r.id === 'rastreio';
+  const results = Object.entries(r.resultados || {}).filter(([k]) => !tracking || FINAL.has(k)).sort((a, b) => b[1] - a[1]);
   const top = r.destaque;
-  return <article className={`routine-card ${hot ? 'hot' : ''}`} style={{ '--routine': meta.color }} aria-label={`${r.nome}: ${r.disparos} disparos`}>
+  const unit = tracking ? (r.disparos === 1 ? 'aviso' : 'avisos') : r.disparos === 1 ? 'disparo' : 'disparos';
+  const where = tracking ? (orders ? ` de ${orders} ${orders === 1 ? 'pedido' : 'pedidos'}` : '') : r.conversas ? ` em ${r.conversas} ${r.conversas === 1 ? 'conversa' : 'conversas'}` : '';
+  return <article className={`routine-card ${hot ? 'hot' : ''}`} style={{ '--routine': meta.color }} aria-label={`${r.nome}: ${r.disparos} ${unit}`}>
     <header><span className="routine-icon" aria-hidden="true">{meta.emoji}</span><div><strong>{r.nome}</strong><small>{r.quando}</small></div></header>
-    <div className="routine-main"><b>{r.disparos}</b><span>{r.disparos === 1 ? 'disparo' : 'disparos'}{r.conversas ? ` em ${r.conversas} ${r.conversas === 1 ? 'conversa' : 'conversas'}` : ''}</span></div>
+    <div className="routine-main"><b>{r.disparos}</b><span>{unit}{where}</span></div>
     <Spark serie={r.serie} size={size} />
     <p className="routine-last"><i className={fresh ? 'live' : ''} />{r.ultimo ? `Último disparo ${ago(r.ultimo, now)}` : 'Não disparou no período'}</p>
     {top?.de > 0 && <p className="routine-highlight"><b>{pct(top.pct)}</b> {top.rotulo} <small>({top.n} de {top.de})</small></p>}
@@ -82,23 +86,28 @@ function RoutineCard({ routine: r, now, hot, size, children }) {
   </article>;
 }
 
-function Feed({ items, now, names, onOpen }) {
-  if (!items?.length) return <p className="muted routine-empty">Nenhuma rotina disparou no período.</p>;
+function Feed({ items, now, names, onOpen, empty }) {
+  if (!items?.length) return <p className="muted routine-empty">{empty}</p>;
   return <ol className="routine-feed">{items.map((f, i) => {
     const meta = ROUTINES[f.rotina] || {}, [label, tone] = resultLabel(f.rotina, f.resultado);
     return <li key={`${f.at}-${f.rotina}-${i}`}>
       <span className="routine-dot" style={{ background: meta.color }} />
       <span className="routine-feed-what"><b>{meta.emoji} {names[f.rotina] || f.rotina}</b>
         {f.nome && f.conversa && onOpen ? <button type="button" className="text-button" onClick={() => onOpen(f.conversa)} title="Abrir a conversa">{f.nome}</button> : f.nome && <span>{f.nome}</span>}
-        <small title={clock(f.at)}>{ago(f.at, now)}</small></span>
+        <small title={clock(f.at)}>{ago(f.at, now)}{f.avisos > 1 ? ` · ${f.avisos} avisos desse pedido` : ''}</small></span>
       <span className={`routine-chip ${tone}`}>{label}</span>
     </li>;
   })}</ol>;
 }
 
+const SHORT = { cutucada: 'Cutucada', abandono: 'Carrinho', lembrete: 'Lembrete', rastreio: 'Rastreio' };
+const FEED_MAX = 12;
+const FOLLOWUPS = 'followups';   // cutucada, carrinho esquecido e lembrete: as que chamam a pessoa de volta
+
 export function RoutinesPanel({ source, period, step, now = Date.now(), onOpen }) {
   const { data } = useSummary('rotinas', { source, period });
   const [hot, setHot] = useState(null);
+  const [only, setOnly] = useState(FOLLOWUPS);   // o rastreio avisa ~6 vezes por pedido: só aparece se pedir
   useEffect(() => {   // passo ao vivo de uma rotina: o cartão dela acende na hora, sem esperar o resumo
     if (!step?.rotina) return undefined;
     setHot(step.rotina);
@@ -112,8 +121,15 @@ export function RoutinesPanel({ source, period, step, now = Date.now(), onOpen }
     <div className="panel-heading"><div><h2 id="routines-title">O que o Maestro faz sozinho</h2><p>Rotinas que disparam sem a pessoa pedir: cada disparo, o que ela fez depois e a última passada do cron. Sem texto da conversa.</p></div>
       {hot && <span className="live-pill routine-pill" style={{ '--routine': ROUTINES[hot]?.color }} role="status"><i />{names[hot]} agora</span>}</div>
     <div className="routines-body">
-      <div className="routine-grid">{routines.map(r => <RoutineCard key={r.id} routine={r} now={now} hot={hot === r.id} size={data.serie?.tamanho}>{r.id === 'lembrete' && <Cron v={data.varredura} now={now} />}</RoutineCard>)}</div>
-      <aside className="routine-side"><h3>Últimos disparos</h3><Feed items={data.disparos} now={now} names={names} onOpen={onOpen} /></aside>
+      <div className="routine-grid">{routines.map(r => <RoutineCard key={r.id} routine={r} now={now} hot={hot === r.id} size={data.serie?.tamanho} orders={data.pedidosAcompanhados}>{r.id === 'lembrete' && <Cron v={data.varredura} now={now} />}</RoutineCard>)}</div>
+      <aside className="routine-side"><h3>Últimos disparos</h3>
+        <div className="segmented routine-filter" role="group" aria-label="Filtrar disparos por rotina">
+          <button type="button" className={only === FOLLOWUPS ? 'active' : ''} aria-pressed={only === FOLLOWUPS} onClick={() => setOnly(FOLLOWUPS)}>Follow-ups</button>
+          {routines.map(r => <button type="button" key={r.id} className={only === r.id ? 'active' : ''} aria-pressed={only === r.id} onClick={() => setOnly(only === r.id ? FOLLOWUPS : r.id)}>{SHORT[r.id] || r.nome}</button>)}
+        </div>
+        <Feed items={(data.disparos || []).filter(f => only === FOLLOWUPS ? f.rotina !== 'rastreio' : f.rotina === only).slice(0, FEED_MAX)} now={now} names={names} onOpen={onOpen}
+          empty={only === FOLLOWUPS ? 'Nenhum follow-up disparou no período.' : 'Essa rotina não disparou no período.'} />
+      </aside>
     </div>
     {data.vitrine > 0 && <p className="routines-foot">Também sem IA: a vitrine de boas-vindas apareceu {data.vitrine} {data.vitrine === 1 ? 'vez' : 'vezes'} no período.</p>}
   </section>;

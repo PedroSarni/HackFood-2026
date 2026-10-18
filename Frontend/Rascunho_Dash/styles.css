@@ -131,6 +131,7 @@
 .desk-card-text strong{font-size:11px;color:var(--ink)}
 .desk-card-text strong small{font-weight:500;color:#93939d}
 .desk-card-text>small{font-size:9.5px;color:#8a8a95;line-height:1.45}
+.desk-card .model-chip,.desk-card .agent-status{flex-shrink:0;white-space:nowrap}
 .pad{padding:4px 21px 20px;font-size:11px}
 .agent-sheet .sheet-hero{display:flex;gap:16px;align-items:flex-start;padding:18px 24px 10px}
 .sheet-hero h2{margin:0;font-family:Manrope,sans-serif;font-size:20px;color:var(--ink)}.sheet-hero h2 span{font-weight:500;color:#8a8a95;font-size:14px}
