@@ -553,17 +553,24 @@ class Bot:
         if any(e.tipo == 'botao' for e in entradas):
             return False  # tocou num botão: é resposta explícita, segue o caminho normal
         fase = u.get('fase')
+        so_oi = all(self._trivial(e) for e in entradas)
         if fase == 'confirmar' and (u.get('carrinho') or {}).get('id'):
-            self._protegido(self.mostrar_resumo)
-        elif fase in FASES_QUE_EXPIRAM:
-            u.update({'fase': 'pedido', 'pergunta': {}, 'pendente': None, 'fila': [], 'atual': None,
-                      'escolha': None, 'novo_endereco': None})
-            self._protegido(lambda: self.menu(VOLTOU))
-            if fase == 'cpf':
-                return True  # CPF nunca vai pra IA: o que ela digitou não segue pro fluxo livre
-        else:
+            if so_oi:  # "oi" depois de um tempo com o resumo pendente: reapresenta o resumo
+                self._protegido(self.mostrar_resumo)
+            return so_oi  # mandou foto, áudio ou pedido: vai direto pro conteúdo, o carrinho fica
+        if fase not in FASES_QUE_EXPIRAM:
             return False
-        return all(self._trivial(e) for e in entradas)
+        u.update({'fase': 'pedido', 'pergunta': {}, 'pendente': None, 'fila': [], 'atual': None,
+                  'escolha': None, 'novo_endereco': None})
+        if fase == 'cpf' and not so_oi:
+            self._protegido(lambda: self.menu(VOLTOU))
+            return True  # CPF nunca vai pra IA: o que ela digitou não segue pro fluxo livre
+        if not so_oi:
+            # 18/10: chegou mandando a foto da lista (ou o pedido) depois de um tempo e levava "sumiu, recomeçamos?"
+            # + menu antes de o bot sequer olhar a foto. Com conteúdo, zera a etapa velha em silêncio e atende.
+            return False
+        self._protegido(lambda: self.menu(VOLTOU))
+        return True
 
     def _ifood_instavel(self):
         try:

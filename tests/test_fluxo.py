@@ -1969,3 +1969,18 @@ def test_cutucar_ligado_de_novo_volta_a_cutucar():
     m.wpp.limpar()
     marca, mandou = _followup(m)
     assert marca and mandou and 'Ainda está por aí?' in m.wpp.textos()[-1]
+
+
+def test_sumiu_1h_e_chegou_mandando_a_foto_nao_leva_boas_vindas():
+    """18/10: quem volta mandando a foto da lista (ou um pedido) levava "sumiu, recomeçamos?" + menu antes de o
+    bot olhar a foto. Com conteúdo, a etapa velha some em silêncio e a foto é lida; o "sumiu" é só pro "oi"."""
+    m = Mundo()
+    m.enviar('quero pao')
+    assert m.estado()['fase'] == 'endereco'
+    m.wpp.limpar()
+    m.agora += 60 * 60
+    m.enviar(('foto', 'lista-1', ''))
+    textos = ' '.join(m.wpp.textos())
+    assert 'sumiu' not in textos and 'O que você quer pedir' not in textos
+    assert m.estado()['pendente'] is None and m.estado()['fase'] != 'endereco' or 'endereço' in textos.lower()
+    assert m.wpp.saida  # respondeu à foto (endereço, cards ou pergunta sobre ela), não ao "oi" que não houve
