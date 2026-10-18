@@ -242,8 +242,11 @@ Sequência obrigatória do iFood, que o fluxo (`finalizar`) respeita:
 
 - **Nada é comprado sem confirmação explícita** da pessoa (`userConsent`), e a confirmação nunca
   vem da IA.
-- **Botão é o caminho principal.** Texto/áudio/foto são entendidos, mas a resposta sempre oferece
-  botões. Quem digita o número de uma opção é atendido igual a quem toca.
+- **O que a pessoa diz manda; botão é atalho.** Em qualquer etapa a mensagem (texto ou áudio) é
+  interpretada antes de ser encaixada na etapa: se é outro assunto, o bot muda de função (pedido no meio
+  do endereço vira o pedido, "cancelar" cancela, papo é respondido e a pergunta volta). A resposta sempre
+  oferece botões, mas só os que levam a algo ("Meu pedido" só com pedido feito). Quem digita o número de
+  uma opção é atendido igual a quem toca. Nada em inglês chega na tela.
 - **Uma loja por pedido.**
 - **Pedido mínimo não trava ninguém.** O aviso de mínimo (e o "O que mais você quer?" abaixo dele)
   vem com **💡 Me sugere algo**: na loja do carrinho, o bot oferece 1º o que acompanha o pedido

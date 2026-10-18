@@ -38,6 +38,7 @@ LOJAS = {
     'b1': ('Adega do Zé', 'LIQUORSTORE', {'min': 25, 'max': 35}, 5.00, 4.3, 1.7, 30.0),
     'p1': ('Pet Feliz', 'PETSTORE', {'min': 40, 'max': 60}, 7.90, 4.6, 3.3, 40.0),
     'l1': ('Lanchonete do Bairro', 'RESTAURANT', {'min': 20, 'max': 35}, 3.99, 4.7, 0.8, 30.0),
+    'r3': ('Esfiharia do Líbano', 'RESTAURANT', {'min': 25, 'max': 40}, 4.90, 4.6, 1.5, 20.0),
 }
 
 # grupo: (nome, minSelections, maxSelections, [(opção, preço adicional)])
@@ -146,6 +147,23 @@ CATALOGO = [
     ('b1', 'Carvão', 'Saco 3 kg', 19.90, None, None),
     ('p1', 'Areia para gatos', 'Pacote 4 kg', 24.90, None, None),
     ('p1', 'Petisco para cães', 'Pacote 65 g', 9.90, None, None),
+    ('r1', 'Pizza margherita', 'Muçarela, tomate e manjericão', 48.90, None, _PIZZA),
+    ('r1', 'Pizza de frango com catupiry', 'Frango desfiado e catupiry', 52.90, 47.90, _PIZZA),
+    ('r1', 'Pizza quatro queijos', 'Muçarela, provolone, parmesão e catupiry', 56.90, None, _PIZZA),
+    ('r3', 'Esfiha de carne', 'Esfiha aberta, carne temperada', 6.90, None, None),
+    ('r3', 'Esfiha de queijo', 'Esfiha aberta, muçarela', 6.90, None, None),
+    ('r3', 'Esfiha de calabresa', 'Esfiha aberta, calabresa e cebola', 7.50, None, None),
+    ('r3', 'Esfiha de frango com catupiry', 'Esfiha fechada', 7.90, None, None),
+    ('r3', 'Kibe frito', 'Unidade', 6.50, None, None),
+    ('r3', 'Pastel de carne', 'Pastel grande', 9.90, None, None),
+    ('r3', 'Pastel de queijo', 'Pastel grande', 9.90, None, None),
+    ('r3', 'Coxinha de frango', 'Unidade', 6.90, None, None),
+    ('r3', 'Refrigerante lata 350 ml', 'Coca-Cola ou Guaraná', 6.00, None, None),
+    ('r3', 'Suco natural de laranja', 'Copo 500 ml', 8.90, None, None),
+    ('r2', 'Lasanha à bolonhesa', 'Porção individual', 32.90, 29.90, None),
+    ('r2', 'Strogonoff de frango', 'Com arroz e batata palha', 28.90, None, None),
+    ('r2', 'Parmegiana de carne', 'Com arroz e fritas', 34.90, None, None),
+    ('r2', 'Feijoada', 'Porção individual com acompanhamentos', 36.90, None, None),
 ]
 SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
              'remedio': ['dipirona', 'paracetamol'], 'racao': ['racao'], 'almoco': ['marmita', 'sopa'],
@@ -153,7 +171,11 @@ SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contraf
              'refri': ['refrigerante'], 'coca': ['refrigerante'], 'guarana': ['refrigerante'],
              'lanche': ['x-', 'misto', 'cachorro'], 'sanduiche': ['x-', 'misto'], 'hamburguer': ['x-', 'burger'],
              'bolacha': ['biscoito'], 'sobremesa': ['pudim', 'bolo', 'chocolate'],
-             'doce': ['doce', 'chocolate', 'pudim', 'bolo'], 'bebida': ['refrigerante', 'suco', 'agua mineral']}
+             'doce': ['doce', 'chocolate', 'pudim', 'bolo'], 'bebida': ['refrigerante', 'suco', 'agua mineral'],
+             'margarita': ['margherita'], 'marguerita': ['margherita'], 'mussarela': ['mucarela'],
+             'muzzarela': ['mucarela'], 'esfirra': ['esfiha'], 'quibe': ['kibe'],
+             'salgado': ['coxinha', 'esfiha', 'pastel', 'kibe'], 'estrogonofe': ['strogonoff'],
+             'strogonof': ['strogonoff']}
 # não ajudam a achar produto: "pão de forma" é pão + forma, e o "de" casava com meio catálogo
 PALAVRAS_VAZIAS = {'de', 'da', 'do', 'das', 'dos', 'e', 'com', 'sem', 'pra', 'para', 'um', 'uma', 'o', 'a',
                    'os', 'as', 'em', 'no', 'na', 'in', 'natura', 'kg', 'g', 'ml', 'l', 'un'}

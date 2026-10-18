@@ -96,7 +96,7 @@ def _erro_em(dados):
     if dados.get('errorType'):  # Order Tracking: campos na raiz
         return ErroMCP(dados.get('code') or dados['errorType'], dados.get('message') or '',
                        tentar_de_novo=bool(dados.get('retryable')),
-                       para_usuario=dados.get('suggestion') or '', bruto=dados)
+                       bruto=dados)  # 'suggestion' é instrução pro agente, em inglês: nunca vai pra tela
     return None
 
 

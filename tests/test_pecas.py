@@ -398,3 +398,40 @@ def test_mock_cada_loja_tem_o_seu_minimo_igual_na_loja_e_no_carrinho():
                      items=[{'itemId': burger['itemId'], 'quantity': 1, 'options': []}])
     det = mcp.chamar('getMerchant', merchantId=loja, userLocation=loc)
     assert car['merchant']['orderMinimumPrice'] == det['minimumOrderAmount'] == LOJAS['l1'][6] == 30.0
+
+
+def test_mock_tem_os_sabores_de_pizza_de_sempre_e_entende_a_grafia_errada():
+    mcp = McpFake()
+    loc = {'latitude': -22.0, 'longitude': -47.9}
+
+    def primeiro(q):
+        return mcp.chamar('searchOffers', query=q, userLocation=loc, resultKind='ITEM')['results'][0]['itemName']
+    assert primeiro('pizza de frango com catupiry') == 'Pizza de frango com catupiry'
+    assert primeiro('pizza marguerita') == 'Pizza margherita'
+
+
+def test_ingles_da_api_nao_vai_pra_tela():
+    from src.bot.fluxo import _em_portugues
+    assert not _em_portugues('Do not attempt to look up this Order ID again.')
+    assert _em_portugues('Esta forma de pagamento não é aceita por este restaurante. Escolha outra opção.')
+    assert not _em_portugues('')
+
+
+def test_anotei_mostra_o_sabor_que_veio_na_observacao():
+    from src.bot import textos as T
+    itens = [{'termo': 'pizza de calabresa'}, {'termo': 'pizza', 'observacao': 'frango catupiry'},
+             {'termo': 'coca-cola', 'observacao': '2 litros'}]
+    assert T.anotei(itens) == 'Anotei: *pizza de calabresa*, *pizza* (frango catupiry) e *coca-cola* (2 litros) ✅'
+    assert T.anotei([]) == 'Anotei ✅'
+
+
+def test_mock_tem_esfiharia_e_prato_do_dia_e_entende_a_grafia_de_casa():
+    mcp = McpFake()
+    loc = {'latitude': -22.0, 'longitude': -47.9}
+
+    def primeiro(q):
+        r = mcp.chamar('searchOffers', query=q, userLocation=loc, resultKind='ITEM', merchantType='RESTAURANT')
+        return r['results'][0]['itemName']
+    assert primeiro('esfiha de carne') == 'Esfiha de carne'
+    assert primeiro('esfirra').startswith('Esfiha')
+    assert primeiro('estrogonofe') == 'Strogonoff de frango'

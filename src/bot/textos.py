@@ -150,6 +150,15 @@ def lista_de_compras(termos):
     return f'📝 Anotei sua lista:\n{linhas}\n\nVou te mostrar um de cada vez. Começando por *{termos[0]}*:'
 
 
+def anotei(itens):
+    """'Anotei: *pizza de calabresa*, *pizza* (frango catupiry) e *coca-cola* (2 litros) ✅'; sem itens, só
+    'Anotei ✅'. O que veio na observação (sabor, tamanho) aparece entre parênteses."""
+    nomes = [f"*{i['termo']}*" + (f" ({i['observacao']})" if i.get('observacao') else '') for i in itens]
+    if not nomes:
+        return 'Anotei ✅'
+    return 'Anotei: ' + (nomes[0] if len(nomes) == 1 else ', '.join(nomes[:-1]) + ' e ' + nomes[-1]) + ' ✅'
+
+
 def card(oferta):
     linhas = [f'*{oferta["nome"]}*']
     if oferta.get('descricao'):

@@ -39,7 +39,7 @@ def test_pedido_antes_do_login_e_retomado_depois_de_entrar():
 def test_saudacao_logado_mostra_menu():
     m = Mundo()
     m.enviar('bom dia')
-    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir', 'repetir', 'meu_pedido']
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir']   # sem pedido nem histórico, sem atalho
 
 
 # --- endereço ----------------------------------------------------------------------------
@@ -182,7 +182,7 @@ def test_sumiu_31_min_no_endereco_e_disse_oi_volta_pro_menu():
     assert len(m.mcp.chamadas_de('createAddress')) == antes
     assert len(m.wpp.saida) == 1  # só o menu, sem resposta dobrada
     assert 'sumiu' in m.wpp.textos()[-1]
-    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir', 'repetir', 'meu_pedido']
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir']
     assert m.estado()['fase'] == 'pedido' and m.estado()['pendente'] is None
 
 
@@ -665,6 +665,89 @@ def test_carrinho_do_ifood_real_e_largado_quando_o_mock_liga():
     busca = m.mcp.chamadas_de('searchOffers')[-1]
     assert 'merchantId' not in (busca.get('refinements') or {})   # não fica preso no Nissei
     assert m.wpp.cards() and not m.estado()['carrinho']
+
+
+def test_pedido_no_meio_do_endereco_muda_de_funcao_e_vira_o_pendente():
+    m = Mundo()
+    m.enviar('quero pao')                                    # sem endereço: o bot pede o endereço
+    m.wpp.limpar()
+    m.enviar('oi eu quero comer uma pizza e uma coca de 2')  # tem número, mas é pedido, não endereço
+    assert not m.mcp.chamadas_de('createAddress')
+    textos = ' '.join(m.wpp.textos())
+    assert 'Anotei' in textos and 'pizza' in textos and 'Pra onde eu mando' in textos
+    assert m.estado()['fase'] == 'endereco' and m.estado()['pendente']['itens'][0]['termo'] == 'pizza'
+    m.enviar('Rua das Flores, 120, São Carlos')
+    m.tocar('cand:0')
+    m.tocar('compl_nao')
+    assert m.mcp.chamadas_de('searchOffers')[-1]['query'] == 'pizza'   # retomou o pedido novo, não o pão
+
+
+def test_nao_tem_escrito_no_complemento_e_sem_complemento():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.enviar('Rua das Flores, 120, São Carlos')
+    m.tocar('cand:0')
+    m.enviar('não tem')
+    assert not m.mcp.chamadas_de('createAddress')[-1].get('complement')
+
+
+def test_pedido_no_complemento_anota_e_pergunta_o_complemento_de_novo():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.enviar('Rua das Flores, 120, São Carlos')
+    m.tocar('cand:0')
+    m.wpp.limpar()
+    m.enviar('quero uma pizza tambem')
+    assert m.estado()['fase'] == 'complemento' and m.estado()['pendente']['itens'][0]['termo'] == 'pizza'
+    assert 'Anotei' in ' '.join(m.wpp.textos())
+
+
+def test_sem_numero_no_cpf_nao_e_cpf_invalido_e_segue_o_fluxo():
+    from src.bot import textos as T
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.tocar('fim')
+    m.tocar('pag:0')                # PIX: agora o bot pede o CPF
+    assert m.estado()['fase'] == 'cpf'
+    m.wpp.limpar()
+    m.enviar('cancelar')
+    assert T.CPF_INVALIDO not in ' '.join(m.wpp.textos()) and not m.estado()['carrinho']
+
+
+def test_meu_pedido_e_pedir_de_novo_so_aparecem_quando_levam_a_algo():
+    m = Mundo()
+    m.enviar('bom dia')
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir']
+    u = m.armazem[f'u:{m.wa}']
+    u['pedidos'] = [{'id': 'p1', 'resumo': '1x Pão francês'}]
+    m.armazem[f'u:{m.wa}'] = u
+    m.enviar('bom dia')
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir', 'repetir', 'meu_pedido']
+
+
+def test_pedido_que_este_ifood_nao_conhece_sai_da_lista_sem_ingles_na_tela():
+    m = Mundo()
+    u = m.armazem.get(f'u:{m.wa}') or {}
+    u['pedidos'] = [{'id': 'pedido-do-ifood-real', 'resumo': '1x Pizza'}]
+    m.armazem[f'u:{m.wa}'] = u
+    m.enviar(('botao', 'meu_pedido'))
+    textos = ' '.join(m.wpp.textos())
+    assert 'Do not' not in textos and 'Order' not in textos
+    assert not m.estado()['pedidos'] and 'meu_pedido' not in [i for i, _ in m.wpp.ultimos_botoes()]
+
+
+def test_papo_no_endereco_sem_endereco_nenhum_responde_e_pede_de_novo():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.llm.resposta = {'acao': 'endereco', 'texto': None, 'resposta': 'Nem me fale, tá quente! 🥵'}
+    m.wpp.limpar()
+    m.enviar('nossa que calor que ta fazendo hoje')
+    m.llm.resposta = None
+    assert not m.mcp.chamadas_de('createAddress')
+    textos = ' '.join(m.wpp.textos())
+    assert 'quente' in textos and 'Pra onde eu mando' in textos and m.estado()['fase'] == 'endereco'
 
 
 def test_audio_vira_pedido():

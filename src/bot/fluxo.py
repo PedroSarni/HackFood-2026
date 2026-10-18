@@ -172,7 +172,7 @@ class Bot:
                 if pend:
                     self.botao(pend['botao']) if pend.get('acao') == 'botao' else self.intencao(pend)
                 else:
-                    self.perguntar(T.PERGUNTA_PEDIDO, T.MENU, fase='pedido')
+                    self.perguntar(T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             self._protegido(seguir)
         finally:
             self._falar_rodada()
@@ -410,7 +410,18 @@ class Bot:
         texto = prefixo or T.boas_vindas(self._primeiro_nome())
         if prefixo:
             texto += '\n\n' + T.PERGUNTA_PEDIDO
-        self.perguntar(texto, T.MENU, fase='pedido')
+        self.perguntar(texto, self._menu(), fase='pedido')
+
+    def _menu(self):
+        """Botões do menu: "Fazer pedido" sempre; os atalhos só quando levam a algo."""
+        return [T.B_PEDIR] + self._atalhos()
+
+    def _atalhos(self):
+        """"Pedir de novo" só com algo pra repetir (pedido nosso ou histórico) e "Meu pedido" só com pedido
+        feito: botão que leva a "não tem nada" é botão a menos."""
+        tem_pedido = bool(self.u.get('pedidos'))
+        repete = tem_pedido or bool(self.ctx.armazem.get(f'hist:{self.wa}'))
+        return ([T.B_REPETIR] if repete else []) + ([T.B_MEU_PEDIDO] if tem_pedido else [])
 
     def _primeiro_nome(self):
         n = self.u.get('nome_ifood') or self.u.get('nome') or ''
@@ -464,9 +475,15 @@ class Bot:
             if midias and not texto:
                 self.dizer('Por segurança, escreva o CPF com os números, por favor. 🙂')
                 return
-            self.receber_cpf(texto)
-            return
+            # sem nenhum número não tem CPF ali: é outro assunto ("cancelar", "tira a coca"), que segue o fluxo
+            if re.search(r'\d', texto) or normalizar(texto) in SEM_CPF:
+                self.receber_cpf(texto)
+                return
         if not midias:
+            if fase in ('endereco', 'complemento', 'bairro') and not regra_rapida(texto):
+                texto = self._etapa_ou_outro_assunto(texto, fase)
+                if texto is None:  # era outro assunto e já foi atendido
+                    return
             if fase == 'endereco':
                 r = regra_rapida(texto)
                 if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados'):
@@ -482,7 +499,7 @@ class Bot:
                 return
             if fase == 'complemento':
                 r = regra_rapida(texto)
-                if r and r['acao'] == 'nao':
+                if (r and r['acao'] == 'nao') or normalizar(texto) in SEM_COMPLEMENTO:
                     self.sem_complemento()
                 else:
                     self.receber_complemento(texto)
@@ -716,7 +733,7 @@ class Bot:
         self.menu()
 
     def ajuda(self, _arg=None):
-        self.perguntar(T.AJUDA, T.MENU, fase='pedido')
+        self.perguntar(T.AJUDA, self._menu(), fase='pedido')
 
     def sair(self):
         self.ctx.sair(self.wa)
@@ -738,13 +755,19 @@ class Bot:
         texto = T.PERGUNTA_PEDIDO
         if car and car.get('itens'):
             texto = 'O que mais você quer? 😊\nÉ só escrever ✍️'
-        botoes = [T.B_FINALIZAR, T.B_INICIO] if car and car.get('itens') else [T.B_REPETIR, T.B_MEU_PEDIDO]
+        botoes = [T.B_FINALIZAR, T.B_INICIO] if car and car.get('itens') else self._atalhos()
         falta = _falta(car or {})
         if falta:  # abaixo do mínimo a sugestão vira botão: quem não sabe o que digitar só toca
             texto = (f'O que mais você quer? 😊\n{T.falta_minimo(falta, car.get("loja"))}\n'
                      'É só escrever ✍️ ou tocar em *Me sugere algo*.')
             botoes = [T.B_SUGERIR] + botoes
-        self.perguntar(texto, botoes, fase='pedido')
+        if botoes:
+            self.perguntar(texto, botoes, fase='pedido')
+            return
+        # sem pedido nem histórico não há atalho que sirva: só a pergunta, sem botão que não leva a nada
+        self.dizer(texto)
+        self.u['fase'] = 'pedido'
+        self.u['pergunta'] = {'texto': texto, 'botoes': [], 'titulos': []}
 
     def sugerir(self, _arg=None, itens=None):
         """'Me sugere algo', 'algo que complete esse valor' ou o botão 💡. Na loja do carrinho,
@@ -880,6 +903,52 @@ class Bot:
         self.dizer('Não consegui achar a localização desse endereço. 😕 Vamos cadastrar de novo?')
         self.pedir_endereco()
         return None
+
+    def _etapa_ou_outro_assunto(self, texto, fase):
+        """Endereço, bairro e complemento não engolem qualquer coisa: "quero uma pizza e uma coca de 2"
+        tem número e não é endereço. Com cara forte da etapa (CEP, rua/avenida, apto/bloco...) segue
+        direto; o resto o Gemini lê sabendo a etapa, e outro assunto muda a função do bot (pedido novo
+        vira o pendente, cancelar cancela...). Devolve o texto pra etapa, ou None se já atendeu."""
+        if _cara_de_etapa(texto, fase):
+            return texto
+        try:
+            it = interpretar(self.ctx.llm, self.u, [('texto', texto)], aviso=self._aviso_ifood())
+        except ErroLLM as e:
+            print(f'LLM falhou lendo a etapa {fase}: {e!r}')
+            if fase == 'endereco' and PEDIDO.search(normalizar(texto)):  # sem Gemini, pedido não vai pro geocoder
+                self.perguntar(T.ENDERECO_AINDA, [T.B_TENTAR, T.B_INICIO], fase='endereco')
+                return None
+            return texto
+        self._resposta = it.get('resposta')
+        a = it.get('acao')
+        if a in ('comprar', 'sugerir'):
+            self.u['pendente'] = it  # o pedido novo substitui o que esperava o endereço
+            self._voltar_pra_etapa(T.anotei(it.get('itens') or []))
+            return None
+        if a == 'fora_do_escopo':
+            self._voltar_pra_etapa(self._resposta or T.FORA_DO_ESCOPO)
+            return None
+        if a in OUTRO_ASSUNTO:
+            self.intencao(it)
+            return None
+        if a == 'endereco' and fase == 'endereco':
+            if it.get('texto'):
+                return it['texto']  # o endereço sem o resto da frase ("entrega na rua x, 120")
+            # o Gemini não achou endereço nenhum ali ("que calor hoje"): responde e pede de novo
+            self._voltar_pra_etapa(self._resposta or 'Hmm, isso não parece um endereço. 🤔')
+            return None
+        return texto
+
+    def _voltar_pra_etapa(self, prefixo):
+        """Responde o outro assunto e repete a pergunta da etapa (a do endereço não tem botão, e o
+        repetir_pergunta de pergunta sem botão cai no menu)."""
+        fase = self.u.get('fase')
+        if fase == 'endereco':
+            self.perguntar(f'{prefixo}\n\n{T.PEDIR_ENDERECO}', [T.B_INICIO], fase='endereco')
+        elif fase == 'bairro':
+            self.perguntar(f'{prefixo}\n\nQual é o *bairro*? Escreva aqui. 🙂', [T.B_INICIO], fase='bairro')
+        else:
+            self.repetir_pergunta(prefixo)
 
     def pedir_endereco(self, _arg=None):
         self.u['novo_endereco'] = None
@@ -1277,7 +1346,7 @@ class Bot:
     def mostrar_carrinho(self):
         car = self.u.get('carrinho') or {}
         if not car.get('itens'):
-            self.perguntar(T.PERGUNTA_PEDIDO, T.MENU, fase='pedido')
+            self.perguntar(T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             return
         linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car['itens'])
         self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"))}',
@@ -1330,7 +1399,7 @@ class Bot:
         u = self.u
         car = u.get('carrinho')
         if not car or not car.get('itens'):
-            self.perguntar('Seu pedido ainda está vazio. 🙂\n' + T.PERGUNTA_PEDIDO, T.MENU, fase='pedido')
+            self.perguntar('Seu pedido ainda está vazio. 🙂\n' + T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             return
         u['fila'] = []
         api = self.ctx.ifood(self.wa)
@@ -1449,7 +1518,7 @@ class Bot:
             self.finalizar()
             return
         t = normalizar(texto)
-        if t in ('nao', 'sem cpf', 'sem', 'nao quero', 'n', 'pular', 'nao tenho'):
+        if t in SEM_CPF:
             self.sem_cpf()
             return
         if self._cpf_obrigatorio():
@@ -1628,9 +1697,17 @@ class Bot:
             return
         pedidos = self.u.get('pedidos') or []
         if not pedidos:
-            self.perguntar(T.SEM_PEDIDO, [T.B_PEDIR, T.B_REPETIR], fase='pedido')
+            self.perguntar(T.SEM_PEDIDO, self._menu(), fase='pedido')
             return
-        st = self.ctx.ifood(self.wa).rastrear(pedidos[0]['id'])
+        try:
+            st = self.ctx.ifood(self.wa).rastrear(pedidos[0]['id'])
+        except ErroMCP as e:
+            if 'NOT_FOUND' not in str(e.codigo or '').upper():
+                raise
+            # pedido que este iFood não conhece (feito antes de ligar o mock, por exemplo): sai da lista
+            self.u['pedidos'] = pedidos[1:]
+            self.perguntar(T.SEM_PEDIDO, self._menu(), fase='pedido')
+            return
         self.perguntar(T.status_pedido(st.get('codigo'), st.get('descricao')) +
                        f'\n\n🧾 {pedidos[0].get("resumo", "")}', [T.B_PEDIR, T.B_INICIO], fase='acompanhando')
 
@@ -1705,7 +1782,7 @@ class Bot:
             return
         ped = (u.get('pedidos') or [None])[0]
         if not ped:
-            self.perguntar(T.AGENDAR_SEM_PEDIDO, T.MENU, fase='pedido')
+            self.perguntar(T.AGENDAR_SEM_PEDIDO, self._menu(), fase='pedido')
             return
         self.perguntar(T.oferecer_repetir(ped.get('resumo')),
                        [(f'rec:{dias}', T.quando(dias, hora).capitalize()), T.B_REC_NAO], fase='recorrencia')
@@ -1726,14 +1803,14 @@ class Bot:
             self._refazer(rec['pedido_id'], rec.get('loja'))
         elif oque == 'parar':
             self.ctx.recorrencias.remover(self.wa, rid)
-            self.perguntar(T.LEMBRETE_PARADO, T.MENU, fase='pedido')
+            self.perguntar(T.LEMBRETE_PARADO, self._menu(), fase='pedido')
         else:
             self.ctx.recorrencias.respondido(self.wa, rid)
-            self.perguntar(T.LEMBRETE_ADIADO, T.MENU, fase='pedido')
+            self.perguntar(T.LEMBRETE_ADIADO, self._menu(), fase='pedido')
 
     def parar_lembretes(self):
         n = self.ctx.recorrencias.remover_todas(self.wa)
-        self.perguntar(T.LEMBRETE_PARADO if n else 'Você não tem lembretes ligados. 🙂', T.MENU, fase='pedido')
+        self.perguntar(T.LEMBRETE_PARADO if n else 'Você não tem lembretes ligados. 🙂', self._menu(), fase='pedido')
 
     def _lembrete_pendente(self):
         """Lembrete que venceu quando a janela de 24h estava fechada: mostra agora."""
@@ -1777,7 +1854,7 @@ class Bot:
             u['cpf'] = None
             self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF], fase='cpf')
         else:
-            msg = e.para_usuario or T.ERRO
+            msg = e.para_usuario if _em_portugues(e.para_usuario) else T.ERRO  # inglês da API nunca vai pra tela
             if _falha_do_ifood(cod):  # servidor deles caiu/barrou: marca e explica como gente
                 self.ctx.armazem['ifood_instavel'] = self.ctx.agora()
                 msg = self._tutor('ifood_fora', msg)
@@ -1808,6 +1885,41 @@ def _quer_novo_pedido(texto):
     """'Quero fazer um novo pedido' na etapa do endereço: é pedido de menu, não endereço."""
     t = normalizar(texto)
     return not re.search(r'\d', t) and not LOGRADOURO.search(t) and bool(NOVO_PEDIDO.search(t))
+
+
+# claramente outro assunto no meio do endereço: segue o fluxo de sempre (pedido e papo têm tratamento próprio)
+OUTRO_ASSUNTO = {'cancelar', 'ajuda', 'acompanhar', 'ver_pedido', 'sair', 'apagar_dados', 'parar_lembrete'}
+CEP = re.compile(r'\b\d{5}-?\d{3}\b')
+PEDIDO = re.compile(r'\b(quero|queria|me ve|manda|pedir|pede|comer|beber|tomar|comprar|cancela|cancelar|ajuda)\b')
+COMPLEMENTO = re.compile(r'\b(ap|apto|apartamento|bloco|bl|casa|fundos|sala|andar|torre|condominio|cond|lote'
+                         r'|quadra|qd|lt|sobrado|kitnet|edificio|predio|portaria)\b')
+SEM_COMPLEMENTO = {'nao', 'nao tem', 'n', 'nenhum', 'nenhuma', 'sem', 'sem complemento', 'nada', 'nao precisa',
+                   'casa', 'e casa', 'so casa'}
+SEM_CPF = ('nao', 'sem cpf', 'sem', 'nao quero', 'n', 'pular', 'nao tenho')
+
+
+def _cara_de_etapa(texto, fase):
+    """A mensagem tem cara forte do que a etapa pede (CEP ou rua/avenida no endereço; apto/bloco ou
+    resposta curta no complemento; nome curto no bairro)? Aí segue direto, sem perguntar pro Gemini.
+    Verbo de pedido ("quero", "manda", "comer") nunca é cara de etapa."""
+    t = normalizar(texto)
+    if PEDIDO.search(t):
+        return False
+    if fase == 'endereco':
+        return bool(CEP.search(texto) or LOGRADOURO.search(t))
+    if fase == 'complemento':
+        return t in SEM_COMPLEMENTO or bool(COMPLEMENTO.search(t)) or len(t.split()) <= 2
+    return len(t.split()) <= 3
+
+
+# palavras que entregam inglês: as mensagens da API vêm em inglês, e às vezes são instrução pro agente
+INGLES = re.compile(r"\b(the|this|that|not|please|again|attempt|order|error|failed|try|unable|invalid|found"
+                    r"|request|cannot|could|should|must|was|were|is|are|your|you)\b", re.I)
+
+
+def _em_portugues(texto):
+    """Só texto em português vai pra tela: "Do not attempt to look up this Order ID again." não vai."""
+    return bool(texto) and not INGLES.search(texto)
 
 
 def _falta(car):

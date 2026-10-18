@@ -51,8 +51,9 @@ Responda só o JSON do esquema. Campos:
 finalizar, tirar_item, cancelar, acompanhar, repetir, ajuda, saudacao, agradecer, sair, \
 apagar_dados, parar_lembrete, agendar, fora_do_escopo, nao_entendi.
 - itens: quando acao=comprar, cada produto pedido, na ordem. termo curto e no singular \
-("pão francês", "leite integral", "carne moída", "dipirona"), sem a quantidade. \
-quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
+("pão francês", "leite integral", "carne moída", "dipirona"), sem a quantidade. Sabor, tamanho \
+e volume fazem parte do produto e vão no termo ("pizza de calabresa", "coca-cola 2 litros"), não na \
+observacao. quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
 detalhes ("bem passado", "sem cebola", "marca Italac"). Quando acao=sugerir, até 3 produtos \
 que acompanhem o que já está no pedido (refrigerante pro lanche, manteiga pro pão), no mesmo formato.
 - busca: o texto que vai na busca do iFood, que é burra (casa com nome de loja e com sabor). \
