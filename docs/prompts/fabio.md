@@ -381,3 +381,42 @@ volta ao MCP real do iFood na próxima mensagem. Disjuntor liberado; o "tempo r�
 Opções sem tocar no número: (1) link no WhatsApp que abre página com agente de voz no navegador (ElevenLabs
 Agents, que já temos a conta), e (2) número de telefone comum (Twilio) atendido pelo mesmo agente. As duas
 chamam o nosso back no Modal pra usar o MCP. Nada implementado, esperando o Fabio escolher.
+
+## 2026-10-18 ~01h15 — o que o Davi está fazendo
+
+**Prompt:** "o davi fez uns commits ai, veja sobre o que é e o que fazem, no caso o que ele esta fazendo?"
+
+**Resposta:** Expliquei o claim `dash-agentes-mcp` do Davi: abas "Uso do MCP" e "Agentes" no dash, alimentadas
+pelo rastro de cada chamada de IA (só contagens, sem texto), com o liga/desliga (fase 2) esperando. Avisei de um
+teste dele que falhava por empate de horário no Windows (corrigido depois, em e31eedd).
+
+## 2026-10-18 ~01h30 — deploy e o time de agentes como coração do dash
+
+**Prompts:**
+- "veja oq o davi commitou por ultimo, e faça o deploy"
+- "eu deixo fazer o deploy, rode ele. [...] quero aprimorar [...] a gestao e transparencia [...] animação bonitinha
+  de como cada agente esta interagindo entre si, me de a opção de eu abrir um a um e ir filtrando as configurações
+  dele, qual o modelo, qual o system prompt [...] qual key ta setada [...] se eu posso desligar ele por hora [...]
+  personificação [...] ela dever ser tipo a primeira tela, depois o uso do mcp e dps metricas de dinheiro, alem de
+  dar uma enxugada"
+- "faça o back funcionar de uma maneira que qualquer pessoa consiga trabalhar focado na melhoria de um agente [...]
+  queira trocar o modelo de imagem apenas [...] animacoes que transmitam o sentimento da coisa, como um time
+  trabalhando, e uma boa modularização de back."
+- "tudo bem refatorar o design das abas, nada é fixo aqui"
+
+**Resposta:** Deploy das 01:31 (com o fix do Davi `e5f3d73`). O Davi passou a tarefa inteira pro Fabio, então
+abri o claim `dash-agents-control`.
+- **Back:** `src/agentes/` com um arquivo por agente (Lia, Íris, Duda, Beto, Tito, Vina, Otto). Cada arquivo tem
+  a fila de modelos SÓ daquele agente; trocar o modelo da foto é mexer em `src/agentes/foto.py`, ou fazer pelo
+  dash sem deploy.
+- **Interruptor:** liga/desliga sem deploy (`cfg:agentes`). O desligado cai no plano B de sempre e conta como
+  "pulo", não erro.
+- **Ficha do ar:** keys só com os 4 últimos caracteres e versão do prompt (`cfg:agentes_ar`).
+- **Dash:** "Agentes" virou a 1ª tela. Tem o palco ao vivo (recados correndo entre cliente, Maestro, agente e
+  iFood, com balões), os cards de desempenho com filtros e a ficha de cada um (desempenho, fila e modelo
+  principal, keys, plano B, onde mexer, system prompt, interruptor com confirmação pros essenciais).
+- **Menu:** Agentes → Uso do MCP → Dinheiro → Conversas, e o resto em "Mais análises". Saíram Inteligência
+  artificial, Follow-ups, Financeiro (foi pro Dinheiro), o cartão de propaganda e os enfeites.
+- **Testes e deploy:** 419 do back e 35 do front passando. Deploy às ~02h30 (2af1cf6). A ficha do ar aparece no
+  dash depois da 1ª mensagem que o bot receber.
+
