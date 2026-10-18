@@ -342,3 +342,9 @@ em centavos" e "diário sem texto". Não confirmado: "MCP real devolve até 10 o
 **Prompt:** "Coloque o arquivo 06-feedback-mcp.md (que eu anexei) em docs/entregaveis/. NÃO crie outros .md [...] Confira só as afirmações que dependem do código: freio local (INTERVALO_MIN e PAUSA_BLOQUEIO), ponte/container que se aposenta, modo palco, MERCH-007. Corrija no arquivo só o que estiver errado [...] Não mexa nas afirmações sobre o comportamento do MCP/iFood (seções 2 a 6 e os achados da seção 8) [...] A seção 'Anexo' cita achados.md. Procure esse arquivo no repo. Se não existir, não crie: me avise. [...] Commit 'docs(entregaveis): D6' e push [...]"
 
 **Resposta:** O arquivo já estava em docs/entregaveis/. Conferido: freio 0,35 s (~3 chamadas/s), disjuntor 300 s (5 min), container que se aposenta, ponte, modo palco (10 s, 1 tentativa, desligado por padrão) e MERCH-007 no primeiro item batem com o código; nada corrigido. `achados.md` não existe no repo (não criado). Sem código.
+
+## 2026-10-18 10:50 — D6 sem o anexo que não existe
+
+**Prompt:** "Em docs/entregaveis/06-feedback-mcp.md, apague a seção final '## Anexo' inteira (título e a linha que cita `achados.md`). Não mude mais nada, não crie arquivos. Registre o prompt em docs/prompts/davi.md. Commit 'docs(entregaveis): D6 sem anexo inexistente' e push (pull --rebase antes)."
+
+**Resposta:** Seção "Anexo" removida do D6 (título e a linha do `achados.md`); nada mais mudou. Sem código.
