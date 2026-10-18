@@ -62,3 +62,15 @@ impactam em algo? só pra dar uma olhada"
 e com login real funcionando; a regra da porta é pra quem loga por ferramenta local. Cuidado indireto: com
 a edição bloqueada, nada de mudar o nome do app, o label ou a região no Modal, senão a URL muda e o login
 do iFood quebra.
+
+## 2026-10-17 20:40 — dash do Pedro funcional e em tempo real
+
+**Prompt:** olha: "D:\Users\fabio\Desktop\hackathon" entre ai e vamos começar a fazer uma nova feature, a feature do dash, veja o front do dash exemplo e de vida pra ele, faça ser funcional localmente atualizado em tempo real
+
+**Resposta:** Claim `dash-live-data`. O bot ganhou um diário de eventos (`src/shared/painel.py`: entrada, saída e chamadas ao MCP no modal.Dict `hackfood-painel`, CPF mascarado), um servidor local com SSE (`src/painel/servidor.py`) e um simulador que roda o Bot de verdade com os fakes. O `Frontend/Rascunho_Dash` passou a ler isso ao vivo. Commits 73a8650, bf1d0c2. Pendente: `modal deploy` pra o bot em produção começar a gravar. Achado: carrinho aberto não expira e trava a busca em outra loja.
+
+## 2026-10-17 21:15 — alternar dados reais e demonstração na apresentação
+
+**Prompt:** faça com que eu possa exibir dados mockados (muitos dados) ou simplesmente os dados reais, entende? pra mostrar na apresentação
+
+**Resposta:** O servidor local serve as duas fontes juntas e o seletor no topo do dash troca na hora entre Dados reais, Demonstração (~800 conversas simuladas em 30 dias, ao vivo, em cache) e Base estática; também dá pra abrir com `?fonte=demo|real`. Commit aad024d. Pendente o mesmo deploy.
