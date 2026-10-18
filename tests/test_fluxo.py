@@ -575,6 +575,38 @@ def test_cancelar_limpa_o_pedido():
     assert not m.mcp.chamadas_de('submitOrder')
 
 
+def test_cancelar_pedido_sem_carrinho_volta_pro_menu():
+    m = Mundo()
+    m.enviar('bom dia')
+    assert m.estado()['fase'] == 'pedido'
+    m.wpp.limpar()
+    antes = m.llm.chamadas
+    m.enviar('cancelar pedido')
+    assert m.llm.chamadas == antes  # comando resolvido sem o Gemini (o real buscava como produto)
+    assert m.estado()['fase'] == 'pedido' and m.estado()['carrinho'] is None
+    assert 'pedir' in [i for i, _ in m.wpp.ultimos_botoes()]
+    assert 'Não achei' not in ' '.join(m.wpp.textos())  # não buscou "cancelar pedido" como produto
+
+
+def test_quero_cancelar_com_carrinho_cancela_o_carrinho():
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:1')
+    assert (m.estado()['carrinho'] or {}).get('itens')
+    m.enviar('quero cancelar')
+    assert m.estado()['carrinho'] is None
+    assert not m.mcp.chamadas_de('submitOrder')
+
+
+def test_quero_leite_continua_sendo_compra():
+    m = Mundo()
+    endereco_pronto(m)
+    m.wpp.limpar()
+    m.enviar('quero leite')
+    assert m.wpp.cards()  # buscou o leite
+
+
 def test_tirar_o_unico_item_esvazia_sem_quebrar():
     m = Mundo()
     endereco_pronto(m)

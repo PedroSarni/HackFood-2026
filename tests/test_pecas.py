@@ -200,6 +200,16 @@ def test_regra_rapida_deixa_pedido_de_verdade_pra_ia():
     assert I.regra_rapida('quero 2 pães e leite') is None
 
 
+@pytest.mark.parametrize('texto', ['cancelar pedido', 'Cancelar o pedido', 'cancelar compra',
+                                   'cancelar a compra', 'Quero cancelar!', 'desistir'])
+def test_frases_de_cancelar_viram_cancelar(texto):
+    assert I.regra_rapida(texto) == {'acao': 'cancelar'}
+
+
+def test_quero_leite_continua_sendo_pedido_pra_ia():
+    assert I.regra_rapida('quero leite') is None
+
+
 def test_numero_em():
     assert I.numero_em('3') == 3 and I.numero_em('o 1') == 1 and I.numero_em('meia duzia') == 6
     assert I.numero_em('10 unidades') == 10 and I.numero_em('banana') is None

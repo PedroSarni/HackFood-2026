@@ -105,3 +105,13 @@ não precisa dele, pare e me diga exatamente o que falta [...]"
 bot: `FOLLOWUP_SEG = 180`, `Bot.marca_followup()` e `Bot.followup(wa_id, marca)` em fluxo.py, texto `AINDA_AI`,
 6 testes (241 passando). Falta o Fabio criar a função Modal `followup` e o disparo no fim da `rodada` (trecho
 pronto no chat). Sem deploy.
+
+## 2026-10-17 22:55 — bug: "cancelar pedido" era buscado como produto
+
+**Prompt:** "BUG: "cancelar pedido" não é reconhecido como comando e o bot procura "cancelar pedido" como produto
+("Não achei cancelar pedido perto de você"). [...] acrescentar em COMANDOS, mapeando para 'cancelar', as frases
+[...]"
+
+**Resposta:** 6 frases novas no `COMANDOS` ('cancelar pedido', 'cancelar o pedido', 'cancelar compra',
+'cancelar a compra', 'quero cancelar', 'desistir'), sem mexer nas outras. 10 testes novos (273 passando),
+incluindo um que exige que "cancelar pedido" seja resolvido sem chamar o Gemini.

@@ -121,6 +121,8 @@ COMANDOS = {
     'menu': 'inicio', 'inicio': 'inicio', 'comecar': 'inicio', 'voltar': 'inicio',
     'ajuda': 'ajuda', 'socorro': 'ajuda', 'como funciona': 'ajuda',
     'cancelar': 'cancelar', 'cancela tudo': 'cancelar', 'parar': 'cancelar',
+    'cancelar pedido': 'cancelar', 'cancelar o pedido': 'cancelar', 'cancelar compra': 'cancelar',
+    'cancelar a compra': 'cancelar', 'quero cancelar': 'cancelar', 'desistir': 'cancelar',
     'sair': 'sair', 'deslogar': 'sair', 'desconectar': 'sair',
     'apagar meus dados': 'apagar_dados', 'apagar dados': 'apagar_dados',
     'excluir meus dados': 'apagar_dados',
