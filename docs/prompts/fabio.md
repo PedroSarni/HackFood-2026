@@ -267,3 +267,9 @@ resposta do Gemini subiu, porque o 3.5-flash-lite parou em MAX_TOKENS às 22h38.
 **Prompt:** na hora do cpf mandei um audio dizendo que n precisa de cpf, se for audio pro cpf ou foto, só ignore considere que n quis mandar
 
 **Resposta:** Na etapa do CPF, áudio ou foto não é ouvido nem aberto e vale como "sem CPF" (loja que exige CPF continua pedindo pra escrever). No modo áudio, a fala do CPF agora diz: escreve os números ou, se não quiser, manda um áudio. O teste da foto no CPF (claim bot-photo-group-kit) foi ajustado pra regra nova.
+
+## 2026-10-17 23:00 — deploy da foto e do kit em grupo
+
+**Prompt:** pode fazer deploy
+
+**Resposta:** Worktree atualizada pro main (bbfd811, já com os fixes do time), 335 testes passando, deploy feito no mesmo app/label `hackfood-bot` (URL do login do iFood intacta). Foto vira pedido e o kit pra dividir com os amigos estão no ar.
