@@ -1,7 +1,7 @@
 # Estado do projeto
 
 > Atualizar a cada ~1h ou depois de entrega importante. Quem terminou o trabalho atualiza.
-> Última atualização: 17/10 20h15 por Davi
+> Última atualização: 17/10 21h18 por Davi
 
 ## Ideia escolhida
 Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital): botões sempre, 3 opções por vez com Mais opções, texto, áudio e foto, várias mensagens seguidas, e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência, usando o MCP do iFood como agente externo. Ainda a decidir: pedido em grupo e áudio de saída (item B2).
@@ -50,6 +50,7 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 - [x] A1 Registrar a ideia (decisoes.md e estado.md) — Davi
 - [ ] A2 Mentor: MCP real (invalid_client), perguntas da seção 7 do contexto-evento.md, e COMO submeter os entregáveis — Davi
 - [ ] A3 Testar o bot no WhatsApp como usuário (idoso apressado) e anotar problemas — Davi e time
+  - corrigidos 2 bugs achados nos testes: fase endereço prendia a pessoa em loop com "Olá"/"novo pedido" (d0b0c3c) e sessão nunca expirava (4797590)
 - [ ] A4 Combinar canal do time e divisão dos entregáveis — Davi
 ### Produto
 - [ ] B1 Regra da ordem de prioridade dos itens (ranking). Davi decide, Fabio implementa em src/bot/ranking.py
