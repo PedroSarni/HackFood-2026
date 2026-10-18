@@ -472,3 +472,13 @@ como eu quero ver mais dados sobre o mcp nessa tela, to sentindo muita falta dis
 - **Testes:** 37 do front passando. Sem deploy: só o dash mudou.
 - Errata: os horários "~02h" das entradas anteriores eram ~05h (o relógio de verdade).
 
+## 2026-10-18 ~05h25 — tenho que pagar o WhatsApp? (e voltou)
+
+**Prompts:** "pera, eu tenho que pagar o wpp agora?", "pq?", "qual o link", "veja se tudo voltou ao normal",
+"mandei agora, e ele n respondeu", "ata foi"
+
+**Resposta:** Responder quem escreveu, dentro de 24h, continua de graça pela regra conhecida; cobra template. A
+Meta exige a cobrança configurada pra entregar até o que é grátis. Passei o link do assistente de moeda que veio
+no erro. A conta passou a aparecer com moeda BRL na Graph API (só leitura), mas às 05:30 o erro mudou pra forma
+de pagamento; o Fabio ajustou e, desde 05:30:28, nenhuma falha de entrega nos logs do Modal.
+

@@ -47,6 +47,8 @@ Convenção herdada: valor `PREENCHER` = não configurado (trate como string vaz
   `131042 Business eligibility payment issue`: a conta do WhatsApp Business está sem moeda configurada no
   faturamento. O bot recebe, entende e responde normalmente (log "envio falhou" no Modal), quem barra é a Meta.
   Só o Fabio resolve: Meta Business Suite → Faturamento e pagamentos → conta do WhatsApp → definir país/moeda.
+  **Resolvido às 05:31:** o Fabio configurou a moeda (BRL) e, quando a Meta passou a reclamar da forma de
+  pagamento (mesmo 131042, outro detalhe), também ela. Desde então as entregas voltaram sem erro.
 - Política da Meta desde 15/01/2026: proibido chatbot de IA de uso geral. IA para tarefa do negócio (pedir comida)
   pode. O bot deve recusar papo fora do assunto em vez de virar um ChatGPT no zap.
 
