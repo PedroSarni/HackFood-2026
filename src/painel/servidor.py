@@ -259,7 +259,7 @@ class Painel:
             saida.append(item)
             if len(saida) >= limite:
                 break
-        saida.sort(key=lambda e: e['ts'])
+        saida.reverse()   # de volta à ordem do diário (sort por ts embaralharia os empates do mesmo instante)
         return json.dumps({'agora': time.time(), 'passos': saida}, ensure_ascii=False)
 
     def rodar(self):
