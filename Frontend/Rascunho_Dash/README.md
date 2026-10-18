@@ -1,6 +1,6 @@
 # HackFood Analytics
 
-Protótipo local em React, React Router e Vite. Identidade visual em vermelho, branco e cinza; nenhum serviço de pedidos é conectado.
+Dash local em React, React Router e Vite, alimentado em tempo real pelo diário do bot (ou pela demonstração simulada). Identidade visual em vermelho, branco e cinza.
 
 ## Executar
 
@@ -19,7 +19,6 @@ Um servidor local serve **duas fontes ao mesmo tempo** e o seletor no topo do da
 | --- | --- |
 | **Dados reais** | O diário do bot de verdade (`modal.Dict hackfood-painel`, gravado por `src/shared/painel.py`). Precisa do login do Modal nesta máquina. |
 | **Demonstração** | ~800 conversas simuladas em 30 dias, com clientes novos chegando ao vivo. Os clientes conversam com o Bot de verdade (fluxo, textos, MCP falso), então as conversas no drawer são as reais do bot. Nenhum dado real. |
-| **Base estática** | As fixtures originais abaixo (data fixa 17/10/2026). "Simular compra" usa esta base. |
 
 ```sh
 .venv/Scripts/python.exe -m src.painel.servidor     # na raiz do repo (flags: --sem-real, --sem-demo, --nova-demo)
@@ -45,18 +44,9 @@ cd Frontend/Rascunho_Dash && npm run dev            # o Vite repassa /api pra 12
 - Relatório PDF disponível no menu **Exportar → Relatório PDF**, nos dois modos, e em **Relatórios → Baixar relatório PDF**, no modo avançado. Inclui resumo executivo, vendas diárias, funil, restaurantes, distribuição de status, critérios das métricas e todas as conversas do recorte global, com paginação automática.
 - Identidade visual utiliza os PNGs fornecidos em `images/`, com a paleta vermelho `#EA1D2C`, branco e cinza. O WebP original tem um fundo quadriculado incorporado (não é transparente), por isso os PNGs foram priorizados para preservar o acabamento.
 
-## Demonstrar uma compra
-
-1. Clique em **Simular compra**.
-2. Avance pelas cinco ações no rodapé do painel: recomendação, carrinho, checkout, pagamento e confirmação.
-3. Cada ação registra mensagens e eventos. O carrinho não entra no GMV até a confirmação.
-4. Clique em **Ver resultado no Analytics**. A mesma sessão já compõe os indicadores e pode ser localizada em Conversas por `CLI-PITCH`.
-
-Nenhuma mensagem é enviada ao WhatsApp e nenhum pagamento ou pedido real é realizado. Apenas as últimas 20 sessões de pitch são guardadas em `localStorage`, na chave `hackfood-demo-sessions-v1`. A preferência usa `hackfood-mode`. Quando armazenamento não estiver disponível, a demonstração continua em memória.
-
 ## Dados e métricas
 
-`data.js` centraliza fixtures, filtros, cálculos e exportação. A base tem 360 sessões simuladas entre 19/08 e 17/10/2026; a data de referência é fixa para manter a apresentação reproduzível. A amostra padrão de 30 dias tem 180 sessões. Cada sessão representa uma única jornada de compra; valores são inteiros em centavos. Fuso: `America/Sao_Paulo`.
+`data.js` centraliza filtros, cálculos e exportação. Os dados chegam do servidor local (`live.js`): dados reais do bot ou a demonstração simulada; a data de referência é o "hoje" do servidor. Cada sessão representa uma única jornada de compra; valores são inteiros em centavos. Fuso: `America/Sao_Paulo`. A base fixa de 360 sessões ficou só para os testes (`tests/fixtures.js`).
 
 | Indicador | Regra |
 | --- | --- |
@@ -71,17 +61,17 @@ Nenhuma mensagem é enviada ao WhatsApp e nenhum pagamento ou pedido real é rea
 | Primeira lista aceita | Sessões que selecionaram na primeira lista / sessões com recomendação |
 | Recompra | Clientes com ≥2 compras / clientes com ≥1 compra no período |
 
-Comparação com período imediatamente anterior de mesma duração. Hipóteses de abandono são identificadas como hipóteses. Compra após follow-up é uma associação temporal; não há grupo de controle. Todos os números derivam das fixtures, sem dados reais misturados.
+Comparação com período imediatamente anterior de mesma duração. Hipóteses de abandono são identificadas como hipóteses. Compra após follow-up é uma associação temporal; não há grupo de controle. Cada fonte é calculada separadamente: dados reais e demonstração nunca se misturam.
 
 ## Limites e integração futura
 
-Este diretório estava vazio; não havia backend, autenticação ou integração a preservar. O protótipo **não implementa autenticação administrativa, auditoria de acesso, armazenamento de conversas reais ou integração com WhatsApp/iFood**. Não inserir dados pessoais reais no armazenamento demonstrativo.
+O dash **não implementa autenticação administrativa nem auditoria de acesso**: por isso o servidor do painel só escuta em 127.0.0.1 e não deve ser publicado.
 
-Para integração futura, substituir o carregamento em `data.js` por um serviço autenticado, com paginação no servidor, autorização administrativa, pseudonimização, retenção e registro de acesso. Usar IDs de eventos para deduplicar webhooks e comprovar confirmações de pedidos no backend. Os eventos precisam conter `id`, `conversationId`, `type`, `at`, `source` e metadados disponíveis. Não tratar a simulação como canal de ingestão.
+Para publicar, trocar o servidor local por um serviço autenticado, com paginação no servidor, autorização administrativa, pseudonimização, retenção e registro de acesso. Usar IDs de eventos para deduplicar webhooks e comprovar confirmações de pedidos no backend. Os eventos precisam conter `id`, `conversationId`, `type`, `at`, `source` e metadados disponíveis. Não tratar a simulação como canal de ingestão.
 
 XLSX, coortes, mapas, custos, versões da IA e campanhas reais não foram implementados. Métricas indisponíveis estão identificadas na interface. CSV e PDF são exportações funcionais do protótipo. Fontes web usam Google Fonts com fallback local.
 
-O PDF é gerado no navegador, sem envio de dados a um serviço externo. `pdf-report.js` reutiliza os cálculos de `data.js`; `report-download.js` carrega o gerador e a imagem da marca somente ao solicitar o arquivo. Os relatórios não incluem nomes, telefones ou conteúdo de mensagens. Período, filtros globais efetivos, data de emissão, fuso horário e identificação de dados simulados constam no documento. Uma amostra gerada está em `output/pdf/hackfood-relatorio-exemplo.pdf`.
+O PDF é gerado no navegador, sem envio de dados a um serviço externo. `pdf-report.js` reutiliza os cálculos de `data.js`; `report-download.js` carrega o gerador e a imagem da marca somente ao solicitar o arquivo. Os relatórios não incluem nomes, telefones ou conteúdo de mensagens. Período, filtros globais efetivos, data de emissão, fuso horário e identificação de dados simulados constam no documento.
 
 ## Verificação
 
@@ -90,6 +80,6 @@ npm test
 npm run build
 ```
 
-Os testes cobrem regras financeiras, denominadores, filtros e períodos, integridade das fixtures, CSV, persistência, rotas, modos, etapas do funil, pesquisa, paginação, drawer e simulação completa. O dialog é adaptado no jsdom; comportamento nativo de foco, layout e responsividade precisam de conferência em navegador real. Não havia navegador disponível na sessão de implementação.
+Os testes cobrem regras financeiras, denominadores, filtros e períodos, integridade da base de teste (`tests/fixtures.js`, entregue ao App por um EventSource falso em `tests/setup.js`), CSV, rotas, modos, troca de fonte, etapas do funil, pesquisa, paginação e drawer. O dialog é adaptado no jsdom; comportamento nativo de foco, layout e responsividade precisam de conferência em navegador real.
 
-A exportação PDF também tem testes de seleção de filtros, geração de arquivo, paginação, recorte vazio, falha e nova tentativa, além de bloqueio de downloads duplicados. O PDF de exemplo foi renderizado com Poppler e suas 13 páginas foram inspecionadas; a extração confirmou as 180 conversas únicas e os totais do painel.
+A exportação PDF também tem testes de seleção de filtros, geração de arquivo, paginação, recorte vazio, falha e nova tentativa, além de bloqueio de downloads duplicados.

@@ -1,17 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { advancePitch, createPitchSession, createSeed, csvExport, filterSessions, isSale, metrics, readSessions, STORAGE_KEY } from '../data.js';
+import { csvExport, filterSessions, isSale, metrics, setReferenceDate } from '../data.js';
+import { createSeed, FIXTURE_DATE } from './fixtures.js';
 
-describe('Métricas compartilhadas e integridade da demonstração', () => {
-  it('não confunde carrinho com GMV e registra uma única compra ao finalizar', () => {
-    let session = createPitchSession();
-    for (let i = 0; i < 4; i++) session = advancePitch(session);
-    expect(metrics([session]).gmv).toBe(0);
-    expect(metrics([session]).orders).toBe(0);
-    expect(session.amountCents).toBe(4690);
-    session = advancePitch(session);
-    expect(metrics([session])).toMatchObject({ gmv: 4690, orders: 1, conversion: 100, ticket: 4690 });
-    expect(advancePitch(session)).toBe(session);
-  });
+setReferenceDate(FIXTURE_DATE);
+
+describe('Métricas compartilhadas e integridade da base de teste', () => {
 
   it('aplica o mesmo recorte aos cards, ao funil e às conversas', () => {
     const rows = filterSessions(createSeed(), { period: '7', city: 'Campinas', restaurant: 'Burger da Vila' });
@@ -59,20 +52,14 @@ describe('Métricas compartilhadas e integridade da demonstração', () => {
     expect(data.stages.every(s => s.count === 0)).toBe(true);
   });
 
-  it('persiste somente a base demonstrativa e recupera armazenamento inválido', () => {
-    localStorage.setItem(STORAGE_KEY, 'arquivo inválido');
-    expect(readSessions().length).toBe(360);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...createPitchSession(), demo: false }, createPitchSession()]));
-    expect(readSessions().filter(s => s.id.startsWith('PITCH-')).length).toBe(1);
-    expect(readSessions().every(s => s.demo === true)).toBe(true);
-  });
 
   it('identifica dados simulados no CSV, mascara cliente e neutraliza fórmulas', () => {
-    const session = { ...advancePitch(createPitchSession()), restaurant: '=SUM(A1:A2)' };
-    const csv = csvExport([session]);
+    const session = { ...createSeed().find(s => s.status === 'abandoned'), restaurant: '=SUM(A1:A2)' };
+    const csv = csvExport([session, { ...session, demo: false }]);
     expect(csv).toContain('Simulado');
+    expect(csv).toContain('Bot WhatsApp');
     expect(csv).toContain("'=SUM(A1:A2)");
-    expect(csv).toContain('CLI-PITCH');
+    expect(csv).toContain(session.clientId);
     expect(csv).not.toContain(session.name);
     expect(csv).toContain('"0.00"');
   });

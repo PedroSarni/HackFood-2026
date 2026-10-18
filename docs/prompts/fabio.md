@@ -74,3 +74,9 @@ do iFood quebra.
 **Prompt:** faça com que eu possa exibir dados mockados (muitos dados) ou simplesmente os dados reais, entende? pra mostrar na apresentação
 
 **Resposta:** O servidor local serve as duas fontes juntas e o seletor no topo do dash troca na hora entre Dados reais, Demonstração (~800 conversas simuladas em 30 dias, ao vivo, em cache) e Base estática; também dá pra abrir com `?fonte=demo|real`. Commit aad024d. Pendente o mesmo deploy.
+
+## 2026-10-17 21:35 — tirar a base estática do dash
+
+**Prompt:** apague o estatico do pedro
+
+**Resposta:** Saiu a "Base estática" do dash: fixtures de `data.js`, o roteiro "Simular compra", o CSV e o PDF de exemplo. Ficaram só Dados reais e Demonstração; o cartão "Explorar demonstração" agora abre a Demonstração. A base fixa sobrevive só em `Frontend/Rascunho_Dash/tests/fixtures.js`, pros testes (19 passando). `app.js` (versão antiga em JS puro, não usada pelo `index.html`) não foi mexido.

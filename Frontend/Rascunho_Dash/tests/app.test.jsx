@@ -47,7 +47,7 @@ describe('Divulgação progressiva e navegação', () => {
   });
 });
 
-describe('Conversas e demonstração para o pitch', () => {
+describe('Conversas e fonte dos dados', () => {
   it('abre drawer, exibe eventos e mantém pesquisa/status/página ao fechar', async () => {
     const user = userEvent.setup(); mount('/conversas');
     await user.type(screen.getByRole('textbox', { name: 'Buscar cliente ou conversa' }), 'Marina');
@@ -77,18 +77,13 @@ describe('Conversas e demonstração para o pitch', () => {
     expect(document.querySelector('tbody')).toBeNull();
   });
 
-  it('conclui a simulação e reflete a compra no mesmo conjunto de métricas', async () => {
+  it('cartão de demonstração troca a fonte pra Demonstração', async () => {
     const user = userEvent.setup(); mount('/');
-    const ordersBefore = Number(document.querySelector('.kpi-orders > strong').textContent);
-    await user.click(screen.getByRole('button', { name: 'Simular compra' }));
-    for (const label of ['Receber recomendação', 'Montar carrinho', 'Confirmar checkout', 'Escolher pagamento', 'Simular confirmação']) {
-      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: label }));
-    }
-    expect(within(screen.getByRole('dialog')).getByText('Compra registrada! Os indicadores já foram atualizados.')).toBeTruthy();
-    expect(Number(document.querySelector('.kpi-orders > strong').textContent)).toBe(ordersBefore + 1);
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ver resultado no Analytics' }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Da conversa ao pedido' })).toBeTruthy();
+    expect(screen.getByLabelText('Fonte dos dados').value).toBe('real');
+    expect(screen.queryByRole('button', { name: 'Simular compra' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /Explorar demonstração/ }));
+    expect(screen.getByLabelText('Fonte dos dados').value).toBe('demo');
+    expect([...screen.getByLabelText('Fonte dos dados').options].map(o => o.value)).toEqual(['real', 'demo']);
   });
 
   it('aplica filtros globais e paginação sem alterar a fonte', async () => {

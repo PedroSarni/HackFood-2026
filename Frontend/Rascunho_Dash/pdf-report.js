@@ -152,7 +152,7 @@ export function createAnalyticsPdf({ rows, filters, advanced = false, generatedA
   text('Como ler os indicadores', MARGIN, y + 12, 12, COLORS.ink, true);
   y = paragraph('GMV: soma das compras confirmadas e recuperadas, sem cancelamentos. Não representa lucro ou receita líquida. Ticket médio: GMV dividido pelos pedidos concluídos.', MARGIN, y + 19, WIDTH, 8.5);
   y = paragraph('Conversão: sessões com compra confirmada divididas pelas sessões iniciadas no período. O funil conta sessões únicas que alcançaram cada etapa. Abandonados: carrinhos sem conclusão após 30 minutos, ainda não recuperados.', MARGIN, y + 3, WIDTH, 8.5);
-  paragraph('Base integralmente simulada. Compras após follow-up indicam associação temporal, não causalidade. O relatório usa os filtros globais; pesquisa e filtros locais da tabela de Conversas não alteram este recorte.', MARGIN, y + 3, WIDTH, 8.5);
+  paragraph(`${rows.length && rows.every(s => s.demo) ? 'Base simulada (demonstração).' : 'Dados do diário do bot no WhatsApp.'} Compras após follow-up indicam associação temporal, não causalidade. O relatório usa os filtros globais; pesquisa e filtros locais da tabela de Conversas não alteram este recorte.`, MARGIN, y + 3, WIDTH, 8.5);
 
   newPage('Conversas do período');
   paragraph('Identificadores pseudonimizados. Nomes, telefones e mensagens não são exportados. Valores do carrinho e compras confirmadas aparecem separadamente.', MARGIN, 58, WIDTH, 8.5);

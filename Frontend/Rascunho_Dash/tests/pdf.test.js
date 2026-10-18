@@ -2,7 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createAnalyticsPdf, reportContext } from '../pdf-report.js';
-import { createSeed, filterSessions } from '../data.js';
+import { filterSessions, setReferenceDate } from '../data.js';
+import { createSeed, FIXTURE_DATE } from './fixtures.js';
+
+setReferenceDate(FIXTURE_DATE);
 
 const logo = new Uint8Array(readFileSync(new URL('../images/icone-ifood-sorriso-quadrado-vermelho-png.png', import.meta.url)));
 
