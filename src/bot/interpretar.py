@@ -185,7 +185,7 @@ def igual_a_botao(texto, titulos):
 
 def opcao_dita(texto, titulos):
     """Quem responde falando diz frase, não o botão: "é no centro" pra "1 · Centro", "pode ser no
-    pix" pra "PIX". Vale se o nome de UMA opção (4+ letras, sem o número da frente) aparece inteiro
+    pix" pra "PIX". Vale se o nome de UMA opção (3+ letras, sem o número da frente) aparece inteiro
     na frase. Com "não" na frase, ou mais de uma opção citada, devolve None (o Gemini decide)."""
     t = f' {normalizar(texto)} '
     if not t.strip() or len(t.split()) > 8 or ' nao ' in t:
