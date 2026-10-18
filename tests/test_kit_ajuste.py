@@ -262,3 +262,69 @@ def test_ajuste_livre_vai_pro_modelo_mas_so_os_lanches_mudam():
     assert not any('lata' in lin['nome'] for lin in linhas(m))
     assert any(lin['item_id'] == batata_antes['item_id'] and lin['qtd'] == batata_antes['qtd'] for lin in linhas(m))
     assert kit(m)['explicacao'] == 'Dois sem carne 🥗' and kit(m)['restricoes'] == ['2 sao vegetarianos']
+
+
+# --- 18/10 08h49 (Breno): "Adiciona um tomate e uma cebola por favor" refez o kit do zero -----------------
+
+def churrasco_8():
+    m = pronto(Mundo())
+    m.enviar('churrasco pra 8 pessoas')
+    assert m.estado()['fase'] == 'kit' and kit(m)['loja'] == 'Supermercado Central'
+    return m
+
+
+def test_adiciona_tomate_e_cebola_no_churrasco_entra_sem_mexer_no_resto():
+    # trocou pães de alho, sumiu com linhas e disse "não encontrei tomate nem cebola" sem ter buscado na loja
+    m = churrasco_8()
+    antes = {lin['item_id']: lin['qtd'] for lin in linhas(m)}
+    sem_loja = len([b for b in m.mcp.chamadas_de('searchOffers') if 'merchantId' not in b['refinements']])
+    n = len(m.wpp.saida)
+    m.enviar('Adiciona um tomate e uma cebola por favor')
+    depois = {lin['item_id']: lin['qtd'] for lin in linhas(m)}
+    assert all(depois.get(i) == q for i, q in antes.items())  # nada do que estava mudou
+    novos = [lin for lin in linhas(m) if lin['item_id'] not in antes]
+    assert sorted(lin['nome'] for lin in novos) == ['Cebola', 'Tomate'] and all(lin['qtd'] == 1 for lin in novos)
+    assert kit(m)['explicacao'] == 'Pus 1x Tomate e pus 1x Cebola 👍'
+    assert len([b for b in m.mcp.chamadas_de('searchOffers') if 'merchantId' not in b['refinements']]) == sem_loja
+    assert not any('Montando um kit' in (d.get('texto') or '') for _, d in m.wpp.saida[n:])  # nada de kit do zero
+
+
+def test_prato_de_novo_em_itens_com_outras_palavras_nao_refaz_o_kit():
+    # a Lia devolveu "churrasco" em itens (o kit era "carne pra churrasco") e o fluxo montou outro kit
+    m = churrasco_8()
+    antes = {lin['item_id']: lin['qtd'] for lin in linhas(m)}
+    original = m.llm.__call__
+
+    def lia(sistema, partes, esquema, **kw):
+        if 'acao' in esquema['properties']:
+            return {'acao': 'grupo', 'numero': None, 'texto': 'adiciona um tomate',
+                    'itens': [{'termo': 'churrasco', 'busca': 'carne churrasco', 'tipo_loja': 'MERCADO'},
+                              {'termo': 'tomate', 'busca': 'tomate', 'tipo_loja': 'MERCADO'}]}, 'fake', 0.01
+        return original(sistema, partes, esquema, **kw)
+    m.ctx._gerar_json = lia
+    n = len(m.wpp.saida)
+    m.enviar('adiciona um tomate')
+    depois = {lin['item_id']: lin['qtd'] for lin in linhas(m)}
+    assert all(depois.get(i) == q for i, q in antes.items()) and kit(m)['loja'] == 'Supermercado Central'
+    assert sum(1 for lin in linhas(m) if lin['nome'] == 'Tomate') == 1  # uma vez só (estava no texto e em itens)
+    assert not any('Montando um kit' in (d.get('texto') or '') for _, d in m.wpp.saida[n:])
+
+
+def test_mesmo_prato_e_o_que_ja_esta_no_texto():
+    tema = {'termo': 'carne pra churrasco', 'tipo_loja': 'MERCADO'}
+    assert grupo.mesmo_prato({'termo': 'churrasco'}, tema) and grupo.mesmo_prato({'termo': 'picanha'}, tema)
+    assert not grupo.mesmo_prato({'termo': 'pizza'}, tema) and not grupo.mesmo_prato({'termo': 'tomate'}, tema)
+    assert grupo.mesmo_prato({'termo': 'coca-cola'}, {'termo': 'coca-cola'}) and not grupo.mesmo_prato({'termo': 'coca'}, {'termo': 'guaraná'})
+    assert kit_ajuste.ja_no_texto('tomate', 'adiciona um tomate') and not kit_ajuste.ja_no_texto('cerveja', 'adiciona um tomate')
+
+
+def test_um_acompanhamento_por_tipo_e_o_essencial_entra():
+    # 18/10 08h50: três pães de alho diferentes no mesmo kit, e sem carvão
+    acomp = lambda nome, termo, unit: {'nome': nome, 'base': nome, 'papel': 'acompanhamento', 'termo': termo, 'unit': unit}  # noqa: E731
+    cands = [{'nome': 'Picanha', 'base': 'Picanha', 'papel': 'principal', 'termo': 'carne pra churrasco', 'unit': 80.0},
+             acomp('Pão de alho A', 'pão de alho', 10.0), acomp('Pão de alho B', 'pão de alho', 12.0),
+             acomp('Pão de alho C', 'pão de alho', 15.0), acomp('Carvão', 'carvão', 19.0),
+             {'nome': 'Guaraná 2 litros', 'base': 'Guaraná 2 litros', 'papel': 'bebida', 'termo': 'refrigerante', 'unit': 9.0}]
+    tema = {'termo': 'carne pra churrasco', 'tipo_loja': 'MERCADO'}
+    escolha = grupo._validar([(0, 4), (1, 1), (2, 1), (3, 1)], cands, 8, tema)
+    assert dict(escolha) == {0: 4, 1: 1, 4: 2, 5: 2}  # um pão de alho, o carvão que faltava e a bebida

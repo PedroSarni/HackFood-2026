@@ -45,17 +45,29 @@ _NADA = re.compile(r'^(?:(?:o|a|os|as|esse|essa|este|esta|mesmo|mesma|mesmos|tud
 # palavra que mostra que o alvo não é um produto ("2 são vegetarianos", "um não come carne")
 _NAO_PRODUTO = re.compile(r'\b(sao|e|esta|estao|come|comem|nao|quer|querem|gosta|gostam|pode|podem|tem|vai|vao|ser|somos|'
                           r'alergic\w*|alergia|vegetarian\w*|vegan\w*|crianc\w*|idos\w*|lactose|gluten|diet\w*|pessoa\w*|'
-                          r'gente|amig\w*|adult\w*|picante|apimentad\w*|cebola|tomate|alface|picles|maionese|ketchup|'
-                          r'mostarda|pimenta|ovo|milho|azeitona|catupiry|cheddar|molho|acucar|oleo|bem passad\w*|mal '
-                          r'passad\w*|ao ponto|quente|gelad\w*|rapido|demora|entrega|hoje|amanha|agora|depois)\b')
+                          r'gente|amig\w*|adult\w*|picante|apimentad\w*|bem passad\w*|mal passad\w*|ao ponto|quente|'
+                          r'gelad\w*|rapido|demora|entrega|hoje|amanha|agora|depois)\b')
+# "sem cebola" num kit de restaurante é como quer o lanche (vai pro modelo); no mercado, cebola é produto
+# (18/10 08h49: "adiciona um tomate e uma cebola" num churrasco tem que virar tomate e cebola no kit)
+_INGREDIENTE = re.compile(r'\b(cebola|tomate|alface|picles|maionese|ketchup|mostarda|pimenta|ovo|milho|azeitona|catupiry|'
+                          r'cheddar|molho|acucar|oleo|sal|queijo|bacon|presunto|calabresa|oregano|rucula|cebolinha|salsinha|'
+                          r'tempero|gelo)\b')
+_CORTESIA = re.compile(r'\b(por favor|por gentileza|pfv|pf|obrigad[oa]|valeu|please|ai|dai|entao|ok|beleza|ne|tipo)\b')
 _BEBIDA_PALAVRA = re.compile(r'\b(refri\w*|bebid\w*|refrigerant\w*)\b')
 _DOCE = re.compile(r'\b(sobremesa\w*|doce\w*|pudim|bolo|sorvete|mousse|milkshake|brownie|petit|torta|chocolate)\b')
 _PORCAO_PALAVRA = re.compile(r'\b(porc(?:ao|oes)|acompanhamento\w*)\b')
 
 
 def frases(ajuste):
-    """'sem refri e mais batata' -> ['sem refri', 'mais batata'] (normalizado, sem acento)."""
-    return [p.strip() for p in _SEPARA.split(normalizar(ajuste)) if p and p.strip()]
+    """'sem refri e mais batata, por favor' -> ['sem refri', 'mais batata'] (normalizado, sem acento nem cortesia)."""
+    partes = (_CORTESIA.sub(' ', p).strip() for p in _SEPARA.split(normalizar(ajuste)) if p)
+    return [' '.join(p.split()) for p in partes if p.strip()]
+
+
+def ja_no_texto(termo, texto):
+    """'tomate' em 'adiciona um tomate': o pedido já está no ajuste (não vira um 2º "põe tomate")."""
+    raizes = relevancia._raizes(termo)
+    return bool(raizes) and all(r in normalizar(texto) for r in raizes)
 
 
 def _n(texto):
@@ -81,10 +93,12 @@ def ler(ajuste, cands, kit, tema):
             alvo = m.group(1)
             if _NADA.match(alvo):
                 ops.append({'op': 'nada'})
-            elif _cita_alguem(alvo, kit, cands, tema) or _produto(alvo):
+            elif _cita_alguem(alvo, kit, cands, tema):
                 ops.append({'op': 'tira', 'alvo': alvo})
+            elif _INGREDIENTE.search(alvo) and (tema.get('tipo_loja') or 'RESTAURANTE') != 'MERCADO' or not _produto(alvo):
+                ops.append({'op': 'livre', 'texto': frase})  # "sem cebola" no lanche: como quer o lanche, não linha
             else:
-                ops.append({'op': 'livre', 'texto': frase})  # "sem cebola": restrição, não linha do kit
+                ops.append({'op': 'tira', 'alvo': alvo})
             continue
         m = _TROCA.match(frase)
         if m and (_cita_alguem(m.group(1), kit, cands, tema) or (_produto(m.group(1)) and _produto(m.group(2)))):
@@ -201,7 +215,7 @@ def aplicar(ops, kit, cands, pessoas, tema, loja):
                 continue
             novo = _achar(op['por'], cands, {n for n, _ in kit}, tema)
             if novo is None:
-                novo = next(iter(loja.buscar(op['por'])), None)
+                novo = _melhor(op['por'], loja.buscar(op['por']), cands)
             if novo is None and loja.reabrir(de[0], op['por']):
                 frases.append(f'troquei por {_nome(cands[de[0]])}')
                 continue
@@ -254,11 +268,19 @@ def aplicar(ops, kit, cands, pessoas, tema, loja):
     return kit[:grupo.MAX_LINHAS], frases, faltou
 
 
+def _melhor(alvo, indices, cands):
+    """Dos achados na busca, o que É o alvo: 'tomate' prefere "Tomate kg" a "Molho de tomate"."""
+    if not indices:
+        return None
+    raiz = relevancia._raizes(alvo)[:1]
+    return next((i for i in indices if raiz and normalizar(cands[i]['nome']).startswith(raiz[0])), indices[0])
+
+
 def _por(alvo, n, kit, cands, pessoas, tema, loja):
     """Põe o alvo no kit: da lista da loja, senão de uma busca nela. Devolve (kit, frase, [não achado])."""
     novo = _achar(alvo, cands, {x for x, _ in kit}, tema)
     if novo is None:
-        novo = next(iter(loja.buscar(alvo)), None)
+        novo = _melhor(alvo, loja.buscar(alvo), cands)
     if novo is None:
         return kit, f'não achei {alvo} nessa loja', [alvo]
     qtd = _quantas(cands[novo], pessoas, n)
@@ -286,21 +308,29 @@ def explicar(frases):
 
 # --------------------------------------------------------------------------- o modelo só mexe no que citou
 
+# o ajuste livre é sobre o principal? ("2 são vegetarianos", "sem cebola", "um não come carne"): só aí o modelo
+# pode mexer nos lanches; "quero algo mais gostoso" não troca nada
+_SOBRE_PRINCIPAL = re.compile(r'vegetarian|vegan|vegg|alerg|lactose|gluten|crianc|idos|picante|apimentad|'
+                              r'\b(?:sem|tira\w*|nao (?:come|comem|quer|querem|gosta|gostam))\b')
+
+
 def conferir(escolha, atual, cands, texto, tema):
-    """Depois do modelo (ajuste livre, "2 são vegetarianos"): os principais podem mudar (é o que ele faz);
-    linha que não é principal e não foi citada fica exatamente como estava, e linha nova que não foi citada
-    não entra. Se ele tirou todos os principais, fica o kit de antes."""
+    """Depois do modelo (ajuste livre): linha que não foi citada fica exatamente como estava e linha nova que
+    não foi citada não entra. Os principais só mudam se o ajuste é sobre eles ("2 são vegetarianos", "sem
+    cebola"). Se ele tirou todos os principais, fica o kit de antes."""
     citadas = {n for n in set([x for x, _ in atual] + [x for x, _ in escolha]) if _cita_texto(texto, cands[n], tema)}
+    principal_livre = any(cands[n]['papel'] == 'principal' for n in citadas) or bool(_SOBRE_PRINCIPAL.search(normalizar(texto)))
+    pode_mudar = lambda n: n in citadas or (principal_livre and cands[n]['papel'] == 'principal')  # noqa: E731
     novo = dict(escolha)
     saida = []
     for n, q in atual:
-        if cands[n]['papel'] == 'principal' or n in citadas:
+        if pode_mudar(n):
             if n in novo:
                 saida.append((n, novo[n]))
         else:
             saida.append((n, q))
     for n, q in escolha:
-        if n not in dict(atual) and (cands[n]['papel'] == 'principal' or n in citadas):
+        if n not in dict(atual) and pode_mudar(n):
             saida.append((n, q))
     if not any(cands[n]['papel'] == 'principal' for n, _ in saida):
         return list(atual)

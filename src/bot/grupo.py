@@ -274,6 +274,18 @@ def tema_em(texto):
     return None
 
 
+def mesmo_prato(a, b):
+    """'churrasco' e 'carne pra churrasco' (e 'picanha') são o mesmo prato; 'pizza' e 'churrasco' não; 'tomate'
+    não é prato nenhum. 18/10 08h48: a Lia devolveu o prato com outras palavras e o fluxo montou outro kit."""
+    ra, rb = receita_de(a), receita_de(b)
+    if ra or rb:
+        return bool(ra and rb and ra['id'] == rb['id'])
+    ta, tb = tema_em((a or {}).get('termo')), tema_em((b or {}).get('termo'))
+    if ta or tb:
+        return bool(ta and tb and normalizar(ta['termo']) == normalizar(tb['termo']))
+    return normalizar((a or {}).get('termo')) == normalizar((b or {}).get('termo'))
+
+
 def _minusculo(texto):
     t = unicodedata.normalize('NFKD', str(texto or '').lower())
     return ''.join(c for c in t if not unicodedata.combining(c))
@@ -612,7 +624,7 @@ def kit_padrao(pessoas, cands, tema=None, sem_bebida=False):
     if porcao:
         escolha.append((idx[id(porcao)], math.ceil(pessoas / 3)))
     escolha = _garantir_pedidos(escolha, cands, pessoas, tema)
-    return _completar(escolha, cands, pessoas, tema, sem_bebida)[:MAX_LINHAS]
+    return _caber_linhas(_completar(escolha, cands, pessoas, tema, sem_bebida), cands, tema)
 
 
 def requantificar(escolha, cands, pessoas, tema):
@@ -642,7 +654,7 @@ def _validar(escolha, cands, pessoas, tema, sem_bebida=False):
         print(f'kit: {total} principais pra {pessoas} pessoas (ideal {ideal}), refazendo as quantidades')
         escolha = requantificar(escolha, cands, pessoas, tema)
     bebidas = [n for n, _ in escolha if _e_bebida(cands[n])]
-    saida = []
+    saida, acompanha = [], set()
     for n, q in escolha:
         c = cands[n]
         if _e_bebida(c):
@@ -650,11 +662,27 @@ def _validar(escolha, cands, pessoas, tema, sem_bebida=False):
                 continue
             if q > _qtd_bebida(c, pessoas) + 1:
                 q = _qtd_bebida(c, pessoas)
-        elif c['papel'] == 'acompanhamento' and q > pessoas:
-            q = quantidade_de(c, pessoas, tema)
+        elif c['papel'] == 'acompanhamento':
+            chave = normalizar(c['termo'])
+            if chave in acompanha or len(acompanha) >= 3:
+                continue  # um pão de alho basta (18/10 08h50: três no mesmo kit); variar sabor é coisa do principal
+            acompanha.add(chave)
+            if q > pessoas:
+                q = quantidade_de(c, pessoas, tema)
         saida.append((n, q))
     saida = _garantir_pedidos(saida, cands, pessoas, tema)
-    return _completar(saida, cands, pessoas, tema, sem_bebida)[:MAX_LINHAS]
+    return _caber_linhas(_completar(saida, cands, pessoas, tema, sem_bebida), cands, tema)
+
+
+def _caber_linhas(escolha, cands, tema):
+    """Mais que MAX_LINHAS: sai primeiro o acompanhamento que ninguém pediu (do fim), nunca o pedido nem o essencial."""
+    escolha = list(escolha)
+    while len(escolha) > MAX_LINHAS:
+        sobra = [n for n, _ in escolha if cands[n]['papel'] == 'acompanhamento' and not _essencial(cands[n], tema)]
+        if not sobra:
+            return escolha[:MAX_LINHAS]
+        escolha = [(n, q) for n, q in escolha if n != sobra[-1]]
+    return escolha
 
 
 def _lista_pro_modelo(cands):
@@ -784,7 +812,8 @@ def _linhas(api, endereco, cands, escolha, pessoas):
             faltou.append(c['termo'])
             continue
         linhas.append({'item_id': c['item_id'], 'nome': c['nome'], 'qtd': q, 'unit': c['unit'],
-                       'total': round(c['unit'] * q, 2), 'opcoes': c['opcoes'], 'papel': c['papel']})
+                       'total': round(c['unit'] * q, 2), 'opcoes': c['opcoes'], 'papel': c['papel'],
+                       'termo': c.get('termo')})
     ordem = {'principal': 0, 'pedido': 1, 'acompanhamento': 2, 'bebida': 3}
     linhas.sort(key=lambda lin: ordem.get(lin['papel'], 9))
     return linhas, faltou
@@ -833,7 +862,7 @@ def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=N
         if fonte['loja_id'] not in vistas:
             vistas.append(fonte['loja_id'])
         mesma_loja = mesma_busca and not outra_loja and anterior.get('loja_id') == fonte['loja_id']
-        if mesma_loja and not novos_extras and anterior.get('candidatos'):
+        if mesma_loja and anterior.get('candidatos'):  # ajuste: a lista da tela, nunca refeita (o que entrou a mais vira "põe")
             cands, faltou_loja = [dict(c) for c in anterior['candidatos']], list(anterior.get('faltou_loja') or [])
         else:
             cands, faltou_loja = candidatos(api, llm, endereco, fonte, tema, list(extras), pessoas)
@@ -841,13 +870,25 @@ def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=N
             fonte = escolher_loja(lista, vistas)  # nenhum principal abriu nessa loja: tenta a próxima
             continue
         atual = None
-        if mesma_loja and anterior.get('linhas'):  # o kit da tela, nos números desta lista
+        if mesma_loja and anterior.get('linhas'):  # o kit da tela, nos números desta lista: nenhuma linha se perde
             pos = {c['item_id']: i for i, c in enumerate(cands)}
-            atual = [(pos[lin['item_id']], lin['qtd']) for lin in anterior['linhas'] if lin['item_id'] in pos]
+            atual = []
+            for lin in anterior['linhas']:
+                if lin['item_id'] not in pos:
+                    cands.append({'item_id': lin['item_id'], 'nome': lin['nome'], 'base': lin['nome'],
+                                  'opcoes': lin.get('opcoes') or [], 'unit': lin['unit'], 'aberto': True,
+                                  'papel': lin['papel'], 'loja_id': fonte['loja_id'],
+                                  'termo': lin.get('termo') or (tema['termo'] if lin['papel'] == 'principal' else lin['nome'])})
+                    pos[lin['item_id']] = len(cands) - 1
+                atual.append((pos[lin['item_id']], lin['qtd']))
         loja = _Loja(api, llm, endereco, fonte, cands, pessoas, tema)
         if atual:
             # ajuste em cima do kit da tela: o código aplica; o modelo só entra no que o código não leu
             ops = kit_ajuste.ler(ajuste, cands, atual, tema) if ajuste else []
+            # o que a Lia pôs em itens agora ("coca" seco, "adiciona tomate" com itens=[tomate]) entra como "põe",
+            # sem refazer a lista da loja e sem repetir o que o texto do ajuste já pede
+            ops += [{'op': 'poe', 'alvo': t, 'n': None} for t in _termos(extras)
+                    if t not in _termos(anterior.get('extras')) and not kit_ajuste.ja_no_texto(t, ajuste or '')]
             livres = [o['texto'] for o in ops if o['op'] == 'livre']
             escolha = list(atual)
             if livres:
@@ -860,9 +901,6 @@ def montar(api, llm, endereco, pessoas, tema, extras=(), ajuste=None, anterior=N
                 escolha = requantificar(escolha, cands, pessoas, tema)
                 explicacao = explicacao or f'Refiz as quantidades pra {pessoas} pessoas 👍'
             escolha, frases, faltou_ajuste = kit_ajuste.aplicar(ops, escolha, cands, pessoas, tema, loja)
-            if novos_extras:  # "coca" dito agora entra; o que já estava e foi tirado antes não volta
-                escolha = _garantir_pedidos(escolha, cands, pessoas, tema,
-                                            set(_termos(extras)) - set(_termos(anterior.get('extras'))))
             explicacao = kit_ajuste.explicar(frases) or explicacao
             break
         # kit novo nesta loja (1º kit, outra loja, outra comida): o modelo compõe, sabendo o que já foi pedido

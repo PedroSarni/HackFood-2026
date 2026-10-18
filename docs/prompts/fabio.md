@@ -742,3 +742,23 @@ correcoes certinho"
 então pra ele vai `thinking: disabled` (`_chamar_claude`, com teste). Fila da Duda (`src/agentes/relevancia.py`) e
 `MODELOS_ROTEIRO` da Vina com o Haiku na frente e o Sonnet de reserva; `claude-haiku-5-5` entrou nas opções do dash.
 Commit + push e deploy no Modal com tudo: Beto consistente, kit em paralelo e Haiku.
+
+## 2026-10-18 ~09h00 — "o Beto ainda está chapando" (adicionar tomate e cebola refez o kit)
+
+**Prompt:** "o beto ainda esta chapando, nao esta alterando o kit bem, de uma olhada nisso em especial [2 prints: kit de
+churrasco pra 8 no Savegnago com 3 pães de alho; depois de 'Adiciona um tomate e uma cebola por favor', outro kit
+com 1 pão de alho diferente e 'Não encontrei tomate nem cebola na loja'] ele chapou demais, veja o tamanho da
+inconsistencia"
+
+**Resposta:** Pelo diário (conversa do Breno, 08:48): a Lia devolveu o prato de novo em `itens` ("churrasco", o kit
+era "carne pra churrasco") e o fluxo entendeu "na verdade quero outra comida" → montou um kit DO ZERO (busca do
+principal, lojas, modelo recompondo tudo); tomate e cebola nem foram buscados. Corrigido:
+- `_mesmo_termo` do fluxo virou `mesmo_prato` (mesma receita = mesmo prato): só muda de kit se a comida mudar mesmo;
+  produto novo em `itens` vira "põe X" em cima do kit da tela, buscado SÓ na loja, sem repetir o que o texto já pede;
+- no ajuste a lista de candidatos da tela nunca é refeita, e linha da tela que não está na lista vira candidato
+  (nenhuma linha some); "tomate"/"cebola" voltaram a ser produto (no lanche, "sem cebola" continua indo pro modelo);
+  "por favor" e afins saem da frase antes de ler;
+- no ajuste livre o modelo só mexe nos principais se o ajuste é sobre eles ("2 são vegetarianos", "sem cebola");
+- um acompanhamento por tipo (três pães de alho não); passou de 8 linhas, sai acompanhamento, nunca pedido/essencial;
+  na busca da loja, "tomate" prefere "Tomate kg" a "Molho de tomate".
+4 testes novos reproduzindo o caso; deploy no Modal.

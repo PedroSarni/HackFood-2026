@@ -3108,7 +3108,9 @@ def _fechamento(acao):
 
 
 def _mesmo_termo(a, b):
-    return normalizar((a or {}).get('termo')) == normalizar((b or {}).get('termo'))
+    # o mesmo PRATO, não a mesma palavra: 18/10 08h48 a Lia devolveu "churrasco" num kit de "carne pra churrasco"
+    # e o fluxo montou outro kit do zero (src/bot/grupo.py, mesmo_prato)
+    return kit_grupo.mesmo_prato(a, b)
 
 
 def _mesmo_nome(a, b):
