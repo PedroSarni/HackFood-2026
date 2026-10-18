@@ -314,7 +314,8 @@ cerveja: pack de 12 latas serve ~4 pessoas; queijo coalho: 1 espeto por pessoa; 
 e mesmas quantidades ('sem batata e sem refri' tira a batata e o refri; os lanches ficam os mesmos).
 - use SÓ os números da lista e no máximo 8 produtos diferentes. NÃO calcule preços: o sistema calcula.
 - explicacao: 1 frase curta, calorosa, em português, dizendo como pensou o kit, com 1 emoji \
-("1 lanche pra cada, 2 Cocas de 2 litros e batata pra dividir 😋"). Sem valores em reais.
+("um lanche pra cada, Coca de 2 litros e batata pra dividir 😋"). Sem valores em reais e sem quantidades \
+(o código pode ajustar as quantidades depois, pra caber no orçamento).
 Responda só o JSON do esquema."""
 
 ESQUEMA = {

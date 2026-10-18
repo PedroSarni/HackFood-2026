@@ -124,7 +124,8 @@ o valor" ou "o pedido mínimo" = sugerir (quando a pessoa não disse o produto).
 - Comer em grupo e dividir a conta = grupo: "lanchar em 5 pessoas hambúrguer", "pizza pra 4 \
 dividindo", "vamos rachar uma pizza eu e mais 3", "churrasco pra 10 pessoas", "monta um kit pra galera", \
 "quanto fica pra cada". numero = quantas pessoas NO TOTAL, contando quem escreve ("eu e mais 3" = 4, \
-"com 4 amigos" = 5, "em 5 pessoas" = 5, "casal" = 2; não disse = null). itens = primeiro o que querem \
+"com 4 amigos" = 5, "em 5 pessoas" = 5, "pra 13 amigos" = 13 (o "pra" já é o grupo todo), "casal" = 2; \
+não disse = null). itens = primeiro o que querem \
 comer (o principal) e depois o que pediram junto ("hambúrguer com coca" -> hambúrguer, coca-cola): a \
 comida dita vai SEMPRE em itens, nunca só no texto. Sem comida dita (itens vazio) = dividir o pedido que \
 já está montado. "2 pizzas" sem falar de pessoas é comprar.

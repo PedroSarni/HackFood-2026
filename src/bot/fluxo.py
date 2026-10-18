@@ -909,7 +909,11 @@ class Bot:
             self.agendar(it.get('numero'), it.get('hora'), it.get('itens'))
         elif a == 'fora_do_escopo':
             fala = self._resposta or T.FORA_DO_ESCOPO
-            self.repetir_pergunta(fala) if botoes else self.menu(fala)
+            if botoes and fase == 'acompanhando':
+                # pedido já feito, nada esperando resposta: responde e deixa os atalhos, sem repetir o "Combinado!"
+                self.perguntar(fala, [tuple(b) for b in botoes], fase='acompanhando')
+            else:
+                self.repetir_pergunta(fala) if botoes else self.menu(fala)
         else:
             fala = self._resposta or T.NAO_ENTENDI
             self.repetir_pergunta(fala) if botoes else self.menu(fala)
