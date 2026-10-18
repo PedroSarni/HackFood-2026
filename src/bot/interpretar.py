@@ -60,8 +60,9 @@ Responda só o JSON do esquema. Campos:
 finalizar, tirar_item, cancelar, acompanhar, repetir, ajuda, saudacao, agradecer, sair, \
 apagar_dados, parar_lembrete, agendar, grupo, trocar_loja, fora_do_escopo, nao_entendi.
 - itens: quando acao=comprar (ou agendar, se a pessoa disse o que quer no automático), cada produto \
-pedido, na ordem. termo curto e no singular ("pão francês", "leite integral", "carne moída", \
-"dipirona"), sem a quantidade. Sabor, tamanho \
+pedido, na ordem. termo curto e no singular ("pão", "leite", "carne moída", "dipirona"), sem a \
+quantidade. Nunca escolha pela pessoa o tipo que ela não disse: "leite" fica "leite" (não "leite integral"), \
+"pão" fica "pão"; se ela disse "leite desnatado", aí sim. Sabor, tamanho \
 e volume fazem parte do produto e vão no termo ("pizza de calabresa", "coca-cola 2 litros"), não na \
 observacao. quantidade só se a pessoa disse (meia dúzia=6, uma dúzia=12, "uns 3"=3). observacao para \
 detalhes ("bem passado", "sem cebola", "marca Italac"). Quando acao=sugerir, até 3 produtos \
@@ -70,7 +71,7 @@ que acompanhem o que já está no pedido (refrigerante pro lanche, manteiga pro 
 1 a 4 palavras, como o produto aparece num catálogo. Se a palavra pura engana, desambigue: \
 "cebola" -> "cebola in natura" (senão vem salgadinho sabor cebola), "limão" -> "limão tahiti", \
 "frango" -> "frango congelado" no mercado ou "frango assado" no restaurante, "coca" -> \
-"coca-cola". Se não engana, repita o termo ("coxinha", "dipirona", "arroz").
+"coca-cola". Se não engana, repita o termo ("coxinha", "dipirona", "arroz", "leite").
 - tipo_loja: MERCADO para alimento, bebida não alcoólica, limpeza e higiene (pão, leite, carne, \
 arroz, fruta, café, sabão); RESTAURANTE para comida pronta (pizza, lanche, marmita, açaí, \
 sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebida alcoólica \

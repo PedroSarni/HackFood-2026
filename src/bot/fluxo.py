@@ -575,8 +575,14 @@ class Bot:
         return ([T.B_REPETIR] if repete else []) + ([T.B_MEU_PEDIDO] if tem_pedido else [])
 
     def _primeiro_nome(self):
-        n = self.u.get('nome_ifood') or self.u.get('nome') or ''
-        return n.split(' ')[0] if n else ''
+        # o do WhatsApp é de quem está falando; o do iFood é o da conta, que pode ser de outra pessoa (o neto
+        # que fez a conta da avó; no QA de 18/10 o Davi entrou na conta do Fabio e virou "Oi, Fabio!", M3).
+        # O do iFood só entra se o do WhatsApp não parecer nome ("~", emoji)
+        for n in (self.u.get('nome'), self.u.get('nome_ifood')):
+            primeiro = str(n or '').strip().split(' ')[0]
+            if primeiro[:1].isalpha():
+                return primeiro
+        return ''
 
     # ================================================================== roteamento
 
@@ -1977,7 +1983,8 @@ class Bot:
                 return
             else:
                 u['formas'] = formas[:9]
-                botoes = [(f'pag:{i}', f['nome']) for i, f in enumerate(formas[:9])]
+                # + Mudar: no pagamento e no CPF não tinha como voltar (QA U3)
+                botoes = [(f'pag:{i}', f['nome']) for i, f in enumerate(formas[:9])] + [T.B_MUDAR_CURTO]
                 self.perguntar(T.QUAL_PAGAMENTO, botoes, fase='pagamento', rotulo='Ver formas')
                 return
         car = u['carrinho']
@@ -2001,7 +2008,8 @@ class Bot:
             if cpf:
                 u['cpf'] = cpf
             else:
-                self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF], fase='cpf')
+                # no modo áudio não tem botão pra ler em voz: "mudar" falado já vale (é comando)
+                self.perguntar(T.PEDIR_CPF, [T.B_SEM_CPF] + ([] if u.get('voz') else [T.B_MUDAR_CURTO]), fase='cpf')
                 return
         self.mostrar_resumo()
 
@@ -2551,8 +2559,9 @@ class Bot:
             pessoas = lido['pessoas'] or kit_grupo.pessoas_em(escrito)  # o modelo às vezes não preenche
             if (pessoas and pessoas > 1) or u.get('fase') == 'grupo_tema':  # "pizza dessas pra 5": é o kit
                 self.intencao({'acao': 'grupo', 'numero': pessoas, 'itens': lido['parecidos'][:1]})
-            elif lido['ja_pediu'] or QUER_ISSO.search(normalizar(escrito)):
-                # "quero isso", "me vê 2 desse": não pergunta o que ela já disse
+            elif (lido['ja_pediu'] and (escrito.strip() or outras)) or QUER_ISSO.search(normalizar(escrito)):
+                # "quero isso", "me vê 2 desse": não pergunta o que ela já disse. Foto sozinha nunca "já pediu":
+                # a Íris às vezes contava um "sim" de antes da conversa e ia direto pra busca (QA U9)
                 self.foto_sim()
             else:
                 fid = u['foto']['id']

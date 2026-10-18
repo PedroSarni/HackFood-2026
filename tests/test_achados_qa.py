@@ -171,6 +171,51 @@ def test_fazer_pedido_embaixo_da_mesma_pergunta_ensina_em_vez_de_repetir():
     assert m.wpp.textos()[0] == T.COMO_PEDIR and T.PERGUNTA_PEDIDO not in m.wpp.textos()   # QA U1
 
 
+def test_foto_sozinha_sempre_pergunta_mesmo_se_a_iris_acha_que_ja_pediu():
+    m = Mundo()
+    endereco_pronto(m)
+    m.llm.foto = {'tipo': 'comida', 'descricao': 'pizza', 'itens': [], 'ja_pediu': True, 'resposta': 'Que pizza! 🍕',
+                  'parecidos': [{'termo': 'pizza', 'busca': 'pizza', 'tipo_loja': 'RESTAURANTE'}]}
+    buscas = len(m.mcp.chamadas_de('searchOffers'))
+    m.enviar(('foto', 'f1'))                          # sem legenda nem texto: um "sim" de antes não é pedido (U9)
+    assert m.estado()['fase'] == 'foto' and len(m.mcp.chamadas_de('searchOffers')) == buscas
+    m.enviar(('foto', 'f2', 'quero essa'))            # com o pedido escrito, vai direto
+    assert len(m.mcp.chamadas_de('searchOffers')) > buscas
+
+
+def test_pagamento_e_cpf_tem_como_mudar():
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.tocar('fim')
+    assert 'mudar' in [i for i, _ in m.wpp.ultimos_botoes()]                        # pagamento (QA U3)
+    m.tocar('pag:0')
+    assert m.estado()['fase'] == 'cpf' and 'mudar' in [i for i, _ in m.wpp.ultimos_botoes()]
+    m.tocar('mudar')
+    assert m.estado()['fase'] != 'cpf'
+
+
+def test_rastreio_para_quando_a_pessoa_apaga_os_dados():
+    m = pedido_ate_o_resumo(Mundo())
+    m.tocar('ok:')
+    m.armazem.pop(f'u:{m.wa}')                        # "apagar meus dados" com o pedido a caminho (QA H4)
+    m.ctx.armazem = m.armazem
+    assert acompanhar(m.ctx, m.wa, m.rastreios[-1], dormir=lambda s: None) == 'apagou'
+
+
+def test_saudacao_usa_o_nome_de_quem_esta_falando():
+    m = Mundo()
+    m.armazem[f'u:{m.wa}'] = {**(m.armazem.get(f'u:{m.wa}') or {}), 'nome': 'Davi Lima', 'nome_ifood': 'Fabio Kauê'}
+    m.wpp.limpar()
+    m.enviar('oi')
+    assert 'Davi' in m.wpp.textos()[0] and 'Fabio' not in m.wpp.textos()[0]          # QA M3
+    m.armazem[f'u:{m.wa}']['nome'] = '🌸~'
+    m.wpp.limpar()
+    m.enviar('oi')
+    assert 'Fabio' in m.wpp.textos()[0]                                              # sem nome no WhatsApp
+
+
 def test_meu_pedido_com_carrinho_montando_mostra_o_carrinho_e_cade_e_do_que_ja_saiu():
     m = _com_dois_paes()
     m.wpp.limpar()

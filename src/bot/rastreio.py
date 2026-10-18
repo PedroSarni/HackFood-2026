@@ -41,6 +41,16 @@ def segundos_da_dica(dica, padrao=INTERVALO):
     return max(MIN_INTERVALO, min(MAX_INTERVALO, n))
 
 
+def _apagou(ctx, wa_id):
+    """"Apagar meus dados" no meio do rastreio: para de avisar (QA H4; apagar é apagar tudo). No iFood real o
+    login cai e o rastreio para sozinho; no mock não tem login, então é o estado da pessoa que diz."""
+    armazem = getattr(ctx, 'armazem', None)
+    try:
+        return armazem is not None and not armazem.get(f'u:{wa_id}')
+    except Exception:  # noqa: BLE001 - armazém fora do ar não para o rastreio
+        return False
+
+
 def acompanhar(ctx, wa_id, pedido_id, dormir=time.sleep, relogio=time.time):
     """Cada mudança de status vira aviso (em áudio, pra quem pediu tudo áudio: src/bot/voz.py).
     Acabou o acompanhamento, de qualquer jeito: acaba também a sessão do modo áudio."""
@@ -58,6 +68,9 @@ def _acompanhar(ctx, wa_id, pedido_id, dormir, relogio):
     ultimo, vistos = None, set()
     falhas = 0
     while relogio() - inicio < DURACAO_MAX:
+        if _apagou(ctx, wa_id):
+            print(f'rastreio {pedido_id}: a pessoa apagou os dados, parando')
+            return 'apagou'
         try:
             st = ctx.ifood(wa_id).rastrear(pedido_id)
             falhas = 0
