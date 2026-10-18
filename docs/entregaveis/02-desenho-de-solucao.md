@@ -34,7 +34,7 @@ A pessoa conversa por texto, áudio ou foto. A IA entende o pedido e o código c
 3. **Endereço.** Vem da conta iFood dela. Com 1 endereço, usa direto; com vários, confirma o mais provável numa pergunta; sem nenhum, pede e salva.
 4. **Entender o pedido.** "pão, leite e café", um áudio ou a foto de uma lista de papel viram itens com quantidade e tipo de loja.
 5. **Escolher a loja.** Em lista com vários itens, o bot procura a loja que tem tudo e sai mais barata (itens + entrega). O iFood fecha um pedido por loja.
-6. **Mostrar opções.** 3 cards com foto e botão "Quero esse", mais "Mais opções". A pessoa toca ou diz "o do meio".
+6. **Mostrar opções.** Carrossel de cards com foto e botão "Quero esse" (até 10 por vez), mais "Mais opções". A pessoa toca ou diz "o do meio".
 7. **Carrinho.** Opções obrigatórias (tamanho, sabor) uma de cada vez, depois a quantidade na unidade de venda (unidade, kg, pacote). Se faltar para o pedido mínimo, o bot sugere o que combina.
 8. **Fechar.** Com "🧾 Revisar pedido" (ou "pode fechar"), o bot escolhe a entrega padrão, a forma de pagamento (PIX ou vale), aplica o melhor cupom, pede o CPF da nota (pode pular) se não estiver na conta iFood, e mostra o resumo com itens, entrega, pagamento, endereço e total.
 9. **Confirmação explícita.** Só um toque em "Confirmar pedido" ou um "sim" da pessoa no resumo faz o pedido ("já pode passar no pix" fecha direto, sem CPF na nota).

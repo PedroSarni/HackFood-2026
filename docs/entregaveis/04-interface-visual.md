@@ -37,7 +37,7 @@ Botão **Entrar no iFood**, que abre o login oficial. Na volta, o bot mostra de 
 ![Lista entendida (captura de 18/10 em modo de teste, catálogo simulado)](prints/A3.png)
 
 ### A4. Opções com foto
-Carrossel de 3 cards, cada um com foto, nome, preço e loja, e botão **Quero esse**. Embaixo, **➕ Mais opções**.
+Carrossel de cards (até 10 por vez), cada um com foto, nome, preço e loja, e botão **Quero esse**. Embaixo, **➕ Mais opções**.
 > Gostou de algum? Toque em *Quero esse* 👆
 
 ![Opções com foto (captura de 18/10 em modo de teste, catálogo simulado)](prints/A4.png)

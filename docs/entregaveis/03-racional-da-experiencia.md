@@ -29,8 +29,8 @@ Pedir do iFood deve parecer mandar mensagem para alguém de confiança. Cada dec
 
 ## 4. Poucas opções por vez, com foto
 
-**Decisão:** mostrar 3 opções em cards com foto e botão "Quero esse", mais um "Mais opções" que reaproveita a lista já buscada.
-**Por quê:** uma lista longa cansa e a foto reduz o erro de escolha. A pessoa pode tocar ou dizer "o do meio", "a segunda".
+**Decisão:** mostrar as opções em um carrossel de cards com foto e botão "Quero esse", até 10 por vez no texto e 3 no modo áudio, mais um "Mais opções" que reaproveita a lista já buscada.
+**Por quê:** o carrossel deixa a pessoa percorrer as opções sem uma lista longa de texto, e a foto reduz o erro de escolha. A pessoa pode tocar ou dizer "o do meio", "a segunda".
 
 ## 5. O bot escolhe o que dá para escolher por ela
 

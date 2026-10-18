@@ -401,3 +401,11 @@ três marcadores. [...] troque [PRINT A1] a [PRINT A6] por ![legenda](prints/Ax.
 
 **Resposta:** A1 a A6 substituídos no 04 e no entrega-unica.md (o marcador do A3 tinha texto de orientação, que saiu
 junto). A11 entrou na seção A7, acima do marcador [PRINT A7], que ficou intacto. Pendentes: A7, A8, A9.
+
+## 2026-10-18 12:05 — "3 cards" corrigido nos entregáveis
+
+**Prompt:** "Tarefa: corrigir incoerências de "3 cards" nos entregáveis. O código mostra até 10 cards por vez no carrossel
+(POR_PAGINA = 10) [...] Edite SOMENTE estas linhas [02, 03, 04, 06] [...] Depois rode grep [...] e me liste o que sobrou."
+
+**Resposta:** Frases ajustadas no 02 (passo 6), 03 (decisão e justificativa, só com carrossel e foto), 04 (A4) e 06.
+Sobrou o título "Poucas opções por vez, com foto" no 03. Sem código.

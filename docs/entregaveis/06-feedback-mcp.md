@@ -110,4 +110,4 @@ Servidor testado: `https://consumer-mcp.ifood.com.br/marketplace`, conta de test
   - Sugestão: expor `requiresCpf` em `searchOffers`/`getMerchant`, ou aceitar o CPF depois, só no `submitOrder`.
 - **Total parcial com taxas.** Em um item de R$ 36,99, o total do carrinho veio R$ 47,97 (entrega + taxa). O agente precisa somar sozinho para explicar a diferença; um campo `fees[]` com nome e valor resolveria.
 - **Catálogo sem marca.** Buscar "carne friboi" em um mercado real não trouxe nenhum produto da marca; trouxe patinho e acém sem marca no nome. O agente precisa de `brand` como campo filtrável.
-- **Lista pesada para chat.** `searchOffers` devolve até 25 itens por página; para um carrossel de WhatsApp (3 cards) a maior parte é descartada.
+- **Lista pesada para chat.** `searchOffers` devolve até 25 itens por página; para um carrossel de WhatsApp (até 10 cards) a maior parte é descartada.
