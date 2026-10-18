@@ -245,3 +245,18 @@ lembrete comparava isso com o total com entrega. Agora o modelo guarda `subtotal
 diz o que comparar (total com total se já se sabe, senão subtotal com subtotal, inclusive em lembrete antigo); o
 lembrete mostra "Itens: R$ X + entrega" até o 1º pedido e, depois dele, "Da última vez" com o total pago. 2 testes
 novos (o 1º falha sem a correção), nenhum existente mudou, 462 passando. Sem deploy.
+
+## 2026-10-18 06:10 — cinco acertos de texto (U6, U5, U25, U28, U22)
+
+**Prompt:** "Cinco acertos de texto/formatação no bot (src/bot/fluxo.py, src/bot/textos.py). Faça SÓ estes, nesta
+ordem, um commit por item: A. U6: itens iguais em linhas separadas [...] Some pelo mesmo produto: '5x Leite
+integral' [...] B. U5: quando a lista lida de foto/áudio ('Anotei sua lista:') tiver quantidade guardada, mostre [...]
+C. U25: o lembrete da recorrência diz 'nessa forma de pagamento' sem dizer qual [...] D. U28: ao tocar 'Hoje não' [...]
+Diga quando [...] E. U22: a recusa de papo fora do assunto vem colada em 'Tudo bem, cancelei. Nada foi comprado.'
+mesmo sem pedido em andamento [...] Teste automático para A, B, D e E [...]"
+
+**Resposta:** 5 commits. A: `somar_iguais`/`lista_itens` (textos.py) no resumo, no "Combinado!" e no lembrete; o
+carrinho continua com as linhas. B: "Anotei sua lista" mostra "2x leite" quando há `quantidade` (não há campo de
+unidade, então "1 kg" só aparece se já vier no termo). C: "pagando com *PIX*", com a forma do lembrete ou a preferida.
+D: "Te chamo de novo na semana que vem/amanhã/no mês que vem". E: o aviso do menu ("cancelei") ficava guardado como
+pergunta e voltava em toda repetição; agora vale uma vez só. 8 testes novos, nenhum existente mudou. Sem deploy.

@@ -1789,3 +1789,32 @@ def test_hoje_nao_fala_a_frequencia_de_cada_lembrete():
     from src.bot import textos as T
     assert 'amanhã' in T.lembrete_adiado(1) and 'no mês que vem' in T.lembrete_adiado(30)
     assert 'daqui a 15 dias' in T.lembrete_adiado(15) and 'daqui a 3 dias' in T.lembrete_adiado(3)
+
+
+# --- U22: "cancelei" só quando havia o que cancelar -----------------------------------------------
+
+def test_papo_fora_do_assunto_depois_de_cancelar_nao_repete_o_cancelei():
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.enviar(('botao', 'cancelar'))
+    assert 'cancelei' in m.wpp.textos()[-1]  # tinha carrinho: aí sim
+    m.wpp.limpar()
+    m.enviar('me conta uma piada')
+    texto = ' '.join(m.wpp.textos())
+    assert '[fala]' in texto and 'O que você quer pedir' in texto
+    assert 'cancelei' not in texto and 'Nada foi comprado' not in texto
+
+
+def test_papo_fora_do_assunto_com_carrinho_cheio_nao_cancela_nem_diz_cancelei():
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    itens = m.estado()['carrinho']['itens']
+    m.wpp.limpar()
+    m.enviar('me conta uma piada')
+    texto = ' '.join(m.wpp.textos())
+    assert '[fala]' in texto and 'cancelei' not in texto
+    assert m.estado()['carrinho']['itens'] == itens  # o carrinho continua lá

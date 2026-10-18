@@ -486,6 +486,9 @@ class Bot:
         if prefixo:
             texto += '\n\n' + T.PERGUNTA_PEDIDO
         self.perguntar(texto, self._menu(), fase='pedido')
+        if prefixo and self.u.get('pergunta'):
+            # o aviso ("Tudo bem, cancelei") é de uma vez só: repetir a pergunta depois não traz ele de volta
+            self.u['pergunta']['texto'] = T.PERGUNTA_PEDIDO
         if not prefixo:  # o "oi": boas-vindas curtinha e a vitrine do gosto da pessoa logo embaixo
             self._mostrar_vitrine()
 
