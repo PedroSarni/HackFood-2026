@@ -330,3 +330,9 @@ em centavos" e "diário sem texto". Não confirmado: "MCP real devolve até 10 o
 **Prompt:** "Mande o Claude Code tirar a frase do limite de 10 ofertas do D3 e ajustar a do CPF."
 
 **Resposta:** Em `docs/entregaveis/03-racional-da-experiencia.md`, removida a linha "Limite conhecido: o MCP real devolve até 10 ofertas…" (§4) e a frase do CPF (§9) passou a dizer que usa o CPF da conta iFood, pede uma vez se não houver (pode pular, salvo loja que exige), nunca vai a modelo e só segue ao iFood no fechamento. Sem mudança de código.
+
+## 2026-10-18 10:20 — entregável D1 (proposta de negócio) no repo
+
+**Prompt:** "Coloque o arquivo 01-proposta-de-negocio.md (que eu anexei) em docs/entregaveis/ com o conteúdo exatamente como está, sem reescrever. NÃO crie outros .md. Confira só os números e nomes que citam o código (se algo estiver errado, corrija com a menor mudança e me diga). Registre o prompt em docs/prompts/davi.md. Commit 'docs(entregaveis): D1' e push (pull --rebase antes)."
+
+**Resposta:** O arquivo já estava em docs/entregaveis/ (idêntico ao anexo). Conferido contra o código; única correção: removido o próximo passo "Notificar o status do pedido ao longo da entrega", que já existe (rastreio avisa cada mudança). Dados do IBGE e do Ailo não são verificáveis pelo repo. Sem código.
