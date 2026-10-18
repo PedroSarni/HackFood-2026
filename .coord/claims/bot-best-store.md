@@ -1,7 +1,7 @@
 ---
 slug: bot-best-store
 owner: Fabio
-status: active
+status: done
 started: 2026-10-17 23:40
 ---
 
@@ -26,4 +26,12 @@ NÃO cobre: dividir um pedido em duas lojas (o iFood fecha um pedido por loja), 
 
 ## Onde está (preencher ao terminar)
 
--
+- `src/bot/melhor_loja.py` — `planejar(api, llm, endereco, itens)` (a loja que tem tudo e sai mais em conta:
+  `{'itens', 'lojas': [{loja_id, loja, taxa, tempo, nota, tem, custo}]}`), `com_tudo_primeiro(...)` (kit),
+  `ofertas_de_varios(...)` (busca + UM filtro do Gemini pra vários itens), `mais_parecida(ofertas, nome)`
+- `src/bot/relevancia.py` — `filtrar_varios(llm, [(ofertas, pedido)])`: o filtro de relevância em lote
+- `src/bot/fluxo.py` — `_planejar` (no `iniciar_compra`), `trocar_loja` (botão `loja`/`loja:k`, ação `trocar_loja`),
+  `ficar_na_loja` (`loja_fica`), `_mudar_de_loja`/`_equivalentes` (o carrinho vai junto), `_replanejar`
+- `src/bot/grupo.py` — `montar` passa pelo `com_tudo_primeiro`; `escolher_loja` prefere quem tem tudo
+- `src/shared/mcp_fake.py` — Pizzaria Forno a Lenha (`r4`), Coca na Bella Napoli, mercados com o básico todo
+- `tests/test_melhor_loja.py`
