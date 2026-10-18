@@ -1940,3 +1940,30 @@ def test_cpf_pedido_no_segundo_item_poe_o_item_e_nao_pula_pro_fechamento(monkeyp
     m.enviar('529.982.247-25')
     assert sum(i['qtd'] for i in m.estado()['carrinho']['itens']) == antes + 1  # o 2º item entrou
     assert m.estado()['fase'] != 'confirmar'  # não pulou pro resumo sem ele
+
+
+# --- cfg:cutucar: palco ao vivo sem "Ainda está por aí?" -----------------------------------------
+
+def test_cutucar_off_nao_agenda_nem_cutuca_nem_esquece_o_carrinho():
+    m = Mundo()
+    _carrinho_no_o_que_mais(m)
+    bot = m.Bot(m.ctx)
+    bot.wa, bot.u = m.wa, bot._carregar(m.wa)
+    assert bot.marca_followup() and bot.marca_abandono()  # ligado por padrão: como sempre
+    marca = m.estado()['ultima_msg']
+    m.armazem['cfg:cutucar'] = False
+    assert bot.marca_followup() is None and bot.marca_abandono() is None  # o app.py não agenda pessoa_calada
+    m.wpp.limpar()
+    assert _followup(m) == (None, False)
+    assert m.Bot(m.ctx).followup(m.wa, marca) is False      # nem o que já estava agendado cutuca
+    assert _abandono(m, marca) is False                     # nem esquece o carrinho
+    assert not m.wpp.saida and m.estado()['carrinho']['itens']
+
+
+def test_cutucar_ligado_de_novo_volta_a_cutucar():
+    m = Mundo()
+    m.armazem['cfg:cutucar'] = True
+    m.enviar('quero pao')
+    m.wpp.limpar()
+    marca, mandou = _followup(m)
+    assert marca and mandou and 'Ainda está por aí?' in m.wpp.textos()[-1]

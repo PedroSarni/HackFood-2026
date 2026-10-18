@@ -336,11 +336,19 @@ class Bot:
                 traceback.print_exc()
                 self.dizer(T.ERRO_SEM_BOTAO)
 
+    def _cutucar(self):
+        """Interruptor cfg:cutucar (scripts/modo.py --cutucar, sem deploy): LIGADO por padrão. Desligado (palco ao
+        vivo), ninguém recebe o "Ainda está por aí?" nem tem o carrinho esquecido; os tempos não mudam."""
+        try:
+            return self.ctx.armazem.get('cfg:cutucar') is not False
+        except Exception:  # noqa: BLE001 - armazém fora: fica como sempre foi
+            return True
+
     def marca_followup(self):
         """Depois do processar(): a rodada terminou com pergunta aberta? Devolve a marca (o ultima_msg
         desta rodada) pro src/app.py agendar o follow-up, ou None."""
         u = self.u
-        if not u or u.get('voz'):
+        if not u or u.get('voz') or not self._cutucar():
             return None
         # "O que mais você quer?" com itens no carrinho também é pergunta aberta
         if u.get('fase') not in FASES_FOLLOWUP and not (u.get('fase') == 'pedido' and self._tem_itens()):
@@ -355,7 +363,7 @@ class Bot:
         fase nem na pergunta guardada; no resumo só repete o resumo, nunca confirma."""
         self.wa = wa_id
         self.u = u = self._carregar(wa_id)
-        if not marca or u.get('ultima_msg') != marca or u.get('followup_de') == marca:
+        if not marca or u.get('ultima_msg') != marca or u.get('followup_de') == marca or not self._cutucar():
             return False
         if self.marca_followup() != marca:  # mudou de etapa, entrou no modo áudio ou não tem pergunta
             return False
@@ -374,7 +382,7 @@ class Bot:
     def marca_abandono(self):
         """Depois do processar(): tem itens no carrinho? Devolve a marca pro src/app.py agendar o
         abandono (vale até no modo áudio, onde não há follow-up), ou None."""
-        return ((self.u or {}).get('ultima_msg') or None) if self._tem_itens() else None
+        return ((self.u or {}).get('ultima_msg') or None) if self._tem_itens() and self._cutucar() else None
 
     def abandonar_carrinho(self, wa_id, marca):
         """ABANDONO_SEG depois: continuou calada (ultima_msg == marca) com itens no carrinho e ainda
@@ -382,7 +390,8 @@ class Bot:
         volta pro menu: no resumo, um "sim" tardio nunca confirma. Não mexe em ultima_msg."""
         self.wa = wa_id
         self.u = u = self._carregar(wa_id)
-        if not marca or u.get('ultima_msg') != marca or u.get('abandono_de') == marca or not self._tem_itens():
+        if (not marca or u.get('ultima_msg') != marca or u.get('abandono_de') == marca or not self._tem_itens()
+                or not self._cutucar()):
             return False
         u['abandono_de'] = marca
         u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None, 'grupo': None,

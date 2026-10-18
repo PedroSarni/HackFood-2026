@@ -294,3 +294,16 @@ erro guarda a ação da vez (`retomar_cpf`) e, com o CPF, refaz o item escolhido
 antes (nunca envia direto). O CPF dado fica em `u['cpf']`; se a loja recusa de novo com o CPF já em mãos, diz que não
 deu e volta pro menu, sem pedir de novo. Sem nada pra retomar nem carrinho: "Anotei seu CPF" + menu. 3 testes novos
 (falham sem a correção), nenhum existente mudou. Sem deploy.
+
+## 2026-10-18 09:20 — interruptor cfg:cutucar pra apresentação ao vivo
+
+**Prompt:** "Adicione um interruptor para desligar o follow-up e o abandono sem mudar os tempos. [...] 1. Crie a
+configuração cfg:cutucar no mesmo armazém e no mesmo estilo do modo palco (cfg:reserva_auto): ligada por padrão;
+desligada, o bot não agenda pessoa_calada nem cutuca nem abandona carrinho. 2. Adicione scripts/modo.py --cutucar
+on|off, no mesmo formato do --palco. 3. Teste: com cutucar off, marca_followup/marca_abandono não disparam nada.
+4. NÃO mude FOLLOW_UP_SEG nem ABANDONO_SEG nem nenhum texto. [...]"
+
+**Resposta:** `Bot._cutucar()` (fluxo.py) lê `cfg:cutucar` do armazém, ligado se não existir. Desligado:
+`marca_followup`/`marca_abandono` devolvem None (o app.py não agenda `pessoa_calada`), e `followup`/`abandonar_carrinho`
+já agendados não fazem nada. `scripts/modo.py --cutucar on|off` grava e mostra o estado. Tempos e textos iguais;
+2 testes novos, 512 passando. Sem deploy (vale na próxima mensagem depois do deploy deste código).
