@@ -1,7 +1,7 @@
 # 01 — Proposta de Negócio
 
 Time: Davi, Fabio, Pedro e Breno (Hackathon iFood × SEMCOMP 29, 17–18/10/2026).
-Produto: "Compras pelo WhatsApp", um assistente de compras do iFood que funciona dentro do WhatsApp.
+Produto: "AiFood, compras pelo WhatsApp", um assistente de compras do iFood que funciona dentro do WhatsApp.
 
 ## 1. O problema
 

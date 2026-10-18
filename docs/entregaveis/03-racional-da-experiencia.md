@@ -1,7 +1,7 @@
 # 03 — Racional da Experiência: decisões de UX
 
 Time: Davi, Fabio, Pedro e Breno (Hackathon iFood × SEMCOMP 29, 17–18/10/2026).
-Produto: "Compras pelo WhatsApp".
+Produto: "AiFood, compras pelo WhatsApp".
 
 ## Princípio central
 

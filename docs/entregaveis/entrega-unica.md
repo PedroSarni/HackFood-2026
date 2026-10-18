@@ -1,7 +1,7 @@
 # AiFood — Compras pelo WhatsApp · Entrega única
 
 Time: Davi, Fabio, Pedro e Breno · Hackathon SEMCOMP × iFood "Vendendo com Agentes" (ONOVOLAB, São Carlos), 17–18/10/2026.
-Produto: assistente de compras do iFood que funciona dentro do WhatsApp (agente cadastrado no portal como "Compras pelo WhatsApp"; o projeto passou a se chamar AiFood às 10h26 de 18/10).
+Produto: AiFood, compras pelo WhatsApp, assistente de compras do iFood que funciona dentro do WhatsApp (agente cadastrado no portal como "Compras pelo WhatsApp"; o projeto passou a se chamar AiFood às 10h26 de 18/10).
 
 **Como ler.** Este arquivo junta os entregáveis 01 a 06 e dois anexos. A parte 06 (feedback sobre o MCP) e o Anexo A (cronologia) são as mais detalhadas, porque quem lê é o time que mantém o MCP. Toda afirmação sobre o MCP leva **[testado]** (vimos acontecer) ou **[só na doc]** (lemos na documentação e não reproduzimos). "Não registrado" quer dizer que o repositório não guarda aquele dado. Horários em Brasília; os do git são a referência quando há divergência.
 
@@ -324,7 +324,7 @@ Usamos o MCP de dois jeitos, e as marcas valem para os dois:
 | Quando | Passo | O que aconteceu |
 |---|---|---|
 | 17/10 14h40–15h03 | Cadastro no portal | Portal fora do ar; mentores avisaram que estavam resolvendo [testado] |
-| ~15h10 | 1º agente, "AiFood Agent" (Davi) | Redirect só em localhost (porta 8080, rota `/callback`); escopos de acesso: Dados de usuário, Descoberta e Criação de pedidos. Aprovado em menos de 1h, antes das 15h58 [testado] |
+| ~15h10 | 1º agente, "HackFood Agent" (Davi) | Redirect só em localhost (porta 8080, rota `/callback`); escopos de acesso: Dados de usuário, Descoberta e Criação de pedidos. Aprovado em menos de 1h, antes das 15h58 [testado] |
 | 15h13 | Leitura da doc | Resumo da doc do portal e do llms.txt no repo, com as divergências já anotadas |
 | ~16h05 | 2º agente, "Compras pelo WhatsApp" (Fabio) | Redirects: a rota `/ifood/callback` do backend publicado no Modal e o mesmo localhost. Mesmos 3 escopos. Necessário porque o 1º só tinha localhost, que não serve para login pelo celular |
 | 16h18 | Primeira versão do cliente | OAuth com escopo padrão `openid`; cliente JSON-RPC sobre HTTP no gateway |
@@ -527,7 +527,7 @@ Fontes: `git log` (horário de Brasília, -0300), `docs/prompts/*.md` (horários
 | 13h20–13h52 | Fabio | Regras de colaboração multiagente, hooks de autoria e de arquivos protegidos |
 | 14h40–15h03 | — | Portal de cadastro do iFood fora do ar (D1) |
 | 14h43 | Fabio | Doc do WhatsApp: número e app da Meta emprestados do projeto `handwrite_bot` |
-| ~15h10 | Davi | Agente "AiFood Agent" criado no portal; aprovado antes das 15h58 |
+| ~15h10 | Davi | Agente "HackFood Agent" criado no portal; aprovado antes das 15h58 |
 | 15h13 | Fabio | Resumo da doc do MCP no repo (portal v0.27.0) |
 | 15h52–15h53 | Davi | Docs de contexto: evento, referências, estado, decisões |
 | 15h59 | Fabio | Claim do bot (`bot-ifood-agent`) e stub do MCP falso |

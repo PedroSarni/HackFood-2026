@@ -10,7 +10,7 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - Regras do time (AGENTS.md), hooks e CI de autoria
 - docs/whatsapp.md (Cloud API da Meta, número e token emprestados do handwrite_bot)
 - Resumo do MCP do iFood em "regras da api/"
-- Agente "AiFood Agent" aprovado no portal do iFood em menos de 1h
+- Agente "HackFood Agent" aprovado no portal do iFood em menos de 1h
 - QA do MCP real concluído (conta de teste): achados no contexto-evento.md §8
 - Foto vira pedido e kit pra dividir com os amigos (e821eef)
 - Resposta por áudio com ElevenLabs, só quando a pessoa pede (51ef4ff)
@@ -28,7 +28,7 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - B4: aviso de botão antigo não empilha mais (53e8466)
 - Dash de uso do MCP e rastro dos agentes de IA (Davi, claim `dash-agentes-mcp`, done; 051ea08 a 2a348f7)
 - Dash de controle dos agentes: crachá, interruptor e modelo por agente (Fabio, claim `dash-agents-control`, done)
-- 2º agente "Compras pelo WhatsApp" (Fabio, criado às ~16h05) APROVADO, com redirect no backend publicado (o "AiFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
+- 2º agente "Compras pelo WhatsApp" (Fabio, criado às ~16h05) APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
 - Analista Sofia: lê a página do dash e diz qual time mexe no quê (Fabio, 9626e97)
 - Botão de insights com IA no dash, por time do iFood (Fabio, claim `dash-ai-insights`, done; 054d7d2)
 
@@ -71,7 +71,7 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 ### Feito
 - [x] Docs de contexto no repo e ponteiro no AGENTS.md
 - [x] Bot no ar em modo demo com MCP falso, 65 testes
-- [x] Agente "AiFood Agent" aprovado no portal do iFood
+- [x] Agente "HackFood Agent" aprovado no portal do iFood
 ### Agora (até 18h)
 - [x] A1 Registrar a ideia (decisoes.md e estado.md) — Davi
 - [ ] A2 Mentor: MCP real (invalid_client), perguntas da seção 7 do contexto-evento.md, e COMO submeter os entregáveis — Davi

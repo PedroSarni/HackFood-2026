@@ -363,3 +363,12 @@ código e git log. Conferido no código: 545 testes no pytest e 54 no Vitest, 19
 até 10 cards, filas de modelo por agente. Contradições corrigidas no texto e listadas no chat (testes 521, 3 cards,
 "Sonnet em todos", MERCH-007 só em 18/10, pedido real em 18/10 vs "nunca submitOrder", horários do diário x git).
 Originais 01 a 06 intactos; sem deploy.
+
+## 2026-10-18 10:55 — nome do produto: AiFood
+
+**Prompt:** "Padronize o nome do produto para "AiFood" nos arquivos docs/entregaveis/01 a 06 [...] "AiFood, compras pelo
+WhatsApp" [...] NÃO altere menções históricas: o 1º agente era "HackFood Agent", o 2º "Compras pelo WhatsApp" [...]
+reverta só essas menções [...] Commit "docs(entregaveis): nome AiFood" e push."
+
+**Resposta:** Nome do produto nos entregáveis 01, 02 e 03 agora é "AiFood, compras pelo WhatsApp" (04 a 06 não tinham o
+nome antigo). "AiFood Agent" voltou a "HackFood Agent" em contexto-evento.md, estado.md e entrega-unica.md. Sem deploy.

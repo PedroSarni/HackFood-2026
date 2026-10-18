@@ -1,7 +1,7 @@
 # 02 — Desenho de Solução: fluxo geral
 
 Time: Davi, Fabio, Pedro e Breno (Hackathon iFood × SEMCOMP 29, 17–18/10/2026).
-Produto: "Compras pelo WhatsApp", um assistente que faz o pedido no iFood por quem conversa com ele no WhatsApp.
+Produto: "AiFood, compras pelo WhatsApp", um assistente que faz o pedido no iFood por quem conversa com ele no WhatsApp.
 
 ## 1. Visão em uma frase
 
