@@ -37,3 +37,23 @@
 .call-sequence li strong{color:var(--ink);font-size:11px;overflow:hidden;text-overflow:ellipsis}
 .call-sequence li.failed strong{color:#cc5962}
 @media(max-width:740px){.call-sequence li{grid-template-columns:24px minmax(0,1fr) auto;row-gap:4px}.call-sequence li>span:nth-child(3),.call-sequence li>span:nth-child(4){display:none}}
+.agent-flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.agent-flow-step{background:#fff;border:1px solid var(--line);border-radius:9px;padding:13px 14px;position:relative;min-width:0}
+.agent-flow-step strong{display:block;font-size:11px;color:var(--ink)}
+.agent-flow-step span{display:block;font-size:9px;color:#8a8a95;margin-top:4px;line-height:1.4}
+.agent-flow-step.ia{border-color:#e3dbf2;background:#faf8fd}
+.agent-flow-step.codigo{border-color:#f5c9cd;background:#fff7f8}
+.agent-flow .chart-note{grid-column:1/-1;margin:0}
+.agent-timeline{list-style:none;margin:0;padding:12px 21px 20px}
+.agent-timeline li{display:grid;grid-template-columns:62px 92px minmax(0,1fr);align-items:center;gap:6px 12px;padding:9px 0 9px 12px;border-left:3px solid #ececf1;border-bottom:1px solid #f4f4f6;font-size:10px;color:#75757f}
+.agent-timeline li strong{color:var(--ink);font-size:11px}
+.agent-timeline .lane{font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#a1a1ab}
+.agent-timeline .timeline-when{font-variant-numeric:tabular-nums;color:#a1a1ab}
+.agent-timeline .step-meta{grid-column:3;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.agent-timeline li.lane-ia{border-left-color:#b9a7dc}
+.agent-timeline li.lane-mcp{border-left-color:#f08a93}
+.agent-timeline li.lane-rule{border-left-color:#d3a04b}
+.agent-timeline li.lane-answer{border-left-color:#7fc2a6}
+.agent-timeline li.failed strong{color:#cc5962}
+@media(max-width:950px){.agent-flow{grid-template-columns:1fr 1fr}}
+@media(max-width:740px){.agent-flow{grid-template-columns:1fr}.agent-timeline li{grid-template-columns:52px minmax(0,1fr)}.agent-timeline .lane{display:none}.agent-timeline .step-meta{grid-column:2}}
