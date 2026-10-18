@@ -84,3 +84,13 @@ Centro"). A fase 'bairro' tem o mesmo risco. [...] mudança mínima, mesmo padr�
 pergunta da etapa (com "Não tem" no complemento). O commit do Fabio das 22h02 já mandava o resto pro Gemini,
 mas o "Olá" escapava. 4 testes novos (230 passando). Pendente: "menu", "voltar" e "cancelar" digitados no
 complemento ainda viram complemento.
+
+## 2026-10-17 22:16 — bug: "cancelar"/"menu" viravam complemento ou bairro
+
+**Prompt:** "BUG: nas fases 'complemento' e 'bairro', comandos como "cancelar", "menu", "voltar", "ajuda", "sair"
+e "apagar meus dados" são salvos como complemento/bairro do endereço. [...] chame self.intencao(r) e retorne,
+exatamente como o ramo 'endereco' faz."
+
+**Resposta:** Nas fases complemento e bairro, os 5 comandos (inicio, cancelar, ajuda, sair, apagar_dados) agora
+saem da etapa pelo `intencao`, como no endereço; "oi", "não tem" e texto livre seguem iguais. 4 testes novos
+(234 passando); o do "apto 12" já existia desde 59d4abe e foi reaproveitado.

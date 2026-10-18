@@ -206,6 +206,48 @@ def test_ola_no_bairro_nao_salva():
     assert not _salvos(m)
 
 
+def _ate_o_complemento(m):
+    m.enviar('quero pao')
+    m.enviar('Rua das Flores, 120, São Carlos')
+    m.tocar('cand:0')
+    assert m.estado()['fase'] == 'complemento'
+
+
+def test_cancelar_no_complemento_cancela_e_nao_salva():
+    m = Mundo()
+    _ate_o_complemento(m)
+    m.enviar('cancelar')
+    assert not _salvos(m)
+    assert m.estado()['fase'] == 'pedido' and m.estado()['pendente'] is None
+
+
+def test_menu_no_complemento_vai_pro_menu():
+    m = Mundo()
+    _ate_o_complemento(m)
+    m.enviar('menu')
+    assert not _salvos(m)
+    assert m.estado()['fase'] == 'pedido'
+    assert 'pedir' in [i for i, _ in m.wpp.ultimos_botoes()]
+
+
+def test_cancelar_no_bairro_nao_salva():
+    m = Mundo()
+    m.enviar('quero leite')
+    m.enviar('Rua Sem Bairro, 55, São Carlos')
+    assert m.estado()['fase'] == 'bairro'
+    m.enviar('cancelar')
+    assert not _salvos(m)
+    assert m.estado()['fase'] == 'pedido'
+    assert (m.estado().get('novo_endereco') or {}).get('bairro') is None
+
+
+def test_nao_tem_no_complemento_continua_sem_complemento():
+    m = Mundo()
+    _ate_o_complemento(m)
+    m.enviar('não tem')
+    assert _salvos(m) and not _salvos(m)[-1].get('complement')  # salvou, sem complemento
+
+
 def test_novo_pedido_no_complemento_nao_salva():
     m = Mundo()
     m.enviar('quero pao')

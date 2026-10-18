@@ -482,6 +482,9 @@ class Bot:
         if not midias:
             if fase in ('complemento', 'bairro'):
                 r = regra_rapida(texto)
+                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados'):
+                    self.intencao(r)  # comando escapa da etapa, como no endereço
+                    return
                 if (r and r['acao'] == 'saudacao') or (not r and _quer_novo_pedido(texto)):
                     # "oi" ou "quero fazer um pedido" não é complemento nem bairro: não salva, repete a pergunta
                     self._voltar_pra_etapa(T.ENDERECO_FALTA_POUCO)
