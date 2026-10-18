@@ -204,9 +204,15 @@ def procurando(termo):
     return f'🔎 Procurando *{termo}*...'
 
 
-def lista_de_compras(termos):
-    linhas = '\n'.join(f'{i}. {t}' for i, t in enumerate(termos, 1))
-    return f'📝 Anotei sua lista:\n{linhas}\n\nVou te mostrar um de cada vez. Começando por *{termos[0]}*:'
+def _linhas_da_lista(itens):
+    """'1. 2x arroz': a quantidade só aparece quando a pessoa disse (ou estava escrita na foto)."""
+    return '\n'.join(f'{n}. ' + (f'{i["quantidade"]}x ' if i.get('quantidade') else '') + i['termo']
+                     for n, i in enumerate(itens, 1))
+
+
+def lista_de_compras(itens):
+    return (f'📝 Anotei sua lista:\n{_linhas_da_lista(itens)}\n\n'
+            f'Vou te mostrar um de cada vez. Começando por *{itens[0]["termo"]}*:')
 
 
 def _item_dito(i):
@@ -703,9 +709,8 @@ SEM_LISTA_PRA_TROCAR = 'Ainda não tem pedido pra trocar de loja. Me diga o que 
 PROCURANDO_OUTRAS = '🔎 Vendo quais outras lojas têm tudo isso... ⏳'
 
 
-def procurando_loja(termos, tipo_loja):
-    linhas = '\n'.join(f'{i}. {t}' for i, t in enumerate(termos, 1))
-    return (f'📝 Anotei sua lista:\n{linhas}\n\n'
+def procurando_loja(itens, tipo_loja):
+    return (f'📝 Anotei sua lista:\n{_linhas_da_lista(itens)}\n\n'
             f'🔎 Vendo qual {LOJA_DO_TIPO.get(tipo_loja, "loja")} tem tudo e sai mais em conta... ⏳')
 
 

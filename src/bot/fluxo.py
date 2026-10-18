@@ -1070,7 +1070,7 @@ class Bot:
             # (src/bot/melhor_loja.py); antes era a do 1º item escolhido e o resto ficava pelo caminho
             itens = self._planejar(itens)
         elif len(itens) > 1:
-            self.dizer(T.lista_de_compras([i['termo'] for i in itens]))
+            self.dizer(T.lista_de_compras(itens))
         u['fila'] = list(itens[1:])
         self.buscar(itens[0])
 
@@ -1081,7 +1081,7 @@ class Bot:
         u = self.u
         tipos = [i.get('tipo_loja') or 'MERCADO' for i in itens]
         tipo = max(tipos, key=tipos.count)
-        self.dizer(T.procurando_loja([i['termo'] for i in itens], tipo))
+        self.dizer(T.procurando_loja(itens, tipo))
         plano = melhor_loja.planejar(self.ctx.ifood(self.wa), self.ctx.llm, u['endereco'], itens)
         if not plano['lojas']:
             return itens

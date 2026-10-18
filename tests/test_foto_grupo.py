@@ -528,3 +528,14 @@ def test_ajuste_que_so_tira_mantem_os_lanches_do_kit():
     assert sorted((lin['item_id'], lin['qtd']) for lin in k['linhas'] if lin['papel'] == 'principal') == lanches
     assert not any(lin['papel'] == 'bebida' or 'atata' in lin['nome'] for lin in k['linhas'])
     assert 'Kit atual:' in m.llm.prompts[-1][1]  # o Gemini viu o kit da tela
+
+
+def test_lista_anotada_mostra_a_quantidade_so_quando_tem():
+    from src.bot import textos as T
+    m = pronto(Mundo())
+    m.llm.foto = LISTA
+    m.enviar(('foto', 'lista1'))
+    anotei = next(t for t in m.wpp.textos() if 'Anotei sua lista' in t)
+    assert '1. pão francês\n' in anotei and '2. 2x leite\n' in anotei
+    sem_qtd = T.lista_de_compras([{'termo': 'arroz'}, {'termo': 'feijão', 'quantidade': 3}])
+    assert '1. arroz\n2. 3x feijão' in sem_qtd and 'Começando por *arroz*' in sem_qtd
