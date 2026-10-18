@@ -123,8 +123,8 @@ ENDERECO_DICA = 'Escreva *rua, número e cidade*, ou só o *CEP*. 🙂'
 ENDERECO_AINDA = '😊 Pra montar o pedido, primeiro preciso do endereço de entrega.\n' + ENDERECO_DICA
 ENDERECO_NAO_PARECE = 'Hmm, isso não parece um endereço. 🤔\n' + ENDERECO_DICA
 AINDA_AI = 'Ainda está por aí? 😊'
-ENDERECO_FALTA_POUCO ='😊 Falta só isso pra eu salvar o seu endereço:'
-ESCOLHA_ENDERECO ='Qual destes é o seu endereço? Toque no certo 👇'
+ENDERECO_FALTA_POUCO = '😊 Falta só isso pra eu salvar o seu endereço:'
+ESCOLHA_ENDERECO = 'Qual destes é o seu endereço? Toque no certo 👇'
 PEDIR_COMPLEMENTO = ('Tem apartamento, bloco ou casa nos fundos?\n'
                      'Escreva aqui. Se não tiver, toque em *Não tem*.')
 B_SEM_COMPLEMENTO = ('compl_nao', 'Não tem')
