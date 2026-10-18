@@ -307,3 +307,20 @@ on|off, no mesmo formato do --palco. 3. Teste: com cutucar off, marca_followup/m
 `marca_followup`/`marca_abandono` devolvem None (o app.py não agenda `pessoa_calada`), e `followup`/`abandonar_carrinho`
 já agendados não fazem nada. `scripts/modo.py --cutucar on|off` grava e mostra o estado. Tempos e textos iguais;
 2 testes novos, 512 passando. Sem deploy (vale na próxima mensagem depois do deploy deste código).
+
+## 2026-10-18 09:50 — revisão factual dos entregáveis D2 a D5
+
+**Prompt:** "Coloquei 4 entregáveis do hackathon em docs/entregaveis/ (02-desenho-de-solucao.md,
+03-racional-da-experiencia.md, 04-interface-visual.md, 05-documento-tecnico.md). Eles são o conteúdo final: NÃO crie
+outros arquivos .md [...] Tarefa: revisar só a precisão factual contra o código atual da main [...] Confira cada
+afirmação técnica: nomes de agentes e papéis, fila de modelos, tools do MCP usadas (o texto diz 19 de 23),
+freio/disjuntor/ponte, modo palco, tempos da rajada, textos citados entre aspas, botões, contagem de testes [...],
+menu do dash [...] Corrija no próprio arquivo só o que estiver errado ou desatualizado, com a menor mudança possível
+[...] Commit único 'docs(entregaveis): D2, D3, D4 e D5' [...]"
+
+**Resposta:** Conferi contra o código. Batem: agentes e crachás, fila (Claude > Gemini > OpenRouter), 19 de 23 tools,
+freio 0,35 s, disjuntor 300 s, ponte, palco 10 s/1 tentativa, rajada (0,6/4/2,5/9 s), textos e botões, menu do dash,
+keys com 4 últimos. Corrigido: testes (510/512 → 521), confirmação ("sim" repetido → um "sim" no resumo, desde o
+9e861a3 do Fabio; "já pode passar no pix" fecha direto), CPF da nota pedido se não estiver na conta, papel e plano B
+da Duda, foto sem relação nos cards, "Anotei sua lista" numerado, botões do resumo, kit ainda em andamento, "dinheiro
+em centavos" e "diário sem texto". Não confirmado: "MCP real devolve até 10 ofertas", "leite falado". Sem deploy.
