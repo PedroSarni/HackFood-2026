@@ -156,7 +156,9 @@ def test_pedido_inteiro_so_falando():
     m.enviar('529.982.247-25')
     assert m.estado()['fase'] == 'confirmar'
     m.wpp.limpar()
-    m.enviar('sim')
+    m.enviar('sim')                                          # o resumo também ofereceu um acompanhamento
+    assert not m.mcp.chamadas_de('submitOrder')              # "sim" pra quê? pergunta de novo, falando
+    m.enviar('fazer pedido assim')                           # a opção dita (no modo áudio não tem botão)
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
     assert so_audio(m)                                       # até o "pedido feito" é só áudio
     assert 'Pedido feito' in loc.falas[-1] or 'pedido feito' in loc.falas[-1].lower()
@@ -187,7 +189,8 @@ def test_rastreio_com_voz_fora_do_ar_manda_escrito():
     m, loc = mundo_com_voz()
     pedido_ate_o_resumo(m)
     m.enviar('me responde por áudio')  # liga no resumo (no modo áudio não tem botão pra tocar)
-    m.enviar('sim')
+    m.enviar('sim')                    # com sugestão no resumo, o "sim" só traz a pergunta de volta
+    m.enviar('fazer pedido assim')
     assert m.estado()['voz']['rastreando']
     loc.falhar = True
     from src.bot.rastreio import acompanhar

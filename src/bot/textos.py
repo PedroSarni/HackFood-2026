@@ -150,6 +150,10 @@ ENDERECO_DICA = 'Escreva *rua, número e cidade*, ou só o *CEP*. 🙂'
 ENDERECO_AINDA = '😊 Pra montar o pedido, primeiro preciso do endereço de entrega.\n' + ENDERECO_DICA
 ENDERECO_NAO_PARECE = 'Hmm, isso não parece um endereço. 🤔\n' + ENDERECO_DICA
 AINDA_AI = 'Ainda está por aí? 😊'
+def sim_ou_acompanhamento(sugestao):
+    return f'Só pra eu não errar: faço o pedido assim ou coloco *{sugestao}* antes? 🙂'
+
+
 NADA_PRA_MUDAR = 'Ainda não tem nada no carrinho pra mudar. 🙂'
 CARRINHO_ABANDONADO = 'Esvaziei seu carrinho pra não ficar parado. 🙂 Quando quiser, é só pedir de novo.'
 ENDERECO_FALTA_POUCO = '😊 Falta só isso pra eu salvar o seu endereço:'
@@ -343,6 +347,8 @@ def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None, sug
 
 B_CONFIRMAR = '✅ Confirmar pedido'
 B_MUDAR = ('mudar', '✏️ Mudar algo')
+B_FAZER_ASSIM = '✅ Fazer pedido assim'   # na pergunta de volta do "sim" ambíguo (resumo com sugestão)
+B_MUDAR_CURTO = ('mudar', '✏️ Mudar')
 B_CANCELAR = ('cancelar', '❌ Cancelar')
 O_QUE_MUDAR = 'O que você quer mudar? 👇'
 CANCELADO = 'Tudo bem, cancelei. Nada foi comprado. 🙂'

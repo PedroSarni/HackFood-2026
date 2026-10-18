@@ -170,3 +170,15 @@ que confirma). [...] nenhum teste existente pode mudar sem me explicar."
 pergunta da etapa; no endereço/complemento/bairro escapa da etapa em vez de virar complemento). B2 parado: o
 resumo dos testes existentes já tem sugestão (manteiga), então test_sim_digitado_no_resumo_confirma e dois de
 voz (sim falado no resumo) mudariam; esperando a decisão do Davi. Sem deploy.
+
+## 2026-10-18 02:00 — B2: "sim" no resumo com sugestão pergunta de novo
+
+**Prompt:** "Decisão B2: pode mudar esses 3 testes. Eles garantem justamente o comportamento arriscado: 'sim'
+digitado ou falado fecha o pedido mesmo quando o resumo também pergunta do acompanhamento. Atualize cada um pro
+novo comportamento (re-pergunta com 3 botões; o pedido só fecha no toque em 'Fazer pedido assim') e me explique
+em uma linha por que cada um mudou. Sem sugestão no resumo, 'sim' continua confirmando [...]"
+
+**Resposta:** resumo com sugestão: "sim"/"não" (digitado ou falado) na fase confirmar re-pergunta com
+"✅ Fazer pedido assim", "➕ Colocar <sugestão>" e "✏️ Mudar"; o "Colocar" põe 1 unidade da mesma loja e
+volta pro resumo. Sem sugestão, nada muda. 3 testes atualizados (o "sim" deles confirmava com sugestão na tela),
+6 novos, 418 passando. Sem deploy.

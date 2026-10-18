@@ -608,9 +608,13 @@ def test_toque_duplo_em_confirmar_nao_faz_dois_pedidos():
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
-def test_sim_digitado_no_resumo_confirma():
+def test_sim_digitado_no_resumo_com_sugestao_pergunta_de_novo_e_so_o_toque_fecha():
     m = pedido_ate_o_resumo(Mundo())
+    assert 'pra acompanhar' in m.estado()['pergunta']['texto']   # o resumo também oferece a manteiga
     m.enviar('pode sim')
+    assert not m.mcp.chamadas_de('submitOrder')
+    assert [t for _, t in m.wpp.ultimos_botoes()] == ['✅ Fazer pedido assim', '➕ Colocar manteiga', '✏️ Mudar']
+    m.tocar('ok:')
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
@@ -1557,3 +1561,70 @@ def test_mudar_no_complemento_nao_vira_complemento():
     m.enviar('mudar')
     assert m.estado()['fase'] == 'complemento'
     assert not _salvos(m)
+
+
+# --- "sim"/"não" com sugestão no resumo (B2) ----------------------------------------------
+
+def _resumo_sem_sugestao(m, monkeypatch):
+    monkeypatch.setattr('src.bot.fluxo.complementos', lambda *a, **kw: [])
+    pedido_ate_o_resumo(m)
+    assert 'pra acompanhar' not in m.estado()['pergunta']['texto']
+    return m
+
+
+def test_sim_com_sugestao_nao_fecha_e_mostra_os_3_botoes():
+    m = pedido_ate_o_resumo(Mundo())
+    m.wpp.limpar()
+    m.enviar('sim')
+    assert not m.mcp.chamadas_de('submitOrder')
+    assert m.estado()['fase'] == 'confirmar'
+    botoes = m.wpp.ultimos_botoes()
+    assert [i for i, _ in botoes][1:] == ['acomp', 'mudar'] and botoes[0][0].startswith('ok:')
+    assert all(len(t) <= 20 for _, t in botoes)
+    m.enviar('sim')                              # insistir no "sim" continua sem fechar
+    assert not m.mcp.chamadas_de('submitOrder')
+
+
+def test_nao_com_sugestao_nao_abre_o_mudar_direto():
+    m = pedido_ate_o_resumo(Mundo())
+    m.enviar('não')
+    assert m.estado()['fase'] == 'confirmar'
+    assert 'mud:itens' not in [i for i, _ in m.wpp.ultimos_botoes()]
+    assert [i for i, _ in m.wpp.ultimos_botoes()][1:] == ['acomp', 'mudar']
+    assert not m.mcp.chamadas_de('submitOrder')
+
+
+def test_sim_sem_sugestao_continua_confirmando(monkeypatch):
+    m = _resumo_sem_sugestao(Mundo(), monkeypatch)
+    m.enviar('sim')
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1
+
+
+def test_nao_sem_sugestao_continua_abrindo_o_mudar(monkeypatch):
+    m = _resumo_sem_sugestao(Mundo(), monkeypatch)
+    m.enviar('não')
+    assert m.estado()['fase'] == 'mudar'
+
+
+def test_colocar_sugestao_adiciona_o_item_e_mostra_o_resumo_de_novo():
+    m = pedido_ate_o_resumo(Mundo())
+    m.enviar('sim')
+    antes = len(m.estado()['carrinho']['itens'])
+    m.tocar('acomp')
+    car = m.estado()['carrinho']
+    assert len(car['itens']) == antes + 1 and any('Manteiga' in i['nome'] for i in car['itens'])
+    assert m.mcp.chamadas_de('addItemToCart')
+    assert m.estado()['fase'] == 'confirmar' and 'Confira seu pedido' in m.estado()['pergunta']['texto']
+    assert car.get('entrega') and car.get('pagamento')   # entrega e pagamento refeitos pro resumo novo
+    assert not m.mcp.chamadas_de('submitOrder')
+    m.tocar('ok:')
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1
+
+
+def test_sugestao_que_a_loja_nao_tem_volta_pro_resumo_sem_ela(monkeypatch):
+    m = pedido_ate_o_resumo(Mundo())
+    m.enviar('sim')
+    monkeypatch.setattr('src.bot.fluxo.Bot._coletar', lambda self, pedido, loja_id: ([], None))
+    m.tocar('acomp')
+    assert m.estado()['fase'] == 'confirmar' and not m.mcp.chamadas_de('submitOrder')
+    assert 'manteiga' not in m.estado()['pergunta']['texto'].split('Total')[-1]   # não oferece de novo

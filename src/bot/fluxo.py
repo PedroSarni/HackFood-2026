@@ -581,13 +581,14 @@ class Bot:
             'tentar': self.tentar_de_novo, 'sugerir': self.sugerir, 'nada': lambda _a=None: None,
             'vit': self.escolher_vitrine, 'loja': self.trocar_loja, 'loja_fica': self.ficar_na_loja,
             'foto': self.responder_foto, 'kit': self.responder_kit, 'grupo_n': self.grupo_pessoas,
+            'acomp': self.colocar_sugestao,
         }
         fn = rotas.get(acao)
         if not fn:
             self.repetir_pergunta(T.BOTAO_VELHO)
             return
         if acao in ('pick', 'mais', 'qtd', 'opt', 'fim', 'ok', 'reped', 'rem', 'ent', 'pag', 'cand',
-                    'end', 'loja') and not self.exigir_login(['botao', bid]):
+                    'end', 'loja', 'acomp') and not self.exigir_login(['botao', bid]):
             return
         fn(arg) if acao not in ('inicio', 'apagar_nao') else fn()
 
@@ -771,7 +772,9 @@ class Bot:
             else:
                 self.repetir_pergunta(self._resposta or T.NAO_ENTENDI)
         elif a == 'sim':
-            if fase == 'confirmar':
+            if fase == 'confirmar' and u.get('sugestao_resumo'):
+                self._sim_ou_acompanhamento()  # "sim" pro café ou pro pedido? só o toque fecha
+            elif fase == 'confirmar':
                 self.botao(botoes[0][0] if botoes else 'nada')
             elif fase == 'escolhendo' and self._visiveis():  # "sim, quero esse" com os cards na tela
                 self._escolha_por_fala(it)
@@ -794,6 +797,8 @@ class Bot:
         elif a == 'nao':
             if fase == 'mais':
                 self.finalizar()
+            elif fase == 'confirmar' and u.get('sugestao_resumo'):
+                self._sim_ou_acompanhamento()  # "não" pode ser pro café, não pro pedido
             elif fase == 'confirmar':
                 self.mudar()
             elif fase == 'complemento':
@@ -2025,8 +2030,11 @@ class Bot:
             if 'NOT_FOUND' in str(e.codigo):
                 raise
             print(f'getCart antes do resumo falhou: {e!r}')
-        mais = complementos([i.get('nome') or '' for i in car.get('itens') or []],
-                            (u.get('atual') or {}).get('tipo_loja') or 'MERCADO')
+        mais = [m for m in complementos([i.get('nome') or '' for i in car.get('itens') or []],
+                                        (u.get('atual') or {}).get('tipo_loja') or 'MERCADO')
+                if m != u.get('sugestao_sem_estoque')]
+        # com sugestão, o resumo faz duas perguntas: "sim"/"não" digitados viram uma pergunta de volta
+        u['sugestao_resumo'] = mais[0] if mais else None
         # fim do checkout: total, pagamento e uma sugestão do que acompanha (é só falar), sem passo a mais
         texto = T.resumo(car, u.get('endereco'), car.get('entrega'), car.get('pagamento'), car.get('cupom'),
                          pessoas=self._pessoas(), sugestao=mais[0] if mais else None)
@@ -2042,6 +2050,43 @@ class Bot:
                 return
             texto = T.PRECO_SUBIU + '\n\n' + texto
         self.perguntar(texto, [(f'ok:{car["id"][:12]}', T.B_CONFIRMAR), T.B_MUDAR, T.B_CANCELAR], fase='confirmar')
+
+    def _sim_ou_acompanhamento(self):
+        """O resumo perguntou do acompanhamento e do pedido: "sim" ou "não" digitado não fecha nem abre
+        o mudar. Pergunta de novo com um botão pra cada caminho; o pedido só sai no toque."""
+        u = self.u
+        sug = u['sugestao_resumo']
+        colocar = f'➕ Colocar {sug}'
+        if len(colocar) > MAX_BOTAO:
+            colocar = f'➕ {sug}'[:MAX_BOTAO]
+        self.perguntar(T.sim_ou_acompanhamento(sug),
+                       [(f'ok:{u["carrinho"]["id"][:12]}', T.B_FAZER_ASSIM), ('acomp', colocar), T.B_MUDAR_CURTO],
+                       fase='confirmar')
+
+    def colocar_sugestao(self, _arg=None):
+        """➕ Colocar <sugestão>: a melhor oferta da mesma loja entra com 1 unidade (opção obrigatória
+        vai no padrão, como na escolha falada) e o resumo volta, com entrega e pagamento refeitos."""
+        u = self.u
+        car = u.get('carrinho') or {}
+        sug = u.get('sugestao_resumo')
+        if u.get('fase') != 'confirmar' or not sug or not car.get('itens'):
+            self.repetir_pergunta(T.BOTAO_VELHO)
+            return
+        pedido = {'termo': sug, 'busca': sug, 'quantidade': 1, 'observacao': None,
+                  'tipo_loja': (u.get('atual') or {}).get('tipo_loja') or 'MERCADO'}
+        ofertas, _ = self._coletar(pedido, car.get('loja_id'))
+        if not ofertas:
+            u['sugestao_sem_estoque'] = sug  # não oferece de novo o que a loja não tem
+            self.dizer(T.nao_achei(sug, car.get('loja')))
+            self.mostrar_resumo()
+            return
+        of = ofertas[0]
+        item = self.ctx.ifood(self.wa).item(of['item_id'], of['loja_id'], u['endereco'])
+        item['nome'] = item.get('nome') or of['nome']
+        u['escolha'] = {'oferta': of, 'item': item, 'qtd': 1, 'obs': None, 'opcoes': [], 'grupo': 0, 'feitas': 0,
+                        'termo': sug, 'tipo_loja': pedido['tipo_loja']}
+        self._falado = {'texto': normalizar(sug), 'qtd': 1, 'fechar': True}  # coloca e volta direto pro resumo
+        self._proximo_passo_da_escolha()
 
     def confirmar(self, arg):
         u = self.u
