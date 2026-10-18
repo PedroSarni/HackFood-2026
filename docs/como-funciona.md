@@ -427,10 +427,39 @@ Agentes de IA: entendimento, foto, kit em grupo, relevância/sugestão, tutor, v
 ouvido (Scribe). Follow-up, recorrência e vitrine são **regras** sem IA, reconhecidas pela mensagem que mandaram.
 
 O servidor local (`python -m src.painel.servidor`, só em 127.0.0.1) lê o diário e **agrega lá**: o navegador
-recebe só o resumo e a conversa aberta (`/api/mcp`, `/api/agentes`). No dash (`Frontend/Rascunho_Dash`,
-`npm run dev`): "Uso do MCP" (por tool, tools da doc nunca chamadas, sequência por conversa) e "Agentes"
-(uso por agente, regras, linha do tempo mensagem → entendimento → código chamando especialistas e iFood →
-resposta). A fonte "Demonstração" é simulada e vem sempre com esse rótulo.
+recebe só o resumo e a conversa aberta (`/api/mcp`, `/api/agentes`, `/api/equipe`, `/api/ao-vivo`). No dash
+(`Frontend/Rascunho_Dash`, `npm run dev`) o menu é **Agentes → Uso do MCP → Dinheiro → Conversas**. As outras
+telas ficam em "Mais análises". "Agentes" é a 1ª tela e tem três partes:
+- o palco ao vivo, com cada passo do diário virando um recado entre cliente, Maestro, agente e iFood;
+- os cards de desempenho, com filtros;
+- a ficha de cada agente: modelo, system prompt, keys e interruptor.
+
+A fonte "Demonstração" é simulada e vem sempre com esse rótulo.
+
+### 13.2 O time de agentes: como melhorar um agente sem mexer nos outros
+
+Cada agente tem um arquivo em `src/agentes/<id>.py`: Lia (entendimento), Íris (foto), Duda (relevância), Beto
+(kit em grupo), Tito (tutor), Vina (voz) e Otto (ouvido). O arquivo guarda:
+- o crachá do agente (nome, cargo, bordão);
+- o plano B, ou seja, o que o bot faz sem ele;
+- onde fica o prompt;
+- **a fila de modelos só dele**.
+
+Quem orquestra é o código (`src/bot/fluxo.py`, o "Maestro"). Os agentes não se chamam entre si.
+
+- **Trocar só o modelo de um agente** (ex.: a leitura de foto errando): em `src/agentes/foto.py`, preencha
+  `modelos=[('gemini-3.8-flash', 12.0, 'low'), ...]` e faça o deploy. Sem deploy, há dois caminhos:
+  - o secret `AGENTE_FOTO_MODELOS="modelo:prazo:pensamento,..."`;
+  - a ficha da Íris no dash, em "Modelo principal". Vale na próxima mensagem e o resto da fila vira reserva.
+- **Mexer no prompt:** o prompt fica junto da lógica, em `src/bot/<módulo>.py` (`SISTEMA`). A ficha mostra a
+  versão (hash) do prompt daqui e a do que está no ar, e avisa quando falta deploy.
+- **Desligar um agente por um tempo:** use o interruptor na ficha. Fica no armazém (`cfg:agentes`), sem deploy.
+  O agente desligado nem é chamado: o fluxo recebe um `ErroLLM` e segue pelo plano B de sempre. O dash conta
+  isso como "pulo", não como erro.
+- **Keys:** o bot publica a cada 5 min (`cfg:agentes_ar`) quais keys estão configuradas, só com os 4 últimos
+  caracteres. A key inteira nunca sai do Modal.
+- **Agente novo:** crie `src/agentes/<id>.py` com a `FICHA` e acrescente o módulo em `_carregar()`
+  (`src/agentes/__init__.py`). O roteador reconhece o agente pelo system prompt.
 
 ---
 
