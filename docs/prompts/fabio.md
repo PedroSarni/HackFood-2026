@@ -343,3 +343,12 @@ resumo oficial do repo (`regras da api/ifood-mcp-developer-portal.json`), marcan
 5 que não usa (browseOffers, listItemTaxonomy, getMerchant, updateCartItem, removeVoucher), com ideias de uso.
 Avisei que o disco C: da máquina está cheio (0 GB livres), o que pode travar git, Python e Modal locais (o bot
 no Modal não é afetado).
+
+## 2026-10-18 ~00h25 — religar o que caiu
+
+**Prompt:** "abra /hackathon e retome de onde paramos, os processos morreram no meio"
+
+**Resposta:** O bot já estava no ar (v39, 00:06) e nada ficou pela metade no código. Quem tinha caído era o
+servidor de dados do dash (porta 8787), por falta de memória; o Vite (5173) seguia de pé. Religuei o servidor:
+"Dados reais" já mostra 942 eventos (o deploy resolveu o vazio) e a demonstração, 32 mil. Ficou pendente: apagar
+ou não o `app.js` antigo do Pedro, e o `docs/whatsapp.md` com edição não commitada de outra janela.
