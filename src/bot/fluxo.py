@@ -1898,6 +1898,13 @@ class Bot:
         if modelo:  # "todo dia às 7h peça dois pães": este carrinho vira o modelo do automático, nada sai agora
             self._salvar_modelo(car, modelo)
             return
+        if u.get('fase') == 'confirmar' and u.get('resumo_de') == _marca_resumo(car):
+            # 18/10 03h33: o fechamento demorou, a pessoa tocou Finalizar 3x e recebeu 3 resumos de uma vez.
+            # O resumo do carrinho de agora já está na tela: aponta pra ele em vez de refazer tudo com o iFood.
+            self.dizer(f'☝️ O resumo do pedido está aí em cima. Toque em *{T.B_CONFIRMAR}* pra eu fazer o pedido.')
+            return
+        if not car.get('entrega') or not car.get('pagamento'):  # vai falar com a loja: são vários segundos
+            self.dizer(T.FECHANDO)
         # 1. entrega (a doc exige getCartDeliveryMethods -> setCartDelivery antes do pagamento).
         # Escolhe sozinho a entrega padrão: uma pergunta a menos, e o resumo mostra prazo e taxa.
         if not car.get('entrega'):
@@ -2042,6 +2049,7 @@ class Bot:
                 if m != u.get('sugestao_sem_estoque')]
         # com sugestão, o resumo faz duas perguntas: "sim"/"não" digitados viram uma pergunta de volta
         u['sugestao_resumo'] = mais[0] if mais else None
+        u['resumo_de'] = _marca_resumo(car)
         # fim do checkout: total, pagamento e uma sugestão do que acompanha (é só falar), sem passo a mais
         texto = T.resumo(car, u.get('endereco'), car.get('entrega'), car.get('pagamento'), car.get('cupom'),
                          pessoas=self._pessoas(), sugestao=mais[0] if mais else None)
@@ -2957,6 +2965,12 @@ def _da_hora(agora):
     if 15 <= h < 18:
         return [('lanche', 'RESTAURANTE'), ('pão de queijo', 'RESTAURANTE')]
     return [('pizza', 'RESTAURANTE'), ('hambúrguer', 'RESTAURANTE')]
+
+
+def _marca_resumo(car):
+    """Do que o resumo na tela fala: mudou item, entrega, pagamento ou valor, o resumo é outro."""
+    return [car.get('id'), car.get('total'), len(car.get('itens') or []),
+            (car.get('entrega') or {}).get('id'), (car.get('pagamento') or {}).get('tipo')]
 
 
 def _falta_minimo(car):

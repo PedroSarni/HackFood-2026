@@ -299,6 +299,8 @@ def minimo_da_loja(carrinho):
 
 # --- fechamento -------------------------------------------------------------------------
 
+FECHANDO = '⏳ Fechando com a loja (entrega, pagamento e cupom). Já te mando o resumo!'
+
 CPF_OBRIGATORIO = ('🧾 Essa loja exige *CPF na nota* pra fazer o pedido.\n'
                    'Escreva seu CPF aqui (só os números), por favor. 🙂')
 

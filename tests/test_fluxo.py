@@ -1661,3 +1661,22 @@ def test_pergunta_do_minimo_nao_e_sugestao_e_completar_o_minimo_continua_sendo()
     assert not pergunta_minimo('me sugere algo pra completar o minimo')
     assert pede_sugestao('me sugere algo pra completar o minimo')
     assert not pergunta_minimo('quero 2 dipironas')
+
+
+def test_finalizar_avisa_na_hora_e_toque_repetido_nao_refaz_o_resumo():
+    # 18/10 03h33: fechamento lento, Finalizar tocado 3x, 3 resumos chegaram de uma vez
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.tocar('fim')
+    assert '⏳ Fechando com a loja' in ' '.join(m.wpp.textos())   # avisa antes das chamadas lentas
+    m.tocar('pag:0')
+    m.enviar('529.982.247-25')
+    assert m.estado()['fase'] == 'confirmar'
+    getcart, antes = len(m.mcp.chamadas_de('getCart')), len(m.wpp.textos())
+    m.tocar('fim')              # o Finalizar da mensagem de antes, tocado de novo
+    m.tocar('fim')
+    textos = ' '.join(m.wpp.textos()[antes:])
+    assert 'resumo do pedido está aí em cima' in textos and 'Confira seu pedido' not in textos
+    assert len(m.mcp.chamadas_de('getCart')) == getcart and m.estado()['fase'] == 'confirmar'
