@@ -145,3 +145,41 @@ consistente, sugestão do mínimo e Scribe. O que ainda estiver só na pasta, se
 **Prompt:** nova chave que funciona pra emitir voz: [key da ElevenLabs]
 
 **Resposta:** Key testada: TTS em ogg/opus mono (formato da nota de voz) e o Scribe também funciona com ela, então substituiu a antiga no secret `hackathon-elevenlabs`. Voz padrão trocada pra Roberta (pt-BR) no modelo flash: ~1 s por fala, medido contra Raquel, Ana Alice e Davi. Deploy feito; upload do ogg pra Meta conferido. Falta o teste ponta a ponta no WhatsApp ("me responde por áudio").
+
+## 2026-10-17 ~21h45 — o bot é inflexível: pedido no meio do endereço virou endereço
+
+**Prompt:** "[3 prints: na etapa do endereço, um áudio pedindo pizza com calabresa, frango catupiry e uma coca
+de 2 virou o endereço 'Oi, Eu Quero Comer Uma Pizza...'; depois 'Não achei pizza margherita com calabresa']
+o bot é completamente inflexivel, ignorou o conteudo e mandou o que queria, ele deve mudar de funcao se o
+texto ou o audio falar sobre outra coisa, entende? nesse caso ele falou sobre pizza de marguerita na hora do
+endereco e ele achou que esse era o endereço, puta que pariu mano, seja mais flexivel"
+
+**Resposta:** Endereço, bairro e complemento passaram a ler a mensagem antes de encaixar na etapa: com cara
+forte da etapa (CEP, rua/avenida, apto/bloco) segue direto; o resto o Gemini lê sabendo a etapa. Pedido no
+meio do endereço vira o pedido pendente (o antigo sai), com "Anotei: ..." e a pergunta de volta; papo é
+respondido; cancelar cancela. "não tem" escrito no complemento é sem complemento; CPF sem número segue o
+fluxo. Sabor e tamanho vão no termo da busca. Conferido com o Gemini de verdade na frase do áudio.
+
+## 2026-10-17 ~21h50 — inglês na tela, botão que não leva a nada, fala é lei
+
+**Prompt:** "[print: 'Meu pedido' respondeu 'Do not attempt to look up this Order ID again.'] ele ta falando
+as vezes em ingles essa porra, sem contar que se nao tiver pedido feito, nao deve aparecer esse botao. Tenho
+percebido que tudo que digo quase que é desconsiderado, ele só considera o funcionamento dos botoes sendo que
+o que eu digo sempre deve ser lei, deve ser interpretado a cima de tudo, se precisar chamar outra funcao
+naquele momento faça, entende?"
+
+**Resposta:** O inglês era instrução da API pro agente (`suggestion`) indo pra tela: cortado na origem e com
+filtro no tratador de erros. Pedido que este iFood não conhece (feito antes do mock) sai da lista, com
+resposta em português. "Pedir de novo" e "Meu pedido" só aparecem quando levam a algo (nos 9 menus). Regra
+no `como-funciona.md`: o que a pessoa diz manda; botão é atalho. O mock ganhou esfiharia e pratos do dia
+(o print seguinte deu "Não achei esfiha de carne").
+
+## 2026-10-17 ~21h58 — a voz manda texto junto e corta no fim
+
+**Prompt:** "[print: no modo áudio o bot mandou texto e áudio, e o último áudio cortou no fim] OUTRA COISA:
+eu pedi pra ela responder só por audio, até ai blz, mas ela manda texto e audio, sem contar que esse ultimo
+audio dela saiu cortado no final, quando ela mandar audio é só audio, e audio n deve falar sobre botao, só
+pedir pra pessoa fazer coisas porra" / "na vdd deixe isso pra outro agente, vou mandar pra ele aqui"
+
+**Resposta:** Fica com o outro agente (a frente da voz). Esta sessão não mexeu em voz; só ajustou 2 linhas do
+`tests/test_voz.py`, porque o menu sem pedido não mostra mais os atalhos.
