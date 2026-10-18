@@ -1,16 +1,19 @@
 """Gemini: texto, áudio e foto entram, JSON sai (com esquema garantido pelo próprio modelo).
 
-Secret Modal `llm-conversor` (o mesmo do handwrite_bot, já pago): só a GEMINI_API_KEY é
-usada daqui. Os modelos são nossos (o handwrite tem outras prioridades), com override por
+Secret Modal `hackathon-gemini`: só a GEMINI_API_KEY, key própria do HackFood (até 17/10 20h
+era o `llm-conversor` do handwrite_bot, e a cota dele estourou). Override dos modelos por
 BOT_GEMINI_MODELOS="modelo:prazo:pensamento,modelo:prazo:pensamento".
 
 Medido em 2026-10-17 com 12 mensagens típicas de idoso ("qero pao e lete", "o do meio"...):
 - gemini-3.1-flash-lite sem thinkingConfig: 12/12 certas, média ~1 s (com thinkingLevel=low, ~1-3 s);
 - gemini-3.8-flash: estourou 9 s na maioria e não aceita thinkingLevel=minimal;
-- depois de ~30 chamadas seguidas o lite deu 429 (cota): o reserva tem cota própria.
+- depois de ~30 chamadas seguidas o lite deu 429 (cota): o reserva tem cota própria;
+- às 20h27 o 3.1-lite e o 3.8 deram 503 ("high demand") juntos e o bot ficou sem Gemini.
+  O gemini-3.5-flash-lite respondeu em ~1,3 s, então entrou como 2º da fila (503 volta em
+  ~1,5 s, a fila anda rápido). O 2.5-flash-lite não serve: dá 404 pra key nova.
 Por isso o lite é o principal e o 3.8 fica de reserva. No chat a pessoa está esperando:
-cada tentativa tem prazo curto e, estourou, vai pro próximo em vez de insistir. Se os dois
-falharem, o fluxo ainda busca pelo texto cru (src/bot/fluxo.py, `livre`).
+cada tentativa tem prazo curto e, estourou, vai pro próximo em vez de insistir. Se todos
+falharem, o fluxo ainda busca pelo texto cru, se ele for curto (src/bot/fluxo.py, `livre`).
 """
 import base64
 import json
@@ -20,7 +23,8 @@ import time
 import httpx
 
 GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
-MODELOS = [('gemini-3.1-flash-lite', 6.0, ''), ('gemini-3.8-flash', 9.0, 'low')]
+MODELOS = [('gemini-3.1-flash-lite', 6.0, ''), ('gemini-3.5-flash-lite', 6.0, ''),
+           ('gemini-3.8-flash', 9.0, 'low')]
 MAX_INLINE = 18 * 1024 * 1024
 
 

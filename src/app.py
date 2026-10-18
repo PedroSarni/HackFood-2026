@@ -31,8 +31,11 @@ imagem = (modal.Image.debian_slim(python_version='3.12')
           # add_local_python_source só leva .py: sem isso o /logo.png dava 500 no ar
           .add_local_file(pathlib.Path(__file__).parent / 'web' / 'logo.png', '/root/src/web/logo.png'))
 segredos = [modal.Secret.from_name('hackathon-whatsapp'),
-            modal.Secret.from_name('llm-conversor'),
+            # GEMINI_API_KEY própria do HackFood (o `llm-conversor` é do handwrite_bot e a cota estourou)
+            modal.Secret.from_name('hackathon-gemini'),
             modal.Secret.from_name('hackathon-ifood'),
+            # ELEVENLABS_API_KEY do Scribe (áudio vira texto); PREENCHER = desligado e o Gemini ouve
+            modal.Secret.from_name('hackathon-elevenlabs'),
             # palavra secreta de debug (DEBUG_RESET), fora do git; vazia = desligado
             modal.Secret.from_name('hackathon-debug')]
 
