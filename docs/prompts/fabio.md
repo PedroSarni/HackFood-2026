@@ -792,3 +792,10 @@ somos 14"). Prompt, regra, testes, script de validação e docs atualizados; dep
 linguiça + carvão + bebida + o que pediram, dentro do orçamento). Fila SÓ do Beto (`src/agentes/grupo.py`): Fable 5.1
 na frente (effort medium, prazo 30 s), Sonnet e Gemini de reserva; Lia, Duda e Vina seguem como estavam.
 `claude-fable-5-1` entrou nas opções do dash. Deploy.
+
+## 2026-10-18 ~09h35 — Beto no Opus, não no Fable
+
+**Prompt:** "na verdade coloque o opus, nao temos todo esse tempo"
+
+**Resposta:** Fila do Beto com o Opus 5.5 na frente (effort medium, prazo 20 s; medido ~8 s por kit, kits tão coerentes
+quanto os do Fable, que levava 8–13 s), Sonnet/Gemini de reserva. Só ele. Deploy.
