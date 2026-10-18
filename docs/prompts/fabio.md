@@ -427,3 +427,10 @@ abri o claim `dash-agents-control`.
 
 **Resposta:** Mock religado (`scripts/modo.py --mock on`, sem deploy): o bot volta ao iFood falso na próxima
 mensagem. Tempo rápido segue ligado.
+
+## 2026-10-18 ~02h40 — um agente chamado Tungs
+
+**Prompt:** "coloque o nome de algum agente pra \"tungs\""
+
+**Resposta:** O tutor (antes Tito) virou Tungs em `src/agentes/tutor.py` (commit 15386c5). Só muda o crachá no dash; o
+comportamento e o prompt do tutor seguem iguais, então não precisou de deploy.
