@@ -1,7 +1,7 @@
 # Estado do projeto
 
 > Atualizar a cada ~1h ou depois de entrega importante. Quem terminou o trabalho atualiza.
-> Última atualização: 17/10 23h15 por Davi
+> Última atualização: 18/10 02h20 por Davi
 
 ## Ideia escolhida
 Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sabe usar app (idosos e pouca familiaridade digital): botões sempre, 3 opções por vez com Mais opções, texto, áudio e foto, várias mensagens seguidas, e repete a compra da semana com 1 toque. Diferenciais: acessibilidade e recorrência, usando o MCP do iFood como agente externo. Pedido em grupo (kit pra dividir com os amigos) e foto vira pedido já estão no bot (e821eef), assim como a resposta em áudio (51ef4ff) (item B2).
@@ -20,12 +20,22 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
 - Fixes do endereço, complemento/bairro e "cancelar pedido" (d0b0c3c, 59d4abe, 62fefce, 3a13b42)
 - Sessão ociosa: 30 min parado no meio de uma pergunta volta pro menu (4797590)
 - Dash do Pedro lê o diário do bot ao vivo (Fabio, claim `dash-live-data`, done) e ganhou mascote no perfil (Breno, claim `dash-profile-mascot`, done)
+- Vitrine do "oi": primeira mensagem curta com ideias do gosto da pessoa (0b30faa)
+- A lista vai pro mercado que tem tudo e sai mais em conta (db33ba9)
+- Loja fechada aparece nos testes com "🔒 fechada agora", interruptor `scripts/modo.py --fechadas` (f94bdc6)
+- B1: "mudar" digitado no pagamento abre o mudar (e5f3d73)
+- B2: "sim"/"não" no resumo com sugestão de acompanhamento pergunta de novo com 3 botões (074bcd0)
+- B4: aviso de botão antigo não empilha mais (53e8466)
+- Dash de uso do MCP e rastro dos agentes de IA (Davi, claim `dash-agentes-mcp`, done; 051ea08 a 2a348f7)
+- Dash de controle dos agentes: crachá, interruptor e modelo por agente (Fabio, claim `dash-agents-control`, done)
 
-## No ar agora (17/10 23h15) — MOCK LIGADO
-- Mock no lugar do iFood desde ~21h25 (Fabio, `scripts/modo.py --mock on`, sem deploy), porque o iFood real "tende a cair com
-  frequência" (docs/prompts/fabio.md). Se a demo roda em mock ou no iFood real: a decidir (H3).
-- Último deploy: 17/10 23h00, do main em bbfd811 (foto, kit, voz e os fixes até 3a13b42), segundo docs/prompts/fabio.md.
-  Fora dele: 99c2c31 (follow-up e carrinho abandonado no app.py).
+## No ar agora (18/10 02h20) — MOCK LIGADO
+- Mock ligado de novo às ~02h00 (Fabio, `scripts/modo.py --mock on`, sem deploy); às ~01h45 ele tinha voltado ao iFood real.
+  Se a demo roda em mock ou no iFood real: a decidir (H3).
+- Deploys depois das 23h00 (bbfd811), segundo docs/prompts/fabio.md: ~01h31 (já com e5f3d73, logo com 99c2c31) e ~02h30 (2af1cf6).
+  Há também "deploy feito" na entrada do mercado fechado (f94bdc6); o registro não traz hora nem hash.
+- Em produção: follow-up e abandono (99c2c31) e B1 (e5f3d73). B2 (074bcd0) entra no deploy de f94bdc6 só se ele partiu de um
+  main que já o tinha: a confirmar com o Fabio. B4 (53e8466) NÃO está em produção, é posterior a todos os deploys registrados.
 - Agente "Compras pelo WhatsApp" APROVADO no portal. Credenciais reais no secret `hackathon-ifood`
   (`IFOOD_CLIENT_ID`/`IFOOD_CLIENT_SECRET`, sem `IFOOD_MOCK`). O número já atende pelo deploy novo.
 - OAuth verificado de ponta a ponta: o botão "Entrar no iFood" leva ao login REAL do iFood (client,
@@ -33,13 +43,14 @@ Fechada às 16h55. Agente de compras no WhatsApp pra quem não gosta ou não sab
   Importante: o escopo `openid` NÃO é permitido pro nosso cliente — a string é só `mcp.*`.
 - Pedido completo testado no mock (login, endereço, 3 cards, "Mais opções", carrinho, pagamento, resumo,
   confirmação, rastreio, lembrete). Pra demo sem conta iFood, voltar ao mock: `IFOOD_MOCK=1` no secret.
-- Como tudo funciona: `docs/como-funciona.md`. 344 testes passando em 17/10 23h15 (`.venv/Scripts/python.exe -m pytest`).
+- Como tudo funciona: `docs/como-funciona.md`. 428 testes passando em 18/10 02h20 (`.venv/Scripts/python.exe -m pytest`).
 
 ## Em andamento
 - Fabio, claim `bot-ifood-agent`: back em Python no Modal, em `src/` (webhook do WhatsApp, buffer de rajadas, Gemini, cliente MCP + OAuth, mock do MCP). Reaproveita o setup do handwrite_bot
 - Fabio: 2º agente "Compras pelo WhatsApp" (criado às ~16h05) já APROVADO, com redirect no backend publicado (o "HackFood Agent" só tem localhost:8080, que não serve pro login pelo celular)
 - Painel com seletor dados reais ou demonstração (aad024d); diário de prompts em `docs/prompts/` (regra do Fabio, 6bbeb88)
-- Follow-up aos 3 min e carrinho abandonado aos 5 min: lado do bot (ec68f28) e do app.py (99c2c31) commitados; falta deploy (a confirmar com o Fabio)
+- Claim `docs-vivos` (Davi) segue ativo; `bot-ifood-agent` (Fabio) segue ativo
+- Teste manual da noite (QA): ver H5 a H12
 - Rascunho do 06 (Davi): em andamento, fora do repo
 
 ## Bloqueado ou esperando
@@ -93,6 +104,14 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 - [ ] G1 11h30 tudo travado, 12h30 submissão, 13h pitches
 ### Pendências da noite
 - [ ] H1 Confirmar com o Fabio a versão do deploy que tem os fixes e a foto (fabio.md: deploy das 23h00 do bbfd811)
-- [ ] H2 Follow-up de 3 min e carrinho abandonado aos 5 min no app.py (Davi): código em 99c2c31, falta deploy
+- [x] H2 Follow-up de 3 min e carrinho abandonado aos 5 min no app.py (Davi): código em 99c2c31, no ar desde o deploy de ~01h31 (fabio.md)
 - [ ] H3 Decidir antes do pitch se a demo roda em mock ou no iFood real
 - [ ] H4 Perguntar ao Fabio se o rastreio deve parar quando a pessoa apaga os dados (no mock ele continua)
+- [ ] H5 B3 (alta): carrinho sumiu no meio de uma lista por foto em mock, por volta de 01h43, junto com "botão antigo" no card do pão. Não reproduzido; precisa do diário do número do Davi (01h40 a 01h46) ou reprodução com o mock ligado
+- [x] H6 B4 (média): o aviso "botão antigo" empilha a cada toque (repetir_pergunta). Corrigido na main (53e8466), falta deploy
+- [ ] H7 M2: no MCP real, "Seu pedido até agora" deu R$ 47,97 com 1 item de R$ 36,99; explicar os R$ 10,98
+- [ ] H8 C1: loja fechada hoje diz "Não achei X perto de você, tente escrever de outro jeito"; devia dizer que está fechada
+- [ ] H9 O2: no MCP real o carrossel traz 10 cards de uma vez, o D1 promete 3 por vez; confirmar a regra
+- [ ] H10 O1/M1/V1: leite com só 3 ofertas no mock; desconto de R$ 5 só em uma loja; vitrine possivelmente chegando depois do pedido
+- [ ] H11 U1/U3/U4/U5: botão "Fazer pedido" repete a pergunta; sem voltar no pagamento/CPF; texto digitado não destrava depois do botão antigo; lista da foto sem acento e sem quantidades
+- [ ] H12 QA ainda por fazer: foto (restante), grupo, áudio, recorrência, reteste de B1 e B2 em produção depois do deploy, relatório final

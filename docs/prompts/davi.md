@@ -201,3 +201,14 @@ mensagem tem o aviso UMA vez. Não mexa em mais nada. [...] sem deploy [...]"
 
 **Resposta:** repetir_pergunta restaura o texto original da pergunta depois de reenviar. Teste novo (3 toques
 em botão velho no resumo, aviso 1 vez, pergunta intacta) falha sem a correção. 428 passando. Sem deploy.
+
+## 2026-10-18 02:20 — estado.md fiel ao repo depois da madrugada
+
+**Prompt:** "TAREFA: deixar docs/estado.md fiel ao repo agora. Edição mínima [...] 1. Cabeçalho [...] 2. 'Pronto':
+acrescente, com o hash [...] o que entrou desde 23h15 [...] 3. 'No ar agora': corrija a linha do último deploy e
+do modo [...] 4. 'Em andamento' [...] 5. Lista do projeto: não apague nada. Marque [x] [...] H2 [...] B1 e B2.
+'Pendências da noite': H5 B3, H6 B4, H7 M2, H8 C1, H9 O2, H10 O1/M1/V1, H11 U1/U3/U4/U5, H12 QA [...] Sem deploy."
+
+**Resposta:** estado.md atualizado (428 testes, mock ligado às ~02h00, deploys de ~01h31 e ~02h30, H2 e H6 [x], H5 a
+H12 acrescentados). Divergências com o repo: B1/B2 da lista são outros itens (ranking e decisão de grupo/áudio), então
+não marquei; os bugs B1/B2/B4 estão em "Pronto". B2 e B4 sem deploy comprovado.
