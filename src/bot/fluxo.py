@@ -19,7 +19,7 @@ from src.bot import foto as leitor_foto
 from src.bot import grupo as kit_grupo
 from src.bot import melhor_loja, ranking, relevancia, tutor, vitrine, voz
 from src.bot import textos as T
-from src.bot.combina import complementos
+from src.bot.combina import complementos, ja_tem, so_o_produto
 from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, opcao_dita, pede_sugestao, pergunta_minimo,
                                  so_complemento, so_endereco,
@@ -1005,8 +1005,11 @@ class Bot:
             ja = {'loja': car.get('loja_id'), 'termos': []}
         tipo = (u.get('atual') or {}).get('tipo_loja') or 'MERCADO'
         nomes = [i.get('nome') or '' for i in car.get('itens') or []]
+        # o que a IA propôs passa pelo mesmo crivo do código: só o produto, e nada que o carrinho já tem
+        propostos = [dict(i, termo=so_o_produto(i['termo']), busca=so_o_produto(i.get('busca')) or None)
+                     for i in itens or []]
         candidatos = ([{'termo': i['termo'], 'busca': i.get('busca'), 'tipo_loja': i.get('tipo_loja'),
-                        'de_onde': 'combina'} for i in itens or []]
+                        'de_onde': 'combina'} for i in propostos if not ja_tem(i['termo'], nomes)]
                       # sem carrinho não tem o que acompanhar ("refrigerante" do nada não é recomendação):
                       # vale o que ela costuma levar e, por último, algo da hora do dia
                       + [{'termo': t, 'de_onde': 'combina'} for t in (complementos(nomes, tipo) if nomes else [])]

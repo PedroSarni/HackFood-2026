@@ -1818,3 +1818,45 @@ def test_papo_fora_do_assunto_com_carrinho_cheio_nao_cancela_nem_diz_cancelei():
     texto = ' '.join(m.wpp.textos())
     assert '[fala]' in texto and 'cancelei' not in texto
     assert m.estado()['carrinho']['itens'] == itens  # o carrinho continua lá
+
+
+# --- U13 e U23: a sugestão é validada no código -------------------------------------------------
+
+def _xburger_com_guarana(m):
+    endereco_pronto(m)
+    m.enviar('quero um x burger')
+    xburger = next(c for c in m.wpp.cards() if c['texto'].startswith('*X-Burger*'))
+    m.enviar(('botao', xburger['botoes'][0][0]))
+    m.tocar('qtd:1')
+    m.tocar('fim')
+    u = m.estado()
+    linha = u['carrinho']['itens'][0]
+    u['carrinho']['itens'].append(dict(linha, item_id='guarana', nome='Guaraná Antarctica 2L', qtd=1))
+    m.armazem[f'u:{m.wa}'] = u
+
+
+def test_com_guarana_no_carrinho_nao_sugere_refrigerante():
+    from src.bot.combina import complementos
+    assert 'refrigerante' not in complementos(['X-Burger', 'Guaraná Antarctica 2L'], 'RESTAURANTE')
+    assert 'refrigerante' not in complementos(['Leite integral', 'Coca-Cola 2L'], 'MERCADO')  # o padrão também
+    m = Mundo()
+    _xburger_com_guarana(m)
+    m.wpp.limpar()
+    m.enviar(('botao', 'sugerir'))
+    assert 'refrigerante' not in ' '.join(m.wpp.textos()).lower()
+    assert m.mcp.chamadas_de('searchOffers')[-1]['query'] != 'refrigerante'
+
+
+def test_sugestao_da_ia_passa_pelo_crivo_do_codigo():
+    m = Mundo()
+    _xburger_com_guarana(m)
+    m.wpp.limpar()
+    m.llm.resposta = {'acao': 'sugerir', 'itens': [
+        {'termo': 'refrigerante', 'busca': 'refrigerante', 'tipo_loja': 'RESTAURANTE'},   # já tem guaraná
+        {'termo': 'batata frita pra acompanhar o café', 'busca': 'batata frita', 'tipo_loja': 'RESTAURANTE'}]}
+    m.enviar('me sugere algo pra completar')
+    m.llm.resposta = None
+    textos = ' '.join(m.wpp.textos())
+    assert 'café' not in textos and 'refrigerante' not in textos.lower()  # só cita o que está no carrinho
+    assert 'Que tal *batata frita* pra acompanhar?' in textos
+    assert m.mcp.chamadas_de('searchOffers')[-1]['query'] == 'batata frita'
