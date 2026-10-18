@@ -322,6 +322,87 @@ def test_expirar_preserva_login_e_endereco_salvo():
     assert e['endereco'] == end and m.armazem.get(f'tok:{m.wa}')
 
 
+# --- follow-up de quem calou -------------------------------------------------------------
+
+def _followup(m):
+    """O que o src/app.py faz: pega a marca no fim da rodada, dorme FOLLOWUP_SEG e chama o follow-up."""
+    from src.bot.fluxo import FOLLOWUP_SEG
+    bot = m.Bot(m.ctx)
+    bot.wa, bot.u = m.wa, bot._carregar(m.wa)
+    marca = bot.marca_followup()
+    m.agora += FOLLOWUP_SEG
+    return marca, (m.Bot(m.ctx).followup(m.wa, marca) if marca else False)
+
+
+def test_calou_3_min_no_endereco_recebe_followup_com_a_pergunta():
+    m = Mundo()
+    m.enviar('quero pao')
+    m.wpp.limpar()
+    marca, mandou = _followup(m)
+    assert marca and mandou
+    texto = m.wpp.textos()[-1]
+    assert 'Ainda está por aí?' in texto and 'Pra onde eu mando' in texto
+    assert m.wpp.ultimos_botoes()  # pergunta com botão, não texto solto
+
+
+def test_respondeu_antes_do_followup_nada_sai():
+    m = Mundo()
+    m.enviar('quero pao')
+    bot = m.Bot(m.ctx)
+    bot.wa, bot.u = m.wa, bot._carregar(m.wa)
+    marca = bot.marca_followup()
+    m.agora += 60
+    m.enviar('Rua das Flores, 120, São Carlos')  # respondeu: ultima_msg mudou
+    m.wpp.limpar()
+    assert m.Bot(m.ctx).followup(m.wa, marca) is False
+    assert not m.wpp.saida
+
+
+def test_segundo_followup_pra_mesma_mensagem_nao_sai():
+    m = Mundo()
+    m.enviar('quero pao')
+    marca, mandou = _followup(m)
+    assert mandou
+    m.wpp.limpar()
+    assert m.Bot(m.ctx).followup(m.wa, marca) is False
+    assert not m.wpp.saida
+
+
+def test_fases_sem_pergunta_de_etapa_nao_recebem_followup():
+    for fase in ('pedido', 'login', 'cpf', 'acompanhando'):
+        m = Mundo()
+        m.enviar('bom dia')  # menu: fase pedido, com botões e ultima_msg
+        m.estado()['fase'] = fase
+        m.wpp.limpar()
+        marca, mandou = _followup(m)
+        assert marca is None and mandou is False, fase
+        assert not m.wpp.saida, fase
+
+
+def test_followup_no_resumo_so_repete_o_resumo_e_nao_confirma():
+    m = pedido_ate_o_resumo(Mundo())
+    car_id = m.estado()['carrinho']['id']
+    m.wpp.limpar()
+    marca, mandou = _followup(m)
+    assert mandou
+    tipo, d = m.wpp.saida[-1]
+    assert 'Ainda está por aí?' in d['texto'] and 'Confira seu pedido' in d['texto']
+    assert any(i.startswith('ok:') for i, _ in d['botoes'])
+    assert not m.mcp.chamadas_de('submitOrder')
+    assert m.estado()['fase'] == 'confirmar' and m.estado()['carrinho']['id'] == car_id
+
+
+def test_followup_nao_mexe_em_ultima_msg_fase_nem_pergunta():
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('2')  # quantidade: pergunta com botões
+    antes = {k: m.estado()[k] for k in ('ultima_msg', 'fase', 'pergunta')}
+    marca, mandou = _followup(m)
+    assert mandou
+    depois = {k: m.estado()[k] for k in ('ultima_msg', 'fase', 'pergunta')}
+    assert depois == antes and m.estado()['followup_de'] == marca
+
+
 # --- busca, cards e "mais opções" --------------------------------------------------------
 
 def test_mais_opcoes_reaproveita_a_lista_sem_buscar_de_novo(monkeypatch):

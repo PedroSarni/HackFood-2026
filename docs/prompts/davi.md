@@ -94,3 +94,14 @@ exatamente como o ramo 'endereco' faz."
 **Resposta:** Nas fases complemento e bairro, os 5 comandos (inicio, cancelar, ajuda, sair, apagar_dados) agora
 saem da etapa pelo `intencao`, como no endereço; "oi", "não tem" e texto livre seguem iguais. 4 testes novos
 (234 passando); o do "apto 12" já existia desde 59d4abe e foi reaproveitado.
+
+## 2026-10-17 22:40 — follow-up de 3 min pra quem calou (pedido do Fabio)
+
+**Prompt:** "PEDIDO DO FABIO (dono do bot): "em 3 minutos, se a pessoa não responder mais, o bot manda um
+follow-up". SE src/app.py FOR ARQUIVO PROTEGIDO ou estiver em claim ativo de outra pessoa: faça só a parte que
+não precisa dele, pare e me diga exatamente o que falta [...]"
+
+**Resposta:** `src/app.py` está no claim ativo do Fabio (`bot-ifood-agent`), então ficou de fora. Feito o lado do
+bot: `FOLLOWUP_SEG = 180`, `Bot.marca_followup()` e `Bot.followup(wa_id, marca)` em fluxo.py, texto `AINDA_AI`,
+6 testes (241 passando). Falta o Fabio criar a função Modal `followup` e o disparo no fim da `rodada` (trecho
+pronto no chat). Sem deploy.

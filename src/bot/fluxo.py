@@ -43,6 +43,10 @@ IDLE_MAX = 1800
 FASES_QUE_EXPIRAM = {'endereco', 'complemento', 'bairro', 'cpf', 'endereco_escolha', 'quantidade', 'opcao',
                      'tirar', 'mudar'}
 VOLTOU = 'Faz um tempinho que você sumiu, recomeçamos? 🙂'
+# calou no meio de uma pergunta aberta: depois disso o bot cutuca uma vez (src/app.py dispara)
+FOLLOWUP_SEG = 180
+FASES_FOLLOWUP = {'endereco', 'complemento', 'bairro', 'endereco_escolha', 'escolhendo', 'quantidade', 'opcao',
+                  'mais', 'tirar', 'pagamento', 'confirmar'}
 
 
 def estado_novo():
@@ -305,6 +309,35 @@ class Bot:
             except Exception:  # noqa: BLE001 - nem o aviso com botão saiu: vai texto puro
                 traceback.print_exc()
                 self.dizer(T.ERRO_SEM_BOTAO)
+
+    def marca_followup(self):
+        """Depois do processar(): a rodada terminou com pergunta aberta? Devolve a marca (o ultima_msg
+        desta rodada) pro src/app.py agendar o follow-up, ou None."""
+        u = self.u
+        if not u or u.get('voz') or u.get('fase') not in FASES_FOLLOWUP:
+            return None
+        if u['fase'] not in ('endereco', 'bairro') and not (u.get('pergunta') or {}).get('botoes'):
+            return None  # sem pergunta guardada não há o que reapresentar
+        return u.get('ultima_msg') or None
+
+    def followup(self, wa_id, marca):
+        """FOLLOWUP_SEG depois: se a pessoa continuou calada (ultima_msg == marca) e ainda não foi
+        cutucada por essa mesma mensagem, reapresenta a pergunta da etapa. Não mexe em ultima_msg,
+        fase nem na pergunta guardada; no resumo só repete o resumo, nunca confirma."""
+        self.wa = wa_id
+        self.u = u = self._carregar(wa_id)
+        if not marca or u.get('ultima_msg') != marca or u.get('followup_de') == marca:
+            return False
+        if self.marca_followup() != marca:  # mudou de etapa, entrou no modo áudio ou não tem pergunta
+            return False
+        guardado = {k: u.get(k) for k in ('ultima_msg', 'fase', 'pergunta')}
+        u['followup_de'] = marca
+        try:
+            self._voltar_pra_etapa(T.AINDA_AI)
+        finally:
+            u.update(guardado)
+            self._salvar()
+        return True
 
     def _sessao_ociosa(self, anterior, entradas):
         """Voltou depois de IDLE_MAX com uma pergunta aberta: recomeça do menu (ou reapresenta o
