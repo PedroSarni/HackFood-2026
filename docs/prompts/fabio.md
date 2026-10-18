@@ -273,3 +273,9 @@ resposta do Gemini subiu, porque o 3.5-flash-lite parou em MAX_TOKENS às 22h38.
 **Prompt:** pode fazer deploy
 
 **Resposta:** Worktree atualizada pro main (bbfd811, já com os fixes do time), 335 testes passando, deploy feito no mesmo app/label `hackfood-bot` (URL do login do iFood intacta). Foto vira pedido e o kit pra dividir com os amigos estão no ar.
+
+## 2026-10-18 00:45 — tudo áudio vale também pros avisos do pedido a caminho
+
+**Prompt:** quando eu peço exclusividade de audio, na hora de me enviar os lembretes sobre como pedido está ele fica enviando msg e depois para de mandar audio, apenas texto, quando peço tudo audio, deve ativar a funcao tudo audio, sabe?
+
+**Resposta:** O modo áudio desligava no "pedido feito" e o rastreio (outro processo) só mandava texto. Agora, com tudo áudio, o modo segue até o pedido chegar: cada aviso ("confirmou", "saiu pra entrega", "chegou") vira nota de voz curta, sem pergunta; acabou o rastreio, a sessão de áudio acaba. Áudio falhou, o aviso sai escrito. O rastreio espera 10 s antes da 1ª consulta pra não chegar antes do áudio do "pedido feito".

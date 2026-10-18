@@ -160,10 +160,40 @@ def test_pedido_inteiro_so_falando():
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
     assert so_audio(m)                                       # até o "pedido feito" é só áudio
     assert 'Pedido feito' in loc.falas[-1] or 'pedido feito' in loc.falas[-1].lower()
-    assert not m.estado().get('voz')                         # acabou a sessão, acabou o áudio
+    # 17/10: os avisos do pedido a caminho também são áudio; a sessão acaba quando ele chega
+    assert m.estado()['voz']['rastreando'] == m.rastreios[-1]
+    from src.bot.rastreio import acompanhar
     m.wpp.limpar()
-    m.enviar('oi')
-    assert 'audio' not in tipos(m)
+    fim = acompanhar(m.ctx, m.wa, m.rastreios[-1], dormir=lambda s: None)
+    assert fim == 'DELIVERED'
+    assert tipos(m) and set(tipos(m)) == {'audio'}           # "confirmou", "saiu", "chegou": tudo falado
+    assert 'entregue' in loc.falas[-1].lower()
+    m.wpp.limpar()
+    m.enviar('oi')                                           # acabou a sessão, acabou o áudio
+    assert not m.estado().get('voz') and 'audio' not in tipos(m)
+
+
+def test_sem_modo_audio_o_rastreio_continua_escrito():
+    m, loc = mundo_com_voz()
+    pedido_ate_o_resumo(m)
+    m.tocar('ok:')
+    from src.bot.rastreio import acompanhar
+    m.wpp.limpar()
+    acompanhar(m.ctx, m.wa, m.rastreios[-1], dormir=lambda s: None)
+    assert tipos(m) and set(tipos(m)) == {'texto'} and not loc.falas
+
+
+def test_rastreio_com_voz_fora_do_ar_manda_escrito():
+    m, loc = mundo_com_voz()
+    pedido_ate_o_resumo(m)
+    m.enviar('me responde por áudio')  # liga no resumo (no modo áudio não tem botão pra tocar)
+    m.enviar('sim')
+    assert m.estado()['voz']['rastreando']
+    loc.falhar = True
+    from src.bot.rastreio import acompanhar
+    m.wpp.limpar()
+    acompanhar(m.ctx, m.wa, m.rastreios[-1], dormir=lambda s: None)
+    assert tipos(m) and set(tipos(m)) == {'texto'}           # ninguém fica sem a notícia
 
 
 def test_pedido_de_audio_junto_com_o_pedido_de_compra():

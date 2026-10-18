@@ -222,6 +222,8 @@ reais". Só dinheiro vai por extenso: quantidade, número de casa e minutos fica
 responder por áudio ou escrevendo. EXCEÇÃO: na etapa "cpf" o CPF só vale ESCRITO (por segurança): \
 peça pra escrever os números, nunca pra falar; e diga que, se não quiser CPF na nota, é só mandar \
 um áudio (qualquer áudio ali vale como "sem CPF").
+- Aviso automático de como está o pedido (ninguém falou nada): só dê a notícia, calorosa e curta \
+("Boa notícia: seu pedido saiu pra entrega!"), sem pergunta e sem dizer que ela pode responder.
 - Curto: até 4 frases, no máximo 450 caracteres (até 650 se estiver dizendo opções de produto). \
 Termine sempre a frase: nada de texto cortado.
 - Fale sem marcar o seu gênero (nada de "obrigado/obrigada", "cansado/cansada").
@@ -355,3 +357,39 @@ def roteiro_simples(falas, etapa=''):
             partes.append(t if t[-1] in '.!?' else t + '.')  # "?" fica: a voz entoa como pergunta
     fala = _caber(' '.join(partes), MAX_FALA - len(convite) - 1)
     return f'{fala} {convite}'.strip()
+
+
+# ---------------------------------------------------------------------------- avisos fora da conversa
+
+AVISO = '(ninguém falou nada agora: é um aviso automático de como está o pedido)'
+
+
+def avisar(ctx, wa_id, texto):
+    """Aviso que não é resposta a uma mensagem (rastreio do pedido): em áudio pra quem está no modo
+    áudio, escrito pros outros (ou se o áudio falhar: ninguém fica sem a notícia). 17/10: no modo
+    "tudo áudio" o "saiu pra entrega" chegava escrito."""
+    armazem = getattr(ctx, 'armazem', None)
+    modo = ((armazem.get(f'u:{wa_id}') if armazem is not None else None) or {}).get('voz') or {}
+    if modo:
+        try:
+            fala = roteiro(ctx.llm, [{'tipo': 'texto', 'texto': texto, 'opcoes': []}], AVISO, 'acompanhando',
+                           antes=modo.get('ultima') or '')
+            nota = ctx.falar(fala) if fala else None
+            if nota:
+                print(f'voz {wa_id} (aviso): {fala[:200]}')
+                return ctx.wpp.audio(wa_id, ctx.wpp.subir_midia(*nota), transcricao=fala)
+        except Exception as e:  # noqa: BLE001 - sem áudio, o aviso sai escrito
+            print(f'aviso em áudio falhou: {e!r}')
+    return ctx.wpp.texto(wa_id, texto)
+
+
+def encerrar_depois_do_pedido(ctx, wa_id):
+    """O pedido chegou (ou o acompanhamento acabou): a sessão do modo áudio termina. O rastreio
+    roda em outro processo, então não mexe no estado da conversa: deixa um recado que a próxima
+    rodada lê (src/bot/fluxo.py, `processar`)."""
+    armazem = getattr(ctx, 'armazem', None)
+    try:
+        if armazem is not None and ((armazem.get(f'u:{wa_id}') or {}).get('voz') or {}).get('rastreando'):
+            armazem[f'voz_fim:{wa_id}'] = True
+    except Exception as e:  # noqa: BLE001
+        print(f'encerrar modo áudio falhou: {e!r}')

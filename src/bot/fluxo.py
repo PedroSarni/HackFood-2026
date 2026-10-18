@@ -135,8 +135,13 @@ class Bot:
         self._resposta = None   # fala do Gemini pra esta rodada (interpretar preenche)
         self._direto = None     # "Sim, pode pedir" do lembrete: {'teto': total} = fecha sem resumo
         self._disse = ''
-        if u.get('voz') and anterior and self.ctx.agora() - float(anterior) > IDLE_MAX:
-            u['voz'] = None  # o modo áudio vale pra sessão: sumiu, a próxima volta escrita
+        if self.ctx.armazem.pop(f'voz_fim:{wa_id}', None):
+            u['voz'] = None  # o pedido chegou (src/bot/rastreio.py): acabou a sessão do modo áudio
+        # o modo áudio vale pra sessão: sumiu, a próxima volta escrita. Com pedido a caminho a sessão
+        # continua (os avisos do rastreio vão em áudio) até o rastreio acabar, ou 2 h no pior caso
+        limite = 2 * 3600 if (u.get('voz') or {}).get('rastreando') else IDLE_MAX
+        if u.get('voz') and anterior and self.ctx.agora() - float(anterior) > limite:
+            u['voz'] = None
         self._gravar()
         try:
             entradas = entradas_de(msgs)
@@ -1780,7 +1785,9 @@ class Bot:
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
                                   detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo'),
                                   total=car.get('total'), pessoas=pessoas))
-        self._voz_acaba = True  # pedido feito = fim da sessão: esta resposta ainda vai em áudio, a próxima não
+        if u.get('voz'):  # tudo áudio: os avisos do pedido a caminho também (fim = pedido entregue)
+            u['voz']['rastreando'] = feito['id']
+        self._salvar()  # o rastreio roda em outro processo e lê o modo áudio do armazém
         self.ctx.iniciar_rastreio(self.wa, feito['id'])
         # lembrete só quando a compra se repete (item ou categoria, de qualquer loja) ou quando a pessoa
         # pediu pra agendar: na 1ª vez de um item ninguém quer ser cobrado de rotina

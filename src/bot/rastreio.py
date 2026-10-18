@@ -8,6 +8,7 @@ import re
 import time
 
 from src.bot import textos as T
+from src.bot import voz
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 
 # leve de propósito: o firewall do iFood barra IP por volume (17/10) e pedido de conta de teste nunca
@@ -17,6 +18,7 @@ MIN_INTERVALO = 60
 MAX_INTERVALO = 300
 DURACAO_MAX = 90 * 60
 FINAIS = {'DELIVERED', 'CONCLUDED', 'CANCELLED', 'CANCELED'}
+PRIMEIRA_ESPERA = 10
 
 
 def segundos_da_dica(dica, padrao=INTERVALO):
@@ -33,6 +35,18 @@ def segundos_da_dica(dica, padrao=INTERVALO):
 
 
 def acompanhar(ctx, wa_id, pedido_id, dormir=time.sleep, relogio=time.time):
+    """Cada mudança de status vira aviso (em áudio, pra quem pediu tudo áudio: src/bot/voz.py).
+    Acabou o acompanhamento, de qualquer jeito: acaba também a sessão do modo áudio."""
+    try:
+        return _acompanhar(ctx, wa_id, pedido_id, dormir, relogio)
+    finally:
+        voz.encerrar_depois_do_pedido(ctx, wa_id)
+
+
+def _acompanhar(ctx, wa_id, pedido_id, dormir, relogio):
+    # o "pedido feito" em áudio leva ~3 s pra sair (roteiro + voz): sem essa espera, o 1º status
+    # ("a loja confirmou") podia chegar antes dele
+    dormir(PRIMEIRA_ESPERA)
     inicio = relogio()
     ultimo = None
     falhas = 0
@@ -54,7 +68,7 @@ def acompanhar(ctx, wa_id, pedido_id, dormir=time.sleep, relogio=time.time):
         codigo = st.get('codigo')
         if codigo and codigo != ultimo:
             if codigo != 'ORDER_CREATED':  # "registrado" a pessoa já soube na confirmação
-                ctx.wpp.texto(wa_id, T.status_pedido(codigo, st.get('descricao')))
+                voz.avisar(ctx, wa_id, T.status_pedido(codigo, st.get('descricao')))
             ultimo = codigo
         # a doc manda decidir o fim pelo pollingStop (a lista de códigos terminais não é fechada)
         if st.get('parar') or codigo in FINAIS:
