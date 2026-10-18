@@ -108,7 +108,7 @@ Ver a Lista do projeto abaixo. Itens A1 a A4 primeiro.
 - [ ] H1 Confirmar com o Fabio a versão do deploy que tem os fixes e a foto (fabio.md: deploy das 23h00 do bbfd811)
 - [x] H2 Follow-up e carrinho abandonado aos 5 min no app.py (Davi): código em 99c2c31, no ar desde o deploy de ~01h31 (fabio.md). Follow-up era aos 3 min; com 1 min desde o deploy v49 de 18/10 05h53 (65a480d)
 - [ ] H3 Decidir antes do pitch se a demo roda em mock ou no iFood real
-- [ ] H4 Perguntar ao Fabio se o rastreio deve parar quando a pessoa apaga os dados (no mock ele continua)
+- [x] H4 Perguntar ao Fabio se o rastreio deve parar quando a pessoa apaga os dados (no mock ele continua): para (4143c34)
 - [ ] H5 B3 (alta): carrinho sumiu no meio de uma lista por foto em mock, por volta de 01h43, junto com "botão antigo" no card do pão. Não reproduzido; precisa do diário do número do Davi (01h40 a 01h46) ou reprodução com o mock ligado
 - [x] H6 B4 (média): o aviso "botão antigo" empilha a cada toque (repetir_pergunta). Corrigido na main (53e8466), falta deploy
 - [ ] H7 M2: no MCP real, "Seu pedido até agora" deu R$ 47,97 com 1 item de R$ 36,99; explicar os R$ 10,98
