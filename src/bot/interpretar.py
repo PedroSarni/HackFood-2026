@@ -163,6 +163,7 @@ COMANDOS = {
     'excluir meus dados': 'apagar_dados',
     'parar lembrete': 'parar_lembrete', 'parar lembretes': 'parar_lembrete',
     'meu pedido': 'acompanhar', 'cade meu pedido': 'acompanhar',
+    'mudar': 'mudar', 'alterar': 'mudar', 'mudar pedido': 'mudar', 'mudar o pedido': 'mudar',
 }
 # "cancelar o pedido", "quero cancelar", "cancela tudo" (com erro de digitação no fim, "pediod"); "cancela a
 # coca" NÃO casa: tirar um item fica com o Gemini

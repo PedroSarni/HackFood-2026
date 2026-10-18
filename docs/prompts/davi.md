@@ -155,3 +155,18 @@ página "Uso do MCP" no dash. O que o espiar_mcp grava não mudou. Fase 1B: `esp
 ligados em `contexto_producao` (agente reconhecido pelo prompt de sistema, sem tocar no fluxo), evento `ia`
 só com contagens, rota `/api/agentes` e aba "Agentes". Seção 13.1 em como-funciona.md. Sem deploy; fase 2
 espera o Davi.
+
+## 2026-10-18 01:40 — "mudar" digitado e o "sim" ambíguo do resumo
+
+**Prompt:** "BUG B1: na pergunta 'Como você quer pagar?' (fase 'pagamento'), 'Mudar' digitado recebe 'Essas
+eram todas as opções que achei' [...] BUG B2: o resumo pode trazer duas perguntas juntas ('Quer café pra
+acompanhar? [...]' e 'Posso fazer o pedido?'). Na fase 'confirmar', 'sim' digitado aperta o 1º botão e fecha o
+pedido [...] 1. B1: acrescente em COMANDOS [...] 'mudar', 'alterar', 'mudar pedido', 'mudar o pedido' [...] 2.
+B2: quando o resumo mostrado tiver a sugestão de acompanhamento, 'sim' ou 'não' DIGITADOS [...] o bot pergunta
+de novo com 3 botões [...] Sem sugestão no resumo, o comportamento atual continua igual (há teste para o 'sim'
+que confirma). [...] nenhum teste existente pode mudar sem me explicar."
+
+**Resposta:** B1 feito: 4 frases em COMANDOS -> ação `mudar` (com itens abre o mudar(); sem carrinho repete a
+pergunta da etapa; no endereço/complemento/bairro escapa da etapa em vez de virar complemento). B2 parado: o
+resumo dos testes existentes já tem sugestão (manteiga), então test_sim_digitado_no_resumo_confirma e dois de
+voz (sim falado no resumo) mudariam; esperando a decisão do Davi. Sem deploy.

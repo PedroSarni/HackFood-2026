@@ -1504,3 +1504,56 @@ def test_loja_que_exige_cpf_pede_o_cpf_sem_opcao_de_pular():
     assert m.estado()['fase'] == 'cpf'
     m.enviar('529.982.247-25')
     assert m.estado()['cpf'] == '52998224725'
+
+
+# --- "mudar" digitado (B1) ---------------------------------------------------------------
+
+def _no_pagamento(m):
+    endereco_pronto(m)
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    m.tocar('fim')
+    assert m.estado()['fase'] == 'pagamento'
+    return m
+
+
+def test_mudar_digitado_no_pagamento_abre_o_mudar():
+    from src.bot import textos as T
+    m = _no_pagamento(Mundo())
+    antes = m.llm.chamadas
+    m.wpp.limpar()
+    m.enviar('Mudar')
+    assert m.estado()['fase'] == 'mudar'
+    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['mud:itens', 'mud:endereco', 'mud:pagamento']
+    assert T.FIM_DAS_OPCOES not in ' '.join(m.wpp.textos())
+    assert m.llm.chamadas == antes          # não precisou da IA
+    assert m.estado()['carrinho']['itens']  # o carrinho continua lá
+
+
+def test_mudar_o_pedido_digitado_no_resumo_abre_o_mudar():
+    m = pedido_ate_o_resumo(Mundo())
+    m.enviar('mudar o pedido')
+    assert m.estado()['fase'] == 'mudar' and not m.mcp.chamadas_de('submitOrder')
+
+
+def test_mudar_sem_carrinho_repete_a_pergunta_e_nao_quebra():
+    from src.bot import textos as T
+    m = Mundo()
+    endereco_pronto(m)
+    m.tocar('pick:')
+    assert m.estado()['fase'] == 'quantidade'   # escolheu, mas o carrinho ainda está vazio
+    m.wpp.limpar()
+    m.enviar('alterar')
+    assert m.estado()['fase'] == 'quantidade'
+    assert T.NADA_PRA_MUDAR in ' '.join(m.wpp.textos()) and m.wpp.ultimos_botoes()
+    m = Mundo()
+    m.enviar('mudar')                            # sem nada na conversa: cai no menu
+    assert m.wpp.saida
+
+
+def test_mudar_no_complemento_nao_vira_complemento():
+    m = Mundo()
+    _ate_o_complemento(m)
+    m.enviar('mudar')
+    assert m.estado()['fase'] == 'complemento'
+    assert not _salvos(m)

@@ -150,6 +150,7 @@ ENDERECO_DICA = 'Escreva *rua, número e cidade*, ou só o *CEP*. 🙂'
 ENDERECO_AINDA = '😊 Pra montar o pedido, primeiro preciso do endereço de entrega.\n' + ENDERECO_DICA
 ENDERECO_NAO_PARECE = 'Hmm, isso não parece um endereço. 🤔\n' + ENDERECO_DICA
 AINDA_AI = 'Ainda está por aí? 😊'
+NADA_PRA_MUDAR = 'Ainda não tem nada no carrinho pra mudar. 🙂'
 CARRINHO_ABANDONADO = 'Esvaziei seu carrinho pra não ficar parado. 🙂 Quando quiser, é só pedir de novo.'
 ENDERECO_FALTA_POUCO = '😊 Falta só isso pra eu salvar o seu endereço:'
 ESCOLHA_ENDERECO = 'Qual destes é o seu endereço? Toque no certo 👇'

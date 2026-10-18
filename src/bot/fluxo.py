@@ -632,7 +632,7 @@ class Bot:
         if not midias:
             if fase in ('complemento', 'bairro'):
                 r = regra_rapida(texto)
-                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados', 'acompanhar'):
+                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados', 'acompanhar', 'mudar'):
                     self.intencao(r)  # comando escapa da etapa, como no endereço
                     return
                 if (r and r['acao'] == 'saudacao') or (not r and _quer_novo_pedido(texto)):
@@ -645,7 +645,7 @@ class Bot:
                     return
             if fase == 'endereco':
                 r = regra_rapida(texto)
-                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados', 'acompanhar'):
+                if r and r['acao'] in ('inicio', 'cancelar', 'ajuda', 'sair', 'apagar_dados', 'acompanhar', 'mudar'):
                     self.intencao(r)
                 elif (r and r['acao'] == 'saudacao') or _quer_novo_pedido(texto):
                     # "oi" ou "quero fazer um pedido" não é endereço: não gasta geocoder nem prende a pessoa
@@ -841,6 +841,13 @@ class Bot:
             self.perguntar_tirar()
         elif a == 'cancelar':
             self.cancelar()
+        elif a == 'mudar':  # "mudar" digitado (no pagamento, no CPF...): o mesmo menu do botão Mudar do resumo
+            if (u.get('carrinho') or {}).get('itens'):
+                self.mudar()
+            elif fase in ('endereco', 'complemento', 'bairro'):
+                self._voltar_pra_etapa(T.NADA_PRA_MUDAR)
+            else:
+                self.repetir_pergunta(T.NADA_PRA_MUDAR)
         elif a == 'acompanhar':
             self.acompanhar(sobre=it.get('sobre'))
         elif a == 'repetir':

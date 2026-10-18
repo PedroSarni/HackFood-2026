@@ -206,6 +206,16 @@ def test_frases_de_cancelar_viram_cancelar(texto):
     assert I.regra_rapida(texto) == {'acao': 'cancelar'}
 
 
+@pytest.mark.parametrize('texto', ['mudar', 'Mudar', 'alterar', 'mudar pedido', 'Mudar o pedido'])
+def test_frases_de_mudar_viram_mudar(texto):
+    assert I.regra_rapida(texto) == {'acao': 'mudar'}
+
+
+@pytest.mark.parametrize('texto', ['voltar', 'trocar'])
+def test_voltar_e_trocar_nao_viram_mudar(texto):
+    assert (I.regra_rapida(texto) or {}).get('acao') != 'mudar'
+
+
 def test_quero_leite_continua_sendo_pedido_pra_ia():
     assert I.regra_rapida('quero leite') is None
 
