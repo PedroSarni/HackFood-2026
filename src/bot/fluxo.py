@@ -19,7 +19,7 @@ from src.bot import ranking, relevancia, tutor, voz
 from src.bot import textos as T
 from src.bot.combina import complementos
 from src.bot.ifood import PrecisaLogin
-from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, pede_sugestao,
+from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, opcao_dita, pede_sugestao,
                                  regra_rapida)
 from src.bot.recorrencia import DEMO_SEGUNDOS, botoes_lembrete, categoria
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
@@ -28,6 +28,7 @@ from src.shared.whatsapp import MAX_BOTAO, MAX_LINHA, ErroWhatsApp, partir
 
 IFOOD_INSTAVEL_SEG = 600  # depois de uma falha do iFood, o atendente avisa por 10 min
 POR_PAGINA = 10         # cards por vez no carrossel ("Mais opções" mostra os próximos da MESMA lista)
+POR_PAGINA_VOZ = 3      # modo áudio: as opções são ditas uma a uma, mais que 3 ninguém guarda de ouvido
 POR_PAGINA_SEM_CARROSSEL = 3  # se a Meta recusar o carrossel, volta pros cards soltos
 # carrossel exige foto em todo card: produto sem foto usa a nossa logo
 FOTO_PADRAO = (os.environ.get('HACKFOOD_BASE') or 'https://fabio-araujo-silva--hackfood-bot.us-east.modal.run') + '/logo.png'
@@ -191,7 +192,7 @@ class Bot:
 
     def _falar_rodada(self):
         """Fim da rodada no modo áudio: o que seria escrito vira UMA nota de voz, por último.
-        Qualquer falha (Gemini, ElevenLabs, Meta) manda os textos guardados, na ordem."""
+        Qualquer falha (Gemini, ElevenLabs, Meta) manda as mensagens seguradas, na ordem."""
         g, self._gravador = self._gravador, None
         try:
             if not g or not g.falas:
@@ -212,16 +213,12 @@ class Bot:
             except Exception:  # noqa: BLE001 - sem áudio, vai escrito
                 traceback.print_exc()
             if not enviado:
-                guardados = g.guardados
+                trocar = None
                 if self.u and self.u.get('voz') and not self.u['voz'].get('falou'):
                     # nem o 1º áudio saiu (key sem permissão, ElevenLabs fora): não promete o que não cumpre
                     self.u['voz'] = None
-                    guardados = [(to, T.VOZ_INDISPONIVEL if t == T.VOZ_LIGADA else t) for to, t in guardados]
-                for to, texto in guardados:
-                    try:
-                        self.ctx.wpp.texto(to, texto)
-                    except Exception:  # noqa: BLE001
-                        traceback.print_exc()
+                    trocar = {T.VOZ_LIGADA: T.VOZ_INDISPONIVEL}
+                g.soltar(trocar)
         finally:
             if self._voz_acaba and self.u:
                 self.u['voz'] = None
@@ -385,12 +382,8 @@ class Bot:
         if fase:
             self.u['fase'] = fase
 
-    def dizer(self, texto, fica=False):
-        """fica=True: no modo áudio, sai escrito também (número do pedido, código de entrega)."""
-        if self._gravador:
-            self._gravador.texto(self.wa, texto, fica=fica)
-        else:
-            self.ctx.wpp.texto(self.wa, texto)
+    def dizer(self, texto):
+        self.wpp.texto(self.wa, texto)
 
     def repetir_pergunta(self, prefixo=None):
         p = self.u.get('pergunta') or {}
@@ -518,7 +511,9 @@ class Bot:
                 return
             titulos = (u.get('pergunta') or {}).get('titulos') or []
             i = igual_a_botao(texto, titulos)
-            if i is not None and len(texto) <= 40:
+            if i is None or len(texto) > 40:
+                i = opcao_dita(texto, titulos)  # "é no centro": frase falada com o nome de uma opção
+            if i is not None and len(texto) <= 60:
                 self.botao(u['pergunta']['botoes'][i][0])
                 return
             if pede_sugestao(texto):  # "algo que complete esse valor": sem depender do Gemini
@@ -1152,7 +1147,7 @@ class Bot:
         inicio = lst['pos']
         if inicio == 0 and u.get('endereco') and not (u.get('carrinho') or {}).get('itens'):
             self.dizer(T.entregando_em(u['endereco'].get('apelido') or 'Casa', u['endereco'].get('texto', '')))
-        pagina = lst['ofertas'][inicio:inicio + POR_PAGINA]
+        pagina = lst['ofertas'][inicio:inicio + (POR_PAGINA_VOZ if u.get('voz') else POR_PAGINA)]
         enviado = False
         if len(pagina) >= 2:  # carrossel pede de 2 a 10 cards
             try:
@@ -1609,8 +1604,7 @@ class Bot:
                     self.ctx.dormir(1.5)
         u['pedidos'][0]['codigo'] = detalhes.get('codigo')
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
-                                  detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')),
-                   fica=True)  # número e código de entrega ficam escritos pra consultar depois
+                                  detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')))
         self._voz_acaba = True  # pedido feito = fim da sessão: esta resposta ainda vai em áudio, a próxima não
         self.ctx.iniciar_rastreio(self.wa, feito['id'])
         # lembrete só quando a compra se repete (item ou categoria, de qualquer loja) ou quando a pessoa

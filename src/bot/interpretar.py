@@ -183,6 +183,21 @@ def igual_a_botao(texto, titulos):
     return None
 
 
+def opcao_dita(texto, titulos):
+    """Quem responde falando diz frase, não o botão: "é no centro" pra "1 · Centro", "pode ser no
+    pix" pra "PIX". Vale se o nome de UMA opção (4+ letras, sem o número da frente) aparece inteiro
+    na frase. Com "não" na frase, ou mais de uma opção citada, devolve None (o Gemini decide)."""
+    t = f' {normalizar(texto)} '
+    if not t.strip() or len(t.split()) > 8 or ' nao ' in t:
+        return None
+    achadas = []
+    for i, titulo in enumerate(titulos):
+        nucleo = re.sub(r'^\d+\s+', '', normalizar(titulo))
+        if len(nucleo) >= 3 and f' {nucleo} ' in t:
+            achadas.append(i)
+    return achadas[0] if len(achadas) == 1 else None
+
+
 def cpf_em(texto):
     """CPF de 11 dígitos com dígitos verificadores válidos; None se não for."""
     d = re.sub(r'\D', '', str(texto or ''))

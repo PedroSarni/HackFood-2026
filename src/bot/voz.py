@@ -100,59 +100,60 @@ def resto_do_pedido(texto, padrao):
 # ---------------------------------------------------------------------------- gravador
 
 class Gravador:
-    """Mesma cara do WhatsApp. Com o modo áudio ligado (`ativo()`), texto solto fica guardado e
-    o resto sai na hora; tudo vira `falas` pro roteiro. Desligado, é transparente."""
+    """Mesma cara do WhatsApp. Com o modo áudio ligado (`ativo()`), NADA sai na hora: texto,
+    botões, cards e lista viram `falas` pro roteiro e ficam guardados como plano B. Quem pediu
+    áudio recebe SÓ áudio (17/10 22h: texto + áudio juntos foi reclamação). Exceção: o link de
+    entrar no iFood, que não tem como ser feito por voz. Desligado, é transparente."""
 
     def __init__(self, wpp, ativo):
         self._wpp = wpp
         self._ativo = ativo
-        self.falas = []      # {'tipo', 'texto', 'opcoes', 'fica'} na ordem em que o bot "falou"
-        self.guardados = []  # (to, texto) que não saíram: plano B se o áudio falhar
+        self.falas = []      # {'tipo', 'texto', 'opcoes'} na ordem em que o bot "falou"
+        self.guardados = []  # (nome do método, args, kw) que não saíram: plano B se o áudio falhar
 
     def __getattr__(self, nome):
         return getattr(self._wpp, nome)
 
-    def _anotar(self, tipo, texto, opcoes=None, fica=False):
-        self.falas.append({'tipo': tipo, 'texto': str(texto or ''), 'opcoes': list(opcoes or []), 'fica': fica})
-
-    def texto(self, to, texto, fica=False):
-        """fica=True: sai escrito mesmo no modo áudio (número do pedido, código de entrega)."""
+    def _segurar(self, metodo, tipo, texto, opcoes, *a, **kw):
         if not self._ativo():
-            return self._wpp.texto(to, texto)
-        self._anotar('texto', texto, fica=fica)
-        if fica:
-            return self._wpp.texto(to, texto)
-        self.guardados.append((to, texto))
+            return getattr(self._wpp, metodo)(*a, **kw)
+        self.falas.append({'tipo': tipo, 'texto': str(texto or ''), 'opcoes': [str(o) for o in opcoes or []]})
+        self.guardados.append((metodo, a, kw))
         return {}
 
+    def soltar(self, trocar=None):
+        """Plano B: manda, na ordem, tudo que foi segurado (o áudio não saiu).
+        trocar: {texto antigo: texto novo} pra mensagens de texto puro."""
+        for metodo, a, kw in self.guardados:
+            if metodo == 'texto' and trocar and a[1] in trocar:
+                a = (a[0], trocar[a[1]])
+            try:
+                getattr(self._wpp, metodo)(*a, **kw)
+            except Exception as e:  # noqa: BLE001 - uma mensagem recusada não segura as outras
+                print(f'plano B do áudio: {metodo} falhou: {e!r}')
+        self.guardados = []
+
+    def texto(self, to, texto):
+        return self._segurar('texto', 'texto', texto, None, to, texto)
+
     def botoes(self, to, texto, botoes, *a, **kw):
-        r = self._wpp.botoes(to, texto, botoes, *a, **kw)
-        if self._ativo():
-            self._anotar('botoes', texto, [t for _, t in botoes])
-        return r
+        return self._segurar('botoes', 'botoes', texto, [t for _, t in botoes], to, texto, botoes, *a, **kw)
 
     def lista(self, to, texto, rotulo, linhas, *a, **kw):
-        r = self._wpp.lista(to, texto, rotulo, linhas, *a, **kw)
-        if self._ativo():
-            self._anotar('lista', texto, [t for _, t, _ in linhas])
-        return r
+        return self._segurar('lista', 'lista', texto, [f'{t} ({d})' if d else t for _, t, d in linhas],
+                             to, texto, rotulo, linhas, *a, **kw)
 
     def carrossel(self, to, texto, cards, *a, **kw):
-        r = self._wpp.carrossel(to, texto, cards, *a, **kw)
-        if self._ativo():
-            self._anotar('cards', texto, [' · '.join(x for x in str(c[1] or '').split('\n')[:2] if x) for c in cards])
-        return r
-
-    def link(self, to, texto, rotulo, url, *a, **kw):
-        r = self._wpp.link(to, texto, rotulo, url, *a, **kw)
-        if self._ativo():
-            self._anotar('link', texto, [rotulo])
-        return r
+        opcoes = [' · '.join(x for x in str(c[1] or '').split('\n')[:2] if x) for c in cards]
+        return self._segurar('carrossel', 'opcoes', texto, opcoes, to, texto, cards, *a, **kw)
 
     def imagem(self, to, link, legenda='', *a, **kw):
-        r = self._wpp.imagem(to, link, legenda, *a, **kw)
-        if self._ativo() and legenda:
-            self._anotar('foto', legenda)
+        return self._segurar('imagem', 'texto', legenda, None, to, link, legenda, *a, **kw)
+
+    def link(self, to, texto, rotulo, url, *a, **kw):
+        r = self._wpp.link(to, texto, rotulo, url, *a, **kw)  # login não dá pra fazer por voz: sai sempre
+        if self._ativo():
+            self.falas.append({'tipo': 'link', 'texto': str(texto or ''), 'opcoes': []})
         return r
 
 
@@ -160,32 +161,47 @@ class Gravador:
 
 SISTEMA = """\
 Você é o atendente de um assistente que faz pedidos no iFood pelo WhatsApp. A pessoa pediu pra ser \
-respondida por ÁUDIO, então você vai gravar UMA nota de voz no lugar das mensagens escritas abaixo. \
-Quem ouve são, em geral, pessoas idosas ou com pouca prática com celular.
+respondida SÓ por ÁUDIO: ela não vai ver texto, botão, foto nem lista, só vai OUVIR a sua nota de \
+voz. Você grava UMA nota de voz que substitui todas as mensagens abaixo. Quem ouve são, em geral, \
+pessoas idosas ou com pouca prática com celular.
+
+REGRA DE OURO: as MENSAGENS DO ASSISTENTE são a única verdade sobre o que aconteceu e qual é o \
+próximo passo. Você só reconta elas em voz. O que a pessoa disse serve só pra você soar natural; \
+NUNCA use isso pra adivinhar o próximo passo. Se as mensagens dizem que não entendeu, diga que não \
+entendeu e repita a pergunta delas, mesmo que você ache que entendeu. Nunca pergunte nem afirme \
+nada (CPF, pagamento, endereço, confirmação) que não esteja nas mensagens desta vez.
 
 Escreva exatamente o que vai ser FALADO (o texto vai direto pra uma voz sintética):
 - Soe como um atendente de verdade mandando áudio no WhatsApp: caloroso, natural, português do \
 Brasil informal ("então", "tá bom?", "rapidinho", "prontinho"), sem exagero nem gíria forçada. Não \
 leia as mensagens palavra por palavra: conte com as suas palavras o que elas dizem.
+- PROIBIDO falar de botão, tocar, clicar, tela, foto, card, lista, arrastar, "aqui embaixo" ou \
+"escrito na mensagem": a pessoa não vê nada disso. Peça direto o que ela tem que DIZER ou fazer.
+- Quando houver escolha, diga as opções em voz e pergunte qual ela quer: "é no Centro ou no Jardim \
+São Paulo?", "quer 1, 2 ou 3?", "quer fechar o pedido, pedir mais alguma coisa ou tirar um item?". \
+Produtos: numere e diga nome curto e preço de cada um ("o primeiro é o pão francês, por sete e \
+noventa; o segundo..."), e pergunte qual ela quer, dizendo que pode falar o número ou o nome. Se \
+houver opção de ver mais, diga que ela pode pedir outras opções.
+- Menu inicial: diga só que você faz as compras do iFood e pergunte o que ela quer pedir hoje.
+- Resumo do pedido: os itens, o total e a forma de pagamento, e pergunte se pode fazer o pedido.
+- Pedido feito: diga o número do pedido e o código de entrega soletrando dígito por dígito \
+("o código de entrega é quatro, oito, dois, um") e que é pra falar esse código pro entregador.
+- Link de entrar no iFood: é a única coisa que chega na tela; diga pra ela abrir o link que você \
+mandou, entrar na conta e voltar aqui.
 - Varie o começo: não abra com a mesma palavra da fala anterior (ela vem no contexto) e não \
 comece toda fala com "Olha" ou "Entendido".
-- Se a pessoa ESCREVEU ou FALOU algo, responda primeiro a isso, numa frase curta. Se ela só tocou \
-num botão, não comente o toque nem "confirme" o que ela escolheu além do que as mensagens dizem.
-- Cards com foto: diga que mandou as opções com foto, quantas são e cite no máximo duas \
-(nome curto e preço). Botões: cite o nome dos botões só quando ajuda ("é só tocar em Finalizar pedido").
-- Endereço: fale só a rua e o número (o número em algarismos: "Rua das Flores, 120"); se precisa \
-escolher entre parecidos, diga o que muda (o bairro).
-- Resumo de pedido: fale os itens, o total e a forma de pagamento, sem ler cada linha de taxa.
+- Se a pessoa ESCREVEU ou FALOU algo, pode reagir a isso numa frase curta, sem prometer nada. Não \
+interprete o que ela disse (número, quantidade, escolha) e não "confirme" nada além do que as \
+mensagens dizem: "quero o segundo" não é "duas unidades".
+- Endereço: fale só a rua e o número (o número em algarismos: "Rua das Flores, 120").
 - Dinheiro por extenso do jeito que se fala: "R$ 12,90" -> "doze e noventa", "R$ 5,00" -> "cinco \
-reais", "R$ 112,35" -> "cento e doze e trinta e cinco". Só dinheiro vai por extenso: quantidade, \
-número de casa e minutos ficam em algarismos ("3 pães", "40 a 55 minutos").
-- Nunca leia URL, CPF, emoji, asterisco nem símbolo. Onde estiver "(fica escrito na mensagem)", \
-diga só que está escrito na mensagem, sem tentar adivinhar o que é.
-- SEMPRE termine dizendo o que a pessoa faz agora e que ela pode responder mandando um áudio ou \
-escrevendo (e tocando no botão, quando houver). Varie o jeito de dizer. EXCEÇÃO: na etapa "cpf" \
-o CPF só vale ESCRITO (por segurança): peça pra escrever os números, nunca pra mandar áudio.
-- Curto: de 1 a 4 frases, no máximo 420 caracteres. Se tiver muita coisa, priorize a última \
-pergunta e o que a pessoa precisa decidir.
+reais". Só dinheiro vai por extenso: quantidade, número de casa e minutos ficam em algarismos.
+- Nunca leia URL, emoji, asterisco nem símbolo.
+- Termine com a pergunta ou o pedido do que ela faz agora e lembre, variando o jeito, que ela pode \
+responder por áudio ou escrevendo. EXCEÇÃO: na etapa "cpf" o CPF só vale ESCRITO (por segurança): \
+peça pra escrever os números, nunca pra falar.
+- Curto: até 4 frases, no máximo 450 caracteres (até 650 se estiver dizendo opções de produto). \
+Termine sempre a frase: nada de texto cortado.
 - Fale sem marcar o seu gênero (nada de "obrigado/obrigada", "cansado/cansada").
 - Nunca invente produto, preço, quantidade, prazo ou passo que não esteja nas mensagens. Nunca \
 diga que fez algo que as mensagens não dizem.
@@ -195,24 +211,24 @@ ESQUEMA = {'type': 'OBJECT', 'properties': {'fala': {'type': 'STRING'}}, 'requir
 # fila própria: o áudio é a resposta inteira, então não dá pra esperar o lite oscilar até 7 s.
 # Medido em 17/10 22h: 3.5-flash-lite 0,9 s estável; 3.1-lite de 0,9 a 7 s; 3.8-flash dando 503.
 MODELOS_ROTEIRO = [('gemini-3.5-flash-lite', 3.0, ''), ('gemini-3.1-flash-lite', 3.0, '')]
-MAX_FALA = 600
+MAX_FALA = 800
 CONVITE = 'Pode me responder mandando um áudio ou escrevendo, tá bom?'
 CONVITE_CPF = 'O CPF, por segurança, me escreve aqui com os números, tá bom?'
-ROTULOS = {'texto': 'Mensagem', 'botoes': 'Mensagem com botões', 'lista': 'Mensagem com lista de opções',
-           'cards': 'Cards com foto (a pessoa arrasta pro lado e toca em "Quero esse")',
-           'link': 'Mensagem com botão que abre um site', 'foto': 'Foto com legenda'}
-# o que vai escrito de propósito (número do pedido, código de entrega): o Gemini lia "D mil e três"
-# mesmo com a regra no prompt, então o código nem chega nele
-_CODIGO = re.compile(r'\*[^*\n]*\d[^*\n]*\*')
+ROTULOS = {'texto': 'Mensagem', 'botoes': 'Pergunta com respostas prontas',
+           'lista': 'Pergunta com lista de respostas', 'opcoes': 'Opções de produto, na ordem',
+           'link': 'Link de entrar no iFood (a única coisa que aparece na tela)'}
 
 
 def _para_llm(falas):
     blocos = []
     for i, f in enumerate(falas, 1):
-        texto = _CODIGO.sub('(fica escrito na mensagem)', f['texto']) if f.get('fica') else f['texto']
-        b = f'{i}. {ROTULOS.get(f["tipo"], "Mensagem")}:\n{texto[:900]}'
+        b = f'{i}. {ROTULOS.get(f["tipo"], "Mensagem")}:\n{f["texto"][:900]}'
         if f['opcoes']:
-            b += '\nOpções: ' + ' | '.join(o[:90] for o in f['opcoes'][:10])
+            ops = [re.sub(r'~[^~\n]+~', '', o)[:90] for o in f['opcoes'][:10]]  # sem o preço antigo riscado
+            if f['tipo'] == 'opcoes':  # produto: numerado, a pessoa escolhe dizendo "o segundo"
+                b += '\nOpções: ' + ' | '.join(f'{n}) {o}' for n, o in enumerate(ops, 1))
+            else:  # resposta pronta: só o texto ("1, 2 ou 3" já são números; "Não tem" não precisa)
+                b += '\nRespostas possíveis: ' + ' | '.join(ops)
         blocos.append(b)
     return '\n\n'.join(blocos)
 
@@ -222,30 +238,61 @@ def roteiro(llm, falas, disse='', etapa='', antes=''):
     antes: a fala do áudio anterior, pra não repetir o mesmo começo toda vez."""
     if not falas:
         return ''
-    contexto = [f'Etapa da conversa: {etapa or "inicio"}.',
+    contexto = ['MENSAGENS DO ASSISTENTE (a única verdade; ela NÃO vai ver, você conta em voz), na ordem:',
+                _para_llm(falas),
+                '--- só pra soar natural, não decide nada ---',
+                f'O que a pessoa acabou de mandar: {disse[:300] if disse else "(escolheu uma das opções)"}',
                 f'Fala do áudio anterior: {antes[:200]}' if antes else 'Este é o primeiro áudio da conversa.',
-                f'O que a pessoa acabou de mandar: {disse[:300] if disse else "(tocou num botão)"}',
-                'Mensagens que o assistente ia mandar escritas, na ordem:', _para_llm(falas)]
+                f'Etapa da conversa: {etapa or "inicio"}.']
     try:
         dados, _modelo, _seg = llm(SISTEMA, [('texto', '\n\n'.join(contexto))], ESQUEMA, modelos=MODELOS_ROTEIRO)
         fala = ' '.join(str((dados or {}).get('fala') or '').split()) if isinstance(dados, dict) else ''
     except Exception as e:  # noqa: BLE001 - sem Gemini ainda dá pra falar o texto limpo
         print(f'roteiro do áudio falhou: {e!r}')
         fala = ''
-    fala = _falavel(fala)
-    return fala[:MAX_FALA] if len(fala) >= 15 else roteiro_simples(falas, etapa)
+    fala = _sem_tela(_reais_falados(_falavel(fala)), etapa)  # "R$" escapou: a voz soletraria
+    return _caber(fala) if len(fala) >= 15 else roteiro_simples(falas, etapa)
 
 
 _EMOJI = re.compile('[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍⃣]')
+# a pessoa só ouve: frase que manda tocar/olhar alguma coisa na tela não serve (o Gemini às vezes escapa)
+_TELA = re.compile(r'\b(?:bot(?:ao|ão|oes|ões)|toqu\w*|toca\w*|clic\w*|tela|fotos?|fotinhos?|cards?|arrast\w*'
+                   r'|aqui embaixo|abaixo|escrito na mensagem|na mensagem escrita)\b', re.I)
+_FRASES = re.compile(r'[^.!?]+[.!?]*')
+
+
+def _sem_tela(fala, etapa=''):
+    """Tira as frases que falam de botão/tela; se sumiu o convite pra responder, põe de volta."""
+    frases = [f.strip() for f in _FRASES.findall(fala) if f.strip()]
+    boas = [f for f in frases if not _TELA.search(f)]
+    if len(boas) == len(frases):
+        return fala
+    fala = ' '.join(boas)
+    if fala and not re.search(r'[áa]udio|escrev', fala, re.I):
+        fala += ' ' + (CONVITE_CPF if etapa == 'cpf' else CONVITE)
+    return fala
+
+
+def _caber(fala, limite=MAX_FALA):
+    """Corta no fim de uma frase, nunca no meio de uma palavra (áudio terminando cortado)."""
+    if len(fala) <= limite:
+        return fala
+    corte = fala[:limite]
+    fim = max(corte.rfind('. '), corte.rfind('? '), corte.rfind('! '))
+    return corte[:fim + 1] if fim > limite // 2 else corte.rsplit(' ', 1)[0] + '.'
 
 
 def _falavel(s):
     """Tira o que a voz leria errado: emoji, *negrito*, _itálico_, ~riscado~, links, marcadores."""
-    s = _EMOJI.sub(' ', str(s or ''))
+    s = re.sub(r'\b(\d)️?⃣', r'\1.', str(s or ''))  # "1️⃣" -> "1."
+    s = _EMOJI.sub(' ', s)
     s = re.sub(r'https?://\S+', ' ', s)
+    s = re.sub(r'~[^~\n]+~', ' ', s)  # preço antigo riscado: falado, parecia um segundo preço
     s = re.sub(r'[*_~#•|]', ' ', s)
-    s = re.sub(r'\b(\d+)\s*[-–]\s*(\d+)(\s*min)', r'\1 a \2\3', s)  # '40-55 min': a voz lia 'menos'
-    s = re.sub(r'\b(\d)️?⃣', r'\1.', s)
+    s = re.sub(r'([^.!?:;,\s])[ \t]*\n\s*', r'\1. ', s.strip())  # quebra de linha = pausa: vira ponto
+    s = re.sub(r'\s*\n\s*', ' ', s)
+    s = re.sub(r'\s*·\s*', ', ', s)
+    s = re.sub(r'\b(\d+)\s*[-–]\s*(\d+)(\s*min)', r'\1 a \2\3', s)  # "40-55 min": a voz lia "menos"
     return ' '.join(s.split())
 
 
@@ -258,19 +305,24 @@ def _reais_falados(s):
     return re.sub(r'R\$\s*([\d.]+)(?:,(\d{2}))?', troca, s)
 
 
+ORDINAIS = ['primeiro', 'segundo', 'terceiro', 'quarto', 'quinto', 'sexto', 'sétimo', 'oitavo', 'nono', 'décimo']
+
+
 def roteiro_simples(falas, etapa=''):
-    """Plano B sem Gemini: o texto das mensagens, limpo pra voz, com o convite no fim."""
+    """Plano B sem Gemini: o texto das mensagens, limpo pra voz e sem falar de tela, as opções
+    ditas em voz e o convite no fim."""
     convite = CONVITE_CPF if etapa == 'cpf' else CONVITE
     partes = []
     for f in falas:
-        texto = _CODIGO.sub('na mensagem escrita', f['texto']) if f.get('fica') else f['texto']
-        t = _reais_falados(_falavel(texto))
-        if f['tipo'] == 'cards':
-            t = f'Te mandei {len(f["opcoes"])} opções com foto. ' + t
-        t = t.rstrip(' :,;')
+        t = _sem_tela(_reais_falados(_falavel(f['texto'])), etapa)
+        if f['tipo'] == 'opcoes':
+            itens = [f'o {ORDINAIS[i]}, {_reais_falados(_falavel(o))}' for i, o in enumerate(f['opcoes'][:len(ORDINAIS)])]
+            t = f'Achei {len(itens)} opções: ' + '; '.join(itens) + '. Qual você quer? Pode falar o número ou o nome.'
+        elif f['opcoes'] and f['tipo'] in ('botoes', 'lista') and len(f['opcoes']) > 1:
+            ops = [_falavel(o) for o in f['opcoes']]
+            t += ' Você quer ' + ', '.join(ops[:-1]) + ' ou ' + ops[-1] + '?'
+        t = t.replace(convite, '').rstrip(' :,;')
         if t:
             partes.append(t if t[-1] in '.!?' else t + '.')  # "?" fica: a voz entoa como pergunta
-    fala = ' '.join(partes)
-    if len(fala) > MAX_FALA - len(convite) - 1:
-        fala = fala[:MAX_FALA - len(convite) - 1].rsplit(' ', 1)[0].rstrip(',;:') + '...'
+    fala = _caber(' '.join(partes), MAX_FALA - len(convite) - 1)
     return f'{fala} {convite}'.strip()

@@ -80,6 +80,11 @@ def test_recorta_o_pedido_e_deixa_o_resto(frase, resto):
 
 # --- liga só quando pede -------------------------------------------------------------------
 
+def so_audio(m):
+    """No modo áudio a pessoa só recebe nota de voz (17/10 22h: texto + áudio foi reclamação)."""
+    return tipos(m) and set(tipos(m)) == {'audio'}
+
+
 def test_sem_pedido_nunca_manda_audio():
     m, loc = mundo_com_voz()
     endereco_pronto(m)
@@ -88,28 +93,63 @@ def test_sem_pedido_nunca_manda_audio():
     assert not m.estado().get('voz')
 
 
-def test_pedido_de_audio_responde_em_audio_e_mantem_os_botoes():
+def test_pedido_de_audio_responde_so_com_audio():
     m, loc = mundo_com_voz()
     m.enviar('me responde por áudio')
     assert m.estado()['voz']
-    assert tipos(m)[-1] == 'audio' and m.wpp.saida[-1][1]['voz'] is True  # nota de voz, por último
-    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir']  # menu ainda tocável (sem pedido, sem atalho)
-    assert T.VOZ_LIGADA not in escritos(m)  # o "pode deixar" foi falado, não escrito
+    assert so_audio(m) and len(m.wpp.saida) == 1 and m.wpp.saida[0][1]['voz'] is True  # UMA nota de voz
     assert len(loc.falas) == 1 and 'áudio ou escrevendo' in loc.falas[0]
     assert m.wpp.midias and b'audio/ogg' in m.wpp.midias[0]  # subiu o ogg pra Meta
+    assert m.estado()['pergunta']['botoes']  # a pergunta continua valendo pra resposta falada
 
 
-def test_no_modo_audio_texto_solto_vira_fala_e_cards_continuam():
+def test_audio_nunca_fala_de_botao_nem_de_tela():
     m, loc = mundo_com_voz()
-    endereco_pronto(m)
+    m.llm.falhar = True  # roteiro simples: é o caminho que mais carrega texto de tela ("Toque em...")
     m.enviar('me responde por áudio')
+    m.llm.falhar = False
+    endereco_pronto_falando(m)
+    m.llm.falhar = True
+    m.enviar('o primeiro')
+    for fala in loc.falas:
+        assert not voz._TELA.search(fala), fala
+
+
+def endereco_pronto_falando(m):
+    """O mesmo cadastro de endereço de test_fluxo, mas respondendo de boca (sem botão na tela)."""
+    m.enviar('quero pao')
+    m.enviar('Rua das Flores, 120, São Carlos')
+    assert m.estado()['fase'] == 'endereco_escolha'
+    m.enviar('é no centro')      # frase falada com o nome do bairro: casa com a opção "1 · Centro"
+    assert m.estado()['fase'] == 'complemento'
+    m.enviar('não tem')
+
+
+def test_pedido_inteiro_so_falando():
+    m, loc = mundo_com_voz()
+    m.enviar('me responde por áudio')
+    endereco_pronto_falando(m)
+    assert m.estado()['fase'] == 'escolhendo'
+    assert len(m.estado()['visiveis']) == 3                 # 3 opções por vez: dá pra guardar de ouvido
+    assert 'o primeiro' in loc.falas[-1] and 'o terceiro' in loc.falas[-1]  # as opções foram ditas
+    m.enviar('o segundo')
+    assert m.estado()['fase'] == 'quantidade'
+    m.enviar('10')
+    m.enviar('finalizar pedido')                             # o texto da opção, dito
+    if m.estado()['fase'] == 'pagamento':
+        m.enviar('pix')
+    assert m.estado()['fase'] == 'cpf'
+    m.enviar('529.982.247-25')
+    assert m.estado()['fase'] == 'confirmar'
     m.wpp.limpar()
-    m.enviar('quero leite')
-    assert 'carrossel' in tipos(m) and tipos(m)[-1] == 'audio'
-    assert not escritos(m)  # "Entregando em..." foi pro áudio
-    fala = loc.falas[-1]
-    assert 'Entregando em' in fala and 'opções com foto' in fala
-    assert '*' not in fala and '👇' not in fala and '🏠' not in fala  # nada que a voz leria errado
+    m.enviar('sim')
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1
+    assert so_audio(m)                                       # até o "pedido feito" é só áudio
+    assert 'Pedido feito' in loc.falas[-1] or 'pedido feito' in loc.falas[-1].lower()
+    assert not m.estado().get('voz')                         # acabou a sessão, acabou o áudio
+    m.wpp.limpar()
+    m.enviar('oi')
+    assert 'audio' not in tipos(m)
 
 
 def test_pedido_de_audio_junto_com_o_pedido_de_compra():
@@ -119,13 +159,13 @@ def test_pedido_de_audio_junto_com_o_pedido_de_compra():
     m.enviar('quero leite e me responde por áudio')
     assert m.estado()['voz']
     assert m.mcp.chamadas_de('searchOffers')[-1]['query'] == 'leite'  # o resto seguiu o fluxo
-    assert 'carrossel' in tipos(m) and tipos(m)[-1] == 'audio'
+    assert so_audio(m)
 
 
 def test_pedido_falado_tambem_liga():
     m = Mundo(locutor=Locutor(), transcritor=lambda mime, dados: 'me responde por áudio, por favor')
     m.enviar(('audio', 'midia1'))
-    assert m.estado()['voz'] and tipos(m)[-1] == 'audio'
+    assert m.estado()['voz'] and so_audio(m)
 
 
 def test_quem_pergunta_se_pode_mandar_audio_continua_no_texto():
@@ -143,32 +183,41 @@ def test_pedido_no_meio_do_endereco_repete_a_pergunta_do_endereco():
     assert 'Pra onde eu mando' in loc.falas[-1]
 
 
+def test_login_e_a_unica_coisa_que_aparece_na_tela():
+    loc = Locutor()
+    m = Mundo(logado=False, locutor=loc)
+    m.enviar('me responde por áudio')
+    assert tipos(m) == ['link', 'audio']  # sem o link não dá pra entrar; o resto é falado
+
+
+def test_ligar_com_conversa_junto_nao_vira_nao_entendi():
+    m, loc = mundo_com_voz()
+    m.enviar('me responde por áudio, não enxergo bem')  # o fake diz nao_entendi pro resto
+    assert m.estado()['voz'] and so_audio(m)
+    assert T.NAO_ENTENDI not in ' '.join(loc.falas) and 'Desculpe' not in loc.falas[-1]
+
+
 # --- plano B --------------------------------------------------------------------------------
 
-def test_voz_fora_do_ar_manda_tudo_escrito():
-    m, loc = mundo_com_voz(falhar=True)
+def test_voz_fora_do_ar_manda_as_mensagens_normais():
+    m, loc = mundo_com_voz()
     endereco_pronto(m)
     m.enviar('me responde por áudio')
+    loc.falhar = True  # soluço da ElevenLabs no meio da conversa
     m.wpp.limpar()
     m.enviar('quero leite')
     assert 'audio' not in tipos(m)
-    assert any('Entregando em' in t for t in escritos(m))  # o que ia virar fala saiu escrito
+    assert 'carrossel' in tipos(m) or m.wpp.cards()        # o que foi segurado saiu, com as opções
+    assert any('Entregando em' in t for t in escritos(m))
+    assert m.estado()['voz']                                # já tinha falado antes: a próxima tenta de novo
 
 
 def test_primeiro_audio_falhou_nao_promete_audio():
     m, loc = mundo_com_voz(falhar=True)  # key sem permissão de text_to_speech, por exemplo
     m.enviar('me responde por áudio')
     assert T.VOZ_INDISPONIVEL in escritos(m) and T.VOZ_LIGADA not in escritos(m)
-    assert not m.estado().get('voz')  # não fica tentando (e falhando) a cada mensagem
-
-
-def test_falha_depois_de_ja_ter_falado_mantem_o_modo():
-    m, loc = mundo_com_voz()
-    endereco_pronto(m)
-    m.enviar('me responde por áudio')
-    loc.falhar = True  # soluço da ElevenLabs no meio da conversa
-    m.enviar('quero leite')
-    assert m.estado()['voz']  # a próxima tenta em áudio de novo
+    assert m.wpp.ultimos_botoes()                           # o menu saiu, com botões
+    assert not m.estado().get('voz')                        # não fica tentando (e falhando) a cada mensagem
 
 
 def test_sem_elevenlabs_avisa_e_nao_liga():
@@ -182,7 +231,7 @@ def test_sem_gemini_o_roteiro_simples_ainda_fala():
     m, loc = mundo_com_voz()
     m.llm.falhar = True
     m.enviar('me responde por áudio')
-    assert tipos(m)[-1] == 'audio' and loc.falas[-1].endswith(voz.CONVITE)
+    assert so_audio(m) and loc.falas[-1].endswith(voz.CONVITE)
 
 
 # --- desliga -------------------------------------------------------------------------------
@@ -206,51 +255,20 @@ def test_sumiu_meia_hora_a_proxima_volta_escrita():
     assert not m.estado().get('voz') and 'audio' not in tipos(m)
 
 
-def test_pedido_feito_fecha_em_audio_com_o_numero_escrito_e_a_sessao_seguinte_e_texto():
-    m, loc = mundo_com_voz()
-    m.enviar('me responde por áudio')
-    pedido_ate_o_resumo(m)
-    assert m.estado()['voz']
-    ok = next(i for i in reversed(m.wpp.todos_ids()) if i.startswith('ok:'))
-    m.wpp.limpar()
-    m.enviar(('botao', ok))
-    assert any('Pedido feito' in t for t in escritos(m))  # número e código ficam escritos
-    assert tipos(m)[-1] == 'audio'                          # e a despedida vai falada
-    assert not m.estado().get('voz')                        # acabou a sessão, acabou o áudio
-    m.wpp.limpar()
-    m.enviar('oi')
-    assert 'audio' not in tipos(m)
-
-
 def test_no_cpf_o_audio_pede_pra_escrever():
     m, loc = mundo_com_voz()
     m.llm.falhar = True  # roteiro simples: o convite é nosso, dá pra conferir
     m.enviar('me responde por áudio')
-    endereco_pronto(m)
-    m.tocar('pick:')
-    m.tocar('qtd:3')
-    m.tocar('fim')
-    m.tocar('pag:0')
+    m.llm.falhar = False
+    endereco_pronto_falando(m)
+    m.enviar('o primeiro')
+    m.enviar('10')
+    m.llm.falhar = True
+    m.enviar('finalizar pedido')
+    if m.estado()['fase'] == 'pagamento':
+        m.enviar('pix')
     assert m.estado()['fase'] == 'cpf'
     assert loc.falas[-1].endswith(voz.CONVITE_CPF) and 'áudio' not in loc.falas[-1]
-
-
-def test_ligar_com_conversa_junto_nao_vira_nao_entendi():
-    m, loc = mundo_com_voz()
-    m.enviar('me responde por áudio, não enxergo bem')  # o fake diz nao_entendi pro resto
-    assert m.estado()['voz']
-    assert T.NAO_ENTENDI not in ' '.join(loc.falas) and 'Desculpe' not in loc.falas[-1]
-    assert [i for i, _ in m.wpp.ultimos_botoes()] == ['pedir']
-
-
-def test_codigo_do_pedido_nem_chega_no_gemini():
-    vistos = []
-    def llm(sistema, partes, esquema, modelos=None):
-        vistos.append(partes[0][1])
-        return {'fala': 'Prontinho, pedido feito! O número tá escrito aí na mensagem.'}, 'fake', 0.1
-    voz.roteiro(llm, [{'tipo': 'texto', 'texto': '🎉 *Pedido feito!*\nNúmero do pedido: *D1003*\n'
-                       '🔑 Código de entrega: *4821* (fale pro entregador)', 'opcoes': [], 'fica': True}])
-    assert 'D1003' not in vistos[0] and '4821' not in vistos[0] and 'fica escrito' in vistos[0]
 
 
 # --- roteiro -------------------------------------------------------------------------------
@@ -260,11 +278,27 @@ def test_roteiro_usa_a_fala_do_gemini_limpa():
         assert 'fala' in esquema['properties'] and 'Coloquei' in partes[0][1]
         assert modelos == voz.MODELOS_ROTEIRO  # fila rápida, não a do interpretar
         return {'fala': 'Pronto, coloquei os *dois* leites! 😊 Me manda um áudio ou escreve.'}, 'fake', 0.1
-    fala = voz.roteiro(llm, [{'tipo': 'texto', 'texto': '✅ Coloquei *2x Leite*', 'opcoes': [], 'fica': False}])
+    fala = voz.roteiro(llm, [{'tipo': 'texto', 'texto': '✅ Coloquei *2x Leite*', 'opcoes': []}])
     assert fala == 'Pronto, coloquei os dois leites! Me manda um áudio ou escreve.'
 
 
-def test_roteiro_simples_fala_dinheiro_como_gente():
-    fala = voz.roteiro_simples([{'tipo': 'botoes', 'texto': '🧺 Seu pedido até agora: *R$ 12,90*',
-                                 'opcoes': ['✅ Finalizar pedido'], 'fica': False}])
-    assert '12 reais e 90' in fala and 'R$' not in fala and fala.endswith(voz.CONVITE)
+def test_frase_que_manda_tocar_botao_e_cortada():
+    def llm(sistema, partes, esquema, modelos=None):
+        return {'fala': 'Poxa, não achei esfiha de carne aqui perto. Tenta de outro jeito, tá bom? '
+                        'É só tocar no botão Escrever de novo ou mandar um áudio.'}, 'fake', 0.1
+    fala = voz.roteiro(llm, [{'tipo': 'botoes', 'texto': 'Não achei', 'opcoes': ['Escrever de novo']}])
+    assert 'botão' not in fala and 'tocar' not in fala and fala.startswith('Poxa')
+    assert fala.endswith(voz.CONVITE)  # o convite pra responder voltou no lugar
+
+
+def test_fala_longa_corta_no_fim_da_frase():
+    longa = ' '.join(['Essa é uma frase de teste bem comprida.'] * 40)
+    fala = voz._caber(longa)
+    assert len(fala) <= voz.MAX_FALA and fala.endswith('comprida.')
+
+
+def test_roteiro_simples_fala_dinheiro_e_opcoes_como_gente():
+    fala = voz.roteiro_simples([{'tipo': 'botoes', 'texto': '🧺 Seu pedido até agora: *R$ 12,90*\n\nQuer mais?',
+                                 'opcoes': ['✅ Finalizar pedido', '➕ Quero mais coisas']}])
+    assert '12 reais e 90. Quer mais?' in fala and 'R$' not in fala and fala.endswith(voz.CONVITE)
+    assert 'Finalizar pedido ou Quero mais coisas?' in fala

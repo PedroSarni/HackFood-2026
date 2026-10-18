@@ -58,7 +58,9 @@ def falar(texto, http=None):
     if not texto:
         raise ErroVoz('nada pra falar')
     modelo = _cfg('VOZ_MODELO', MODELO_PADRAO)
-    corpo = {'text': texto, 'model_id': modelo,
+    # pausa no fim: sem ela o flash às vezes come a última palavra e o WhatsApp corta o resto
+    # (17/10: 1 em 8 sem a última palavra; com a pausa, 8 em 8 inteiros e ~1 s de folga)
+    corpo = {'text': f'{texto} <break time="0.7s" />', 'model_id': modelo,
              'voice_settings': {'stability': 0.45, 'similarity_boost': 0.75, 'style': 0.0,
                                 'use_speaker_boost': True, 'speed': float(_cfg('VOZ_VELOCIDADE', '1.0'))}}
     if not modelo.startswith('eleven_multilingual'):

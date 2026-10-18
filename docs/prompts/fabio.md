@@ -183,3 +183,9 @@ pedir pra pessoa fazer coisas porra" / "na vdd deixe isso pra outro agente, vou 
 
 **Resposta:** Fica com o outro agente (a frente da voz). Esta sessão não mexeu em voz; só ajustou 2 linhas do
 `tests/test_voz.py`, porque o menu sem pedido não mostra mais os atalhos.
+
+## 2026-10-17 23:20 — áudio é só áudio, sem falar de botão, sem cortar o fim
+
+**Prompt:** OUTRA COISA: [print da conversa: depois de pedir só áudio, o bot mandou a mensagem com botões E o áudio; o áudio dizia "é só tocar no botão"] eu pedi pra ela responder só por audio, até ai blz, mas ela manda texto e audio, sem contar que esse ultimo audio dela saiu cortado no final, quando ela mandar audio é só audio, e audio n deve falar sobre botao, só pedir pra pessoa fazer coisas porra
+
+**Resposta:** Modo áudio virou só áudio: botões, cards, lista e texto são segurados e viram a fala (só o link de login sai, não dá pra entrar por voz); 3 produtos por vez, ditos numerados; código de entrega falado dígito por dígito; se o áudio falha, as mensagens normais saem. O áudio não fala de botão/tela (prompt + trava que corta a frase). Fim cortado: medido 1 em 8 sem a última palavra no flash; pausa de 0,7 s no fim deixou 8 em 8 inteiros. Resposta falada "é no centro"/"pode ser no pix" agora casa com a opção. Medido também: o Gemini inventava passo (CPF, "dinheiro na entrega") em 9 de 10 quando a pessoa dizia uma coisa e a mensagem era "não entendi"; com a regra de ouro, 0 de 10.
