@@ -1690,3 +1690,48 @@ def test_ver_carrinho_vazio_diz_que_esta_vazio():
     m.llm.resposta = {'acao': 'ver_pedido'}
     m.enviar('mostra o meu carrinho')
     assert 'está vazio' in ' '.join(m.wpp.textos())
+
+
+# --- lembrete do automático: "da última vez" compara a mesma grandeza --------------------------
+
+def _lembrete_do_modelo_com_entrega(m, monkeypatch):
+    from src.shared import mcp_fake
+    endereco_pronto(m)
+    m.enviar('todo dia as 7h quero pao')
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    lj = mcp_fake._LOJA_POR_ID[m.estado()['carrinho']['loja_id']]
+    monkeypatch.setitem(mcp_fake.LOJAS, lj, mcp_fake.LOJAS[lj][:3] + (4.99,) + mcp_fake.LOJAS[lj][4:])
+    sub = m.estado()['carrinho']['subtotal']
+    m.tocar('fim')
+    return m.recs_dic[m.wa][0], sub
+
+
+def _pedir_pelo_lembrete(m, rec):
+    u = m.estado()  # já pediu antes: pagamento e CPF guardados, o "sim" do lembrete fecha sem perguntar nada
+    u.update(pagamento_preferido={'tipo': 'PIX', 'nome': 'PIX'}, cpf='529.982.247-25')
+    m.armazem[f'u:{m.wa}'] = u
+    m.enviar(('botao', f'lem:pedir:{rec["id"]}'))
+
+
+def test_lembrete_com_itens_iguais_e_entrega_nao_diz_que_o_preco_mudou(monkeypatch):
+    from src.bot import textos as T
+    m = Mundo()
+    rec, sub = _lembrete_do_modelo_com_entrega(m, monkeypatch)
+    assert 'Itens:' in T.lembrete(rec) and '+ entrega' in T.lembrete(rec)  # não chama subtotal de "última vez"
+    _pedir_pelo_lembrete(m, rec)
+    assert not any('preço mudou' in t for t in m.wpp.textos())
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1  # o "sim" do lembrete fechou o pedido
+    rec = m.recs_dic[m.wa][0]
+    assert rec['total'] == round(sub + 4.99, 2)  # o próximo lembrete já mostra o que a pessoa pagou
+    assert f'Da última vez: {T.reais(sub + 4.99)}' in T.lembrete(rec)
+
+
+def test_lembrete_com_itens_mais_caros_diz_que_o_preco_mudou(monkeypatch):
+    m = Mundo()
+    rec, _ = _lembrete_do_modelo_com_entrega(m, monkeypatch)
+    m.ctx.recorrencias._mudar(m.wa, rec['id'], subtotal=1.0)  # os itens custavam bem menos da última vez
+    _pedir_pelo_lembrete(m, rec)
+    assert not m.mcp.chamadas_de('submitOrder')
+    assert m.estado()['fase'] == 'confirmar'
+    assert 'preço mudou' in m.wpp.saida[-1][1]['texto']

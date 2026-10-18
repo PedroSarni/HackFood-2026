@@ -481,8 +481,12 @@ def lembrete(rec, endereco=None):
         linhas.append(f'🏠 {endereco.get("apelido") or "Endereço"}: {endereco.get("texto") or ""}'.rstrip(': '))
     if rec.get('pagamento'):
         linhas.append(f'💳 {rec["pagamento"]}')
-    if rec.get('total'):
-        linhas.append(f'💰 Da última vez: {reais(rec["total"])} (pode variar um pouquinho)')
+    from src.bot.recorrencia import preco_da_ultima_vez
+    campo, valor = preco_da_ultima_vez(rec)
+    if valor and campo == 'total':
+        linhas.append(f'💰 Da última vez: {reais(valor)} (pode variar um pouquinho)')
+    elif valor:  # automático que ainda não saiu: a entrega só se sabe no dia
+        linhas.append(f'💰 Itens: {reais(valor)} + entrega (pode variar um pouquinho)')
     linhas += ['', '*Podemos pedir aqui pra enviar na sua casa?*',
                'Se tocar em *Sim, pode pedir*, eu faço o pedido agora nessa forma de pagamento.']
     return '\n'.join(linhas)

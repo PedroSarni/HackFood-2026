@@ -77,7 +77,7 @@ class Recorrencias:
                 if (r.get('pedido_id') or ('modelo', r.get('loja_id'), r.get('resumo'))) != chave]
         rec = {'id': secrets.token_hex(3), 'pedido_id': pedido['id'], 'dias': int(dias),
                'resumo': pedido.get('resumo', ''), 'loja': pedido.get('loja'),
-               'total': pedido.get('total'), 'pagamento': pagamento, 'ciclo': ciclo, 'hora': hora,
+               'total': pedido.get('total'), 'subtotal': pedido.get('subtotal'), 'pagamento': pagamento, 'ciclo': ciclo, 'hora': hora,
                'proximo': proximo, 'avisado': False,
                'loja_id': pedido.get('loja_id'), 'itens': pedido.get('itens')}
         recs.append(rec)
@@ -111,9 +111,23 @@ class Recorrencias:
         if rec:
             self._mudar(wa_id, rid, avisado=False, proximo=self.agora() + rec['dias'] * 86400)
 
+    def guardar_valores(self, wa_id, rid, subtotal, total):
+        """Pedido saiu pelo lembrete: o próximo já mostra o total com entrega que a pessoa pagou."""
+        self._mudar(wa_id, rid, subtotal=subtotal, total=total)
+
     def vencido_sem_aviso(self, wa_id):
         agora = self.agora()
         return next((r for r in self._todas(wa_id) if r['proximo'] <= agora and not r.get('avisado')), None)
+
+
+def preco_da_ultima_vez(rec):
+    """('total', valor) quando já se sabe quanto a pessoa pagou com entrega; senão ('subtotal', valor) dos
+    itens (automático montado sem pedido ainda). O lembrete compara a mesma grandeza que mostra."""
+    if not rec.get('pedido_id') and 'subtotal' not in rec:  # modelo antigo guardava o subtotal em 'total'
+        return 'subtotal', rec.get('total')
+    if rec.get('total'):
+        return 'total', rec['total']
+    return 'subtotal', rec.get('subtotal')
 
 
 def _na_hora(ts, hora):

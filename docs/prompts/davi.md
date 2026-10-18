@@ -230,3 +230,18 @@ não marquei; os bugs B1/B2/B4 estão em "Pronto". B2 e B4 sem deploy comprovado
 histórico; CPFs e telefones só de exemplo). Nada apagado. Aplicados só os itens 6, 7 e 11: status do src/README.md e
 modo demo com `scripts/modo.py`, 2º agente movido pra "Pronto" e Sofia/insights (9626e97, 054d7d2) no estado.md, linha
 do print com endereço removida do fabio.md (continua no histórico do git). 440 passando. Sem deploy.
+
+## 2026-10-18 05:40 — lembrete dizia "o preço mudou" só por causa da entrega
+
+**Prompt:** "Bug de dinheiro no lembrete da recorrência (src/bot/fluxo.py e src/bot/recorrencia.py). Corrija SÓ isto:
+Sintoma: o lembrete mostra 'Da última vez: R$ 24,95' (SUBTOTAL, sem entrega). Quando a pessoa toca 'Sim, pode
+pedir', o total vem R$ 29,94 (24,95 + entrega 4,99) e o bot avisa 'O preço mudou desde a última vez', mas o preço
+dos itens NÃO mudou. [...] Compare grandezas iguais [...] 'O preço mudou' só aparece se o valor realmente mudou.
+Teste 1: itens iguais + entrega de R$ 4,99 → NÃO aparece 'preço mudou'. Teste 2: preço dos itens sobe → aparece.
+[...] NÃO mexa na Lia nem em src/agentes/ [...]"
+
+**Resposta:** O automático montado sem pedido (`_salvar_modelo`) guardava o subtotal no campo `total`, e o "sim" do
+lembrete comparava isso com o total com entrega. Agora o modelo guarda `subtotal`; `preco_da_ultima_vez` (recorrencia.py)
+diz o que comparar (total com total se já se sabe, senão subtotal com subtotal, inclusive em lembrete antigo); o
+lembrete mostra "Itens: R$ X + entrega" até o 1º pedido e, depois dele, "Da última vez" com o total pago. 2 testes
+novos (o 1º falha sem a correção), nenhum existente mudou, 462 passando. Sem deploy.

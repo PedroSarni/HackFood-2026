@@ -24,7 +24,7 @@ from src.bot.ifood import PrecisaLogin
 from src.bot.interpretar import (cpf_em, igual_a_botao, interpretar, normalizar, numero_em, opcao_dita, pede_sugestao, pergunta_minimo,
                                  so_complemento, so_endereco,
                                  regra_rapida)
-from src.bot.recorrencia import DEMO_SEGUNDOS, botoes_lembrete, categoria
+from src.bot.recorrencia import DEMO_SEGUNDOS, botoes_lembrete, categoria, preco_da_ultima_vez
 from src.shared.ifood_mcp import ErroMCP, SemAutorizacao
 from src.shared.llm import ErroLLM
 from src.shared.whatsapp import MAX_BOTAO, MAX_LINHA, ErroWhatsApp, partir
@@ -134,7 +134,7 @@ class Bot:
         anterior = u.get('ultima_msg') or 0  # lido antes de sobrescrever (recorrencia.py usa o novo)
         u['ultima_msg'] = self.ctx.agora()
         self._resposta = None   # fala do Gemini pra esta rodada (interpretar preenche)
-        self._direto = None     # "Sim, pode pedir" do lembrete: {'teto': total} = fecha sem resumo
+        self._direto = None     # "Sim, pode pedir" do lembrete: {'campo', 'teto', 'rid'} = fecha sem resumo
         self._disse = ''
         if self.ctx.armazem.pop(f'voz_fim:{wa_id}', None):
             u['voz'] = None  # o pedido chegou (src/bot/rastreio.py): acabou a sessão do modo áudio
@@ -2056,11 +2056,12 @@ class Bot:
         direto, self._direto = self._direto, None
         if direto is not None:
             # a pessoa já disse "sim" no lembrete vendo valor, endereço e pagamento: fecha na hora,
-            # a não ser que o preço tenha subido mais de 10% (aí ela confere o resumo antes)
+            # a não ser que o preço tenha subido mais de 10% (aí ela confere o resumo antes); compara total
+            # com total, ou subtotal com subtotal quando a entrega da última vez não é conhecida
             teto = direto.get('teto')
-            if not teto or (car.get('total') or 0) <= teto * 1.10:
+            if not teto or (car.get(direto.get('campo') or 'total') or 0) <= teto * 1.10:
                 u['fase'] = 'confirmar'
-                u['via_lembrete'] = True
+                u['via_lembrete'] = direto.get('rid') or True
                 self.confirmar(car['id'][:12])
                 return
             texto = T.PRECO_SUBIU + '\n\n' + texto
@@ -2162,8 +2163,11 @@ class Bot:
         # pediu pra agendar: na 1ª vez de um item ninguém quer ser cobrado de rotina
         repetidos = self._registrar_compra(car['itens'])
         dias_pedidos = u.pop('agendar_depois', None)
-        if u.pop('via_lembrete', None):
+        rid = u.pop('via_lembrete', None)
+        if rid:
             u['fase'] = 'acompanhando'  # já é recorrente: não oferece de novo
+            if isinstance(rid, str):
+                self.ctx.recorrencias.guardar_valores(self.wa, rid, car.get('subtotal'), car.get('total'))
         elif dias_pedidos:
             self.perguntar(T.oferecer_repetir(repetidos[0] if repetidos else None),
                            [(f'rec:{dias_pedidos}', T.quando(dias_pedidos, u.get('agendar_hora')).capitalize()),
@@ -2401,7 +2405,7 @@ class Bot:
         resumo = ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens'])
         demo = bool(self.ctx.armazem.get('cfg:demo_rapido'))
         rec = self.ctx.recorrencias.criar(
-            self.wa, {'id': None, 'resumo': resumo, 'loja': car.get('loja'), 'total': car.get('subtotal'),
+            self.wa, {'id': None, 'resumo': resumo, 'loja': car.get('loja'), 'subtotal': car.get('subtotal'),
                       'loja_id': car.get('loja_id'), 'itens': linhas},
             modelo['dias'], hora=modelo.get('hora'), ciclo=DEMO_SEGUNDOS if demo else None)
         u.update(carrinho=None, fila=[], agendar_hora=None)
@@ -2422,7 +2426,8 @@ class Bot:
             if not self.garantir_endereco({'acao': 'botao', 'botao': f'lem:pedir:{rid}'}):
                 return
             self.ctx.recorrencias.respondido(self.wa, rid)
-            self._direto = {'teto': rec.get('total')}  # o "sim" aqui é a confirmação do pedido
+            campo, teto = preco_da_ultima_vez(rec)
+            self._direto = {'campo': campo, 'teto': teto, 'rid': rid}  # o "sim" aqui é a confirmação do pedido
             self._refazer(rec.get('pedido_id'), rec.get('loja'), modelo=rec if rec.get('itens') else None)
         elif oque == 'parar':
             self.ctx.recorrencias.remover(self.wa, rid)
