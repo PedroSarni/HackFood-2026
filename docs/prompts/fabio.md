@@ -531,3 +531,12 @@ esquerda e pra baixo). Conferido no palco.
 
 **Resposta:** O balão do Maestro sobe mais que o dos agentes (84px em vez de 44px), porque o Maestro é maior e tem os
 pauzinhos por cima. Medido no navegador: o balão para 21px acima da ponta dos pauzinhos.
+
+## 2026-10-18 ~06h00 — animação em tempo real
+
+**Prompt:** "o agente processa as animacoes só dps de responder a msg, seria bom ele processar em tempo real"
+
+**Resposta:** O bot já gravava o diário a cada 0,3 s; o atraso era o servidor local do dash, que a cada evento novo listava
+o modal.Dict inteiro (medido: 11 a 15 s). Agora o bot mantém a chave `recentes` (últimos 120 eventos) e o servidor lê
+só ela (~1 s), com a varredura completa em segundo plano a cada minuto. O palco busca a cada 0,7 s e toca rajadas mais
+rápido. Deploy feito (09b35fd), 429 testes no back e 37 no front.
