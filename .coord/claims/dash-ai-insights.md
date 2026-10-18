@@ -2,7 +2,7 @@
 slug: dash-ai-insights
 owner: araujo.fabio@usp.br
 status: done
-started: 2026-10-18 06:10
+started: 2026-10-18 03:15
 ---
 
 ## O que
@@ -36,5 +36,5 @@ NÃO cobre: insights nas outras páginas, agendar/enviar insights pra alguém.
 - `src/painel/servidor.py` — `POST /api/insights` (cache 10 min), `chamar_analista()`, `_origem_local()`
 - `Frontend/Rascunho_Dash/insights.jsx` — `<InsightsFab />`, `pageSummary()`, `INSIGHT_PAGES`; estilos `.ai-*` em `styles.css`
 - Testes: `tests/test_analista.py`, `Frontend/Rascunho_Dash/tests/insights.test.jsx`
-- Deploy: 2026-10-18 ~06h30 (9626e97)
+- Deploy: 2026-10-18 ~03h40 (9626e97)
 

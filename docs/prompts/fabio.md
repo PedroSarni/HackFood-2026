@@ -449,7 +449,7 @@ imediata e ninguém testou agendar em loja fechada. Deploy feito e interruptor l
 **Resposta:** Tirei o aviso: com `--fechadas on`, a loja fechada aparece igual às abertas (só vem depois delas).
 Deploy feito.
 
-## 2026-10-18 ~05h20 — o bot parou de responder; pauzinhos do Maestro e MCP no palco
+## 2026-10-18 ~02h20 — o bot parou de responder; pauzinhos do Maestro e MCP no palco
 
 **Prompt:** "agora ta muito melhor, tirando o fato que ele parou de responder... voce fez alguma cagada aí, né?....
 outra coisa, adicione uma pequena animacao de pausinhos nas "maos" do maestro se mexendo enquanto ele "orquestra",
@@ -468,9 +468,10 @@ como eu quero ver mais dados sobre o mcp nessa tela, to sentindo muita falta dis
   iFood mostra o total, a % de erro e a última tool chamada. Entrou uma faixa "O que o Maestro mais pede ao iFood"
   que acende a tool da vez, e um 5º número no topo (pedidos ao iFood).
 - **Testes:** 37 do front passando. Sem deploy: só o dash mudou.
-- Errata: os horários "~02h" das entradas anteriores eram ~05h (o relógio de verdade).
+- Errata: os horários "~02h" das entradas anteriores estão certos (horário de Brasília). Os "~05h" e "~06h"
+  desta entrada e das seguintes estavam em UTC e foram corrigidos.
 
-## 2026-10-18 ~05h25 — tenho que pagar o WhatsApp? (e voltou)
+## 2026-10-18 ~02h25 — tenho que pagar o WhatsApp? (e voltou)
 
 **Prompts:** "pera, eu tenho que pagar o wpp agora?", "pq?", "qual o link", "veja se tudo voltou ao normal",
 "mandei agora, e ele n respondeu", "ata foi"
@@ -508,7 +509,7 @@ zerado por `modo.py --zerar`, webhook conferido; ~20 s, testado) e a skill `.cla
 com o contexto do hackathon, o porquê e os limites. O filtro de segurança do agente barrou a 1ª versão
 (mandava rodar sem confirmar) e o commit da skill: ela ficou no disco pro Fabio commitar.
 
-## 2026-10-18 ~05h40 — foto do Tungs
+## 2026-10-18 ~02h50 — foto do Tungs
 
 **Prompt:** "mude a foto do agente tungs para: [imagem do boneco de madeira com taco, Scawy_tung_tung.webp]"
 
@@ -516,21 +517,21 @@ com o contexto do hackathon, o porquê e os limites. O filtro de segurança do a
 fica o emoji). O Tungs usa `tutor.webp`, com zoom no rosto pra caber no círculo do palco, dos cards e da ficha. Sem
 deploy: só o dash muda.
 
-## 2026-10-18 ~05h45 — centralizar o Tungs
+## 2026-10-18 ~02h53 — centralizar o Tungs
 
 **Prompt:** "centralize ele mais pra esquerda caralho"
 
 **Resposta:** O enquadramento da foto passou a levar o rosto pro centro do círculo (zoom de 2,3x deslocado pra
 esquerda e pra baixo). Conferido no palco.
 
-## 2026-10-18 ~05h50 — balão em cima dos pauzinhos
+## 2026-10-18 ~02h56 — balão em cima dos pauzinhos
 
 **Prompt:** "[print do balão \"Maestro Respondeu (botões)\" cobrindo os pauzinhos] o texto esta em cima dos bastoes de maestro arrume isso"
 
 **Resposta:** O balão do Maestro sobe mais que o dos agentes (84px em vez de 44px), porque o Maestro é maior e tem os
 pauzinhos por cima. Medido no navegador: o balão para 21px acima da ponta dos pauzinhos.
 
-## 2026-10-18 ~06h00 — animação em tempo real
+## 2026-10-18 ~03h00 — animação em tempo real
 
 **Prompt:** "o agente processa as animacoes só dps de responder a msg, seria bom ele processar em tempo real"
 
@@ -539,7 +540,7 @@ o modal.Dict inteiro (medido: 11 a 15 s). Agora o bot mantém a chave `recentes`
 só ela (~1 s), com a varredura completa em segundo plano a cada minuto. O palco busca a cada 0,7 s e toca rajadas mais
 rápido. Deploy feito (09b35fd), 429 testes no back e 37 no front.
 
-## 2026-10-18 ~06h10 — botão de IA com varredura de arco-íris e insights por time
+## 2026-10-18 ~03h15 — botão de IA com varredura de arco-íris e insights por time
 
 **Prompt:** "blz, vou tratar de uma featura um pouco trabalhosa [...] adicione um botao flutuante ao canto inferior
 direito das páginas: conversao, clientes e mercado, com o icone de i.a que quando eu clique faça uma animação de como
