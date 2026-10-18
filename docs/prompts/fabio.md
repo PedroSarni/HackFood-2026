@@ -372,3 +372,12 @@ número está em TIER_250) e um servidor de voz WebRTC/SIP, que não cabe no Mod
 Banimento não vem de usar a API oficial, vem de bloqueio e denúncia de usuário; o risco real é mexer nas
 configurações do número emprestado do handwrite. Mock desligado (`scripts/modo.py --mock off`, sem deploy): o bot
 volta ao MCP real do iFood na próxima mensagem. Disjuntor liberado; o "tempo rápido" segue LIGADO.
+
+## 2026-10-18 ~01h55 — gambiarra pra ligação
+
+**Prompt:** "n tem nem um jeito de gambiarra?"
+
+**Resposta:** Pela ligação do WhatsApp não tem: lib não oficial (Baileys etc.) é proibida e é o que dá ban.
+Opções sem tocar no número: (1) link no WhatsApp que abre página com agente de voz no navegador (ElevenLabs
+Agents, que já temos a conta), e (2) número de telefone comum (Twilio) atendido pelo mesmo agente. As duas
+chamam o nosso back no Modal pra usar o MCP. Nada implementado, esperando o Fabio escolher.
