@@ -7,6 +7,7 @@ o mesmo fluxo e as mesmas telas (dados falsos). Desliga quando o iFood voltar.
     .venv/Scripts/python.exe -m modal run scripts/modo.py --mock off
     .venv/Scripts/python.exe -m modal run scripts/modo.py --rapido on   (recorrência vence em 1 min)
     .venv/Scripts/python.exe -m modal run scripts/modo.py --fechadas on (busca mostra loja fechada, pra testar de madrugada)
+    .venv/Scripts/python.exe -m modal run scripts/modo.py --zerar    (zera o disjuntor do 403 do iFood)
     .venv/Scripts/python.exe -m modal run scripts/modo.py            (só mostra como está)
 """
 import time
@@ -17,12 +18,14 @@ app = modal.App('modo-tmp')
 
 
 @app.local_entrypoint()
-def main(mock: str = '', rapido: str = '', fechadas: str = ''):
+def main(mock: str = '', rapido: str = '', fechadas: str = '', zerar: bool = False):
     estado = modal.Dict.from_name('hackfood-estado')
     if mock in ('on', 'off'):
         estado['cfg:mock'] = mock == 'on'
     if rapido in ('on', 'off'):
         estado['cfg:demo_rapido'] = rapido == 'on'
+    if zerar:  # o container novo já nasce com o freio local zerado; o armazém é o que os outros leem
+        estado['ifood_bloqueado_ate'] = 0
     if fechadas in ('on', 'off'):
         estado['cfg:fechadas'] = fechadas == 'on'
     print(f'lojas fechadas na busca: {"APARECEM" if estado.get("cfg:fechadas") else "escondidas"}')

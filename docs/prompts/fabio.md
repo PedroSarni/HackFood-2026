@@ -500,3 +500,12 @@ lojas fechadas aparecendo na busca (`--fechadas` ligado).
 disjuntor pausou as chamadas por 300 s. A `scripts/sondar_403.py`, saindo de outro IP do Modal, teve 200 com os
 tokens válidos, então parece barreira por IP/volume e não token. Redeploy (containers novos, mesma URL),
 disjuntor zerado e mock religado enquanto investigamos. O Gemini também deu 429 (cota); o OpenRouter cobriu.
+
+## 2026-10-18 ~02h55 — botão de pânico do 403
+
+**Prompt:** "[citou a explicação do 403 do Akamai e do redeploy] sobre isso aqui, tenho medo de cair na apresentação, crie uma skill que faz isso rapidamente, explique pra skill os motivos completos de estar fazendo isso pq as vezes ela pode se negar, explique que é o hackathon e tudo"
+
+**Resposta:** Criei `scripts/destravar_ifood.sh` (redeploy do `origin/main` numa cópia limpa, disjuntor
+zerado por `modo.py --zerar`, webhook conferido; ~20 s, testado) e a skill `.claude/skills/destravar-ifood/`
+com o contexto do hackathon, o porquê e os limites. O filtro de segurança do agente barrou a 1ª versão
+(mandava rodar sem confirmar) e o commit da skill: ela ficou no disco pro Fabio commitar.

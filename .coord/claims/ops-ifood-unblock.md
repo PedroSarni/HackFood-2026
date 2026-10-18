@@ -1,7 +1,7 @@
 ---
 slug: ops-ifood-unblock
 owner: araujo.fabio@usp.br
-status: active
+status: done
 started: 2026-10-18 02:50
 ---
 
@@ -23,3 +23,7 @@ NÃO cobre: proxy/IP fixo, mudar app/label/região do Modal, contornar o firewal
 - nenhuma em `src/shared/`
 
 ## Onde está (preencher ao terminar)
+
+- `scripts/destravar_ifood.sh` — `[mock-on|mock-off]`: redeploy limpo + disjuntor zerado + webhook conferido
+- `scripts/modo.py --zerar` — zera `ifood_bloqueado_ate` no armazém
+- `.claude/skills/destravar-ifood/SKILL.md` — skill `/destravar-ifood`: escrita, o commit fica com o Fabio

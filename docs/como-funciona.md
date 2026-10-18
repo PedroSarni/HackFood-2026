@@ -391,6 +391,9 @@ o bot cutuca uma vez ("Ainda está por aí?" + a pergunta da etapa); aos 5 min (
 - **Lojas fechadas na busca** (pros testes de madrugada): `scripts/modo.py --fechadas on|off`, sem deploy.
   A busca para de mandar `onlyOpen` e a loja fechada aparece depois das abertas, como se estivesse
   aberta (sem aviso no card: é só teste). Fechar o pedido nela ainda depende do iFood: se ele recusar, o bot oferece outra loja.
+- **Botão de pânico do 403** (Akamai do iFood barrou o container): `bash scripts/destravar_ifood.sh`.
+  Redeploy do `origin/main` numa cópia limpa (containers novos, mesma URL), disjuntor zerado e webhook
+  conferido, em ~20 s. `mock-off` no fim já volta pro iFood real; `mock-on` é o plano B se o 403 voltar.
 - **Modo demo**: ligar com `IFOOD_MOCK=1` no secret `hackathon-ifood`. O iFood vira o mock e o
   login é simulado. Útil pra demonstrar sem depender de uma conta iFood.
 
