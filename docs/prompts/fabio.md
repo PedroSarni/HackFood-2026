@@ -214,3 +214,14 @@ com o Gemini de verdade nas duas frases. O mock ganhou uma cafeteria.
 **Prompt:** esse gemini ta estourando muito, cadastre como quebra galho pro debug algum modelo openrouter, tenho ele logado no meu pc aqui
 
 **Resposta:** `src/shared/llm.py`: se a fila do Gemini falhar, tenta o OpenRouter (`google/gemini-3.5-flash-lite` e depois `anthropic/claude-haiku-5.5`), com o mesmo esquema JSON; `BOT_LLM=openrouter` pula o Gemini pra debug. Secret novo `hackathon-openrouter` criado com PREENCHER (desligado). A chave do PC não foi lida (o classificador barrou ler o .env da pasta sensível): falta o Fabio passar a chave ou cadastrar no secret.
+
+## 2026-10-17 ~22h35 — o bot viciado em falar de automático
+
+**Prompt:** "o robo ta viciado em falar sobre a recorrencia o tempo todo"
+
+**Resposta:** O diário do bot (mensagens reais dos últimos 90 min) mostrou de onde vinha: a oferta pós-pedido
+disparava em TODA compra depois da 2ª (sempre dizendo "segunda vez"), o "Não precisa" não era lembrado, e o
+modo demo trouxe em 1 minuto o lembrete de um automático criado pelo bug antigo do X-Salada. O Gemini não
+puxava o assunto: nenhuma dessas mensagens veio dele. Agora a oferta sai só na 2ª compra, "Não precisa"
+segura a oferta por uma semana e o texto ficou curto. De carona, com o Gemini fora: "cancelar o pedido"
+cancela (antes virava busca) e "quero jantar pizza hj" busca pizza no restaurante.
