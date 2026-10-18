@@ -236,14 +236,26 @@ class LlmFake:
         self.chamadas = 0
         self.falhar = False
         self.resposta = None   # força uma resposta específica
+        self.foto = None       # o que a "foto" mostra (src/bot/foto.py); None = um X-Bacon
+        self.kit = None        # composição forçada do kit (src/bot/grupo.py); None = regra simples do fake
+        self.prompts = []      # (sistema, texto) de cada chamada, pros testes conferirem
 
     def __call__(self, sistema, partes, esquema, **kw):
         from src.shared.llm import ErroLLM
         self.chamadas += 1
         if self.falhar:
             raise ErroLLM('fake fora do ar')
+        self.prompts.append((sistema, ' '.join(p[1] for p in partes if p[0] == 'texto')))
         if self.resposta is not None:
             return self.resposta, 'fake', 0.01
+        if 'parecidos' in esquema['properties']:  # a foto (src/bot/foto.py)
+            return self.foto or {
+                'tipo': 'comida', 'descricao': 'hambúrguer com bacon', 'itens': [], 'ja_pediu': False,
+                'parecidos': [{'termo': 'x-bacon', 'busca': 'x-bacon', 'tipo_loja': 'RESTAURANTE'},
+                              {'termo': 'hambúrguer', 'busca': 'hamburguer', 'tipo_loja': 'RESTAURANTE'}],
+                'resposta': '[fala] Que delícia, hambúrguer com bacon! 😋'}, 'fake', 0.01
+        if 'explicacao' in esquema['properties']:  # o kit em grupo (src/bot/grupo.py)
+            return (self.kit if self.kit is not None else _kit_fake(partes[0][1])), 'fake', 0.01
         if 'manter' in esquema['properties']:  # filtro de relevância: mantém tudo, na ordem
             n = sum(1 for linha in partes[0][1].split('\n') if linha[:1].isdigit())
             return {'manter': list(range(n))}, 'fake', 0.01
@@ -260,6 +272,9 @@ class LlmFake:
                 itens.append({'termo': termo, 'tipo_loja': loja, 'quantidade': None, 'observacao': None})
         if 'mais opcoes' in texto or 'outras' in texto:
             return {'acao': 'mais_opcoes'}, 'fake', 0.01
+        grupo = _grupo_fake(texto, partes[0][1])
+        if grupo:
+            return grupo, 'fake', 0.01
         if 'piada' in texto or 'presidente' in texto:
             return {'acao': 'fora_do_escopo', 'resposta': '[fala] Haha 😄 piada eu não sei, mas pedido eu faço!'}, 'fake', 0.01
         if 'ta ai' in texto:
@@ -272,6 +287,46 @@ class LlmFake:
         if itens:
             return {'acao': 'comprar', 'itens': itens}, 'fake', 0.01
         return {'acao': 'nao_entendi'}, 'fake', 0.01
+
+
+def _grupo_fake(texto, contexto):
+    """'lanchar em 5 pessoas hamburguer', 'vamos dividir em 3', 'sem refri' com o kit na tela."""
+    import re
+    no_kit = 'Etapa atual da conversa: kit' in contexto
+    n = re.search(r'\b(?:em|pra|somos|para) (\d+)\b|\b(\d+) pessoas', texto)
+    numero = int(n.group(1) or n.group(2)) if n else None
+    if no_kit and ('sem refri' in texto or 'barato' in texto or numero):
+        return {'acao': 'grupo', 'numero': numero, 'texto': None if numero else texto, 'itens': []}
+    if not any(k in texto for k in ('pessoas', 'dividir', 'galera', 'rachar')):
+        return None
+    itens = []
+    for chave, termo in (('hamburguer', 'hambúrguer'), ('pizza', 'pizza'), ('esfiha', 'esfiha'), ('sushi', 'sushi')):
+        if chave in texto:
+            itens.append({'termo': termo, 'busca': termo, 'tipo_loja': 'RESTAURANTE', 'quantidade': None,
+                          'observacao': None})
+    if 'coca' in texto:
+        itens.append({'termo': 'coca-cola', 'busca': 'coca-cola', 'tipo_loja': 'RESTAURANTE', 'quantidade': None,
+                      'observacao': None})
+    return {'acao': 'grupo', 'numero': numero, 'itens': itens}
+
+
+def _kit_fake(prompt):
+    """1 principal por pessoa (2 sabores), refri de 2 litros pra cada 4 e batata pra cada 3; respeita 'sem refri'."""
+    import math
+    import re
+    pessoas = int(re.search(r'Pessoas: (\d+)', prompt).group(1))
+    linhas = re.findall(r'^(\d+)\. \[(\w+)\] (.+?) — R\$', prompt, re.M)
+    princ = [int(n) for n, papel, _ in linhas if papel == 'principal'][:2]
+    itens = [{'n': princ[0], 'qtd': pessoas - pessoas // 2}] + ([{'n': princ[1], 'qtd': pessoas // 2}] if len(princ) > 1 and pessoas > 1 else [])
+    if 'sem refri' not in prompt:
+        litros = [int(n) for n, papel, nome in linhas if papel == 'bebida' and '2 litros' in nome]
+        if litros:
+            itens.append({'n': litros[0], 'qtd': math.ceil(pessoas / 4)})
+    batata = [int(n) for n, papel, nome in linhas if papel == 'acompanha' and 'Batata' in nome]
+    if batata:
+        itens.append({'n': batata[0], 'qtd': math.ceil(pessoas / 3)})
+    itens += [{'n': int(n), 'qtd': 1} for n, papel, _ in linhas if papel == 'pedido'][:1]
+    return {'itens': itens, 'explicacao': '[kit] 1 lanche pra cada e refri pra galera 😋'}
 
 
 class Mundo:
@@ -304,7 +359,8 @@ class Mundo:
             self.Bot(self.ctx).logou(self.wa)
 
     def enviar(self, *msgs):
-        """Cada msg: str (texto), ('botao', id), ('audio', media_id), ('foto', media_id, legenda)."""
+        """Cada msg: str (texto), ('botao', id), ('audio', media_id), ('foto', media_id, legenda),
+        ('documento', media_id, mime)."""
         brutas = []
         for i, m in enumerate(msgs):
             base = {'from': self.wa, 'id': f'wamid.{len(brutas)}{i}', 'timestamp': str(1_800_000_000 + i)}
@@ -318,6 +374,8 @@ class Mundo:
             elif m[0] == 'foto':
                 base.update({'type': 'image', 'image': {'id': m[1], 'mime_type': 'image/jpeg',
                                                         'caption': m[2] if len(m) > 2 else ''}})
+            elif m[0] == 'documento':
+                base.update({'type': 'document', 'document': {'id': m[1], 'mime_type': m[2], 'filename': 'x'}})
             brutas.append(base)
         self.Bot(self.ctx).processar(self.wa, brutas)
         return self.wpp.saida

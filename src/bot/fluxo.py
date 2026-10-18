@@ -15,6 +15,8 @@ import re
 import time
 import traceback
 
+from src.bot import foto as leitor_foto
+from src.bot import grupo as kit_grupo
 from src.bot import ranking, relevancia, tutor, voz
 from src.bot import textos as T
 from src.bot.combina import complementos
@@ -38,11 +40,12 @@ PEDIDOS_GUARDADOS = 10
 TRIVIAIS = {'saudacao', 'agradecer', 'sim'}
 # etapas em que um "oi" no meio não deve jogar o pedido fora: reapresenta a pergunta
 NO_MEIO_DO_PEDIDO = {'escolhendo', 'quantidade', 'opcao', 'mais', 'tirar', 'pagamento', 'cpf', 'confirmar',
-                     'mudar', 'endereco', 'endereco_escolha', 'endereco_lista', 'complemento', 'bairro'}
+                     'mudar', 'endereco', 'endereco_escolha', 'endereco_lista', 'complemento', 'bairro',
+                     'foto', 'kit', 'grupo_pessoas'}
 # sumiu mais que isso no meio de uma pergunta aberta: o "oi" da volta não é resposta daquela etapa
 IDLE_MAX = 1800
 FASES_QUE_EXPIRAM = {'endereco', 'complemento', 'bairro', 'cpf', 'endereco_escolha', 'quantidade', 'opcao',
-                     'tirar', 'mudar'}
+                     'tirar', 'mudar', 'foto', 'kit', 'grupo_pessoas', 'grupo_tema'}
 VOLTOU = 'Faz um tempinho que você sumiu, recomeçamos? 🙂'
 # calou no meio de uma pergunta aberta: depois disso o bot cutuca uma vez (src/app.py dispara)
 FOLLOWUP_SEG = 180
@@ -88,6 +91,10 @@ def entradas_de(msgs):
         elif tipo == 'image':
             i = m.get('image') or {}
             saida.append(Entrada('imagem', i.get('caption', ''), mime=i.get('mime_type'), media_id=i.get('id')))
+        elif tipo == 'document' and str((m.get('document') or {}).get('mime_type') or '').startswith(
+                ('image/', 'application/pdf')):
+            d = m['document']  # foto mandada "como documento" (sem compressão) ou lista em PDF: é foto também
+            saida.append(Entrada('imagem', d.get('caption', ''), mime=d.get('mime_type'), media_id=d.get('id')))
         elif tipo == 'location':
             loc = m.get('location') or {}
             txt = ', '.join(x for x in (loc.get('name'), loc.get('address')) if x)
@@ -472,6 +479,7 @@ class Bot:
             'lem': self.responder_lembrete, 'pular': self.pular_item, 'reped': self.repetir_pedido,
             'apagar_sim': self.apagar, 'apagar_nao': self.menu, 'login': self.reenviar_login,
             'tentar': self.tentar_de_novo, 'sugerir': self.sugerir, 'nada': lambda _a=None: None,
+            'foto': self.responder_foto, 'kit': self.responder_kit, 'grupo_n': self.grupo_pessoas,
         }
         fn = rotas.get(acao)
         if not fn:
@@ -489,9 +497,10 @@ class Bot:
             entradas = [self._ouvir(e) for e in entradas]
         textos = [e.texto for e in entradas if e.tipo in ('texto', 'localizacao') and e.texto]
         texto = '\n'.join(textos).strip()
+        fotos = [e for e in entradas if e.tipo == 'imagem']
         if texto and fase != 'cpf':  # "me responde por áudio" / "pode escrever"
             texto, acabou = self._pedido_de_voz(texto)
-            if acabou:
+            if acabou and not fotos:
                 return
         midias = [e for e in entradas if e.tipo in ('audio', 'imagem')]
         if not texto and not midias:
@@ -499,13 +508,19 @@ class Bot:
             return
 
         if fase == 'cpf':  # CPF nunca vai pra IA
+            # sem nenhum número não tem CPF ali: é outro assunto ("cancelar", "tira a coca"), que segue o fluxo
+            if texto and (re.search(r'\d', texto) or normalizar(texto) in SEM_CPF):
+                self.receber_cpf(texto)
+                return
+            if fotos:  # foto nessa hora pode ser o documento: nem abre, nem manda pra IA
+                self.dizer(T.FOTO_NO_CPF)
+                return
             if midias and not texto:
                 self.dizer('Por segurança, escreva o CPF com os números, por favor. 🙂')
                 return
-            # sem nenhum número não tem CPF ali: é outro assunto ("cancelar", "tira a coca"), que segue o fluxo
-            if re.search(r'\d', texto) or normalizar(texto) in SEM_CPF:
-                self.receber_cpf(texto)
-                return
+        elif fotos:  # foto em qualquer etapa é pedido: comida, lista de compras ou produto
+            self.receber_fotos(fotos, texto, outras=[e for e in midias if e.tipo != 'imagem'])
+            return
         if not midias:
             if fase in ('complemento', 'bairro'):
                 r = regra_rapida(texto)
@@ -580,7 +595,10 @@ class Bot:
             # sem Gemini, texto curto ainda vira busca ("pão", "leite integral"), sem o "quero ... hj" em
             # volta; frase não: "algo que complete esse valor" ia pra busca do iFood ao pé da letra
             termo = ' '.join(w for w in texto.split() if normalizar(w) not in ENCHIMENTO)
-            if termo and fase in ('inicio', 'pedido', 'escolhendo', 'mais', None) and len(termo.split()) <= 4:
+            tema = kit_grupo.tema_em(texto) if texto else None
+            if tema and fase != 'kit' and kit_grupo.parece_grupo(texto):  # "pizza pra 4 dividindo" sem Gemini
+                intent = {'acao': 'grupo', 'numero': kit_grupo.pessoas_em(texto), 'itens': [tema]}
+            elif termo and fase in ('inicio', 'pedido', 'escolhendo', 'mais', 'grupo_tema', None) and len(termo.split()) <= 4:
                 loja = 'RESTAURANTE' if categoria(termo) in DE_RESTAURANTE else 'MERCADO'
                 intent = {'acao': 'comprar', 'itens': [{'termo': termo[:60], 'quantidade': None,
                                                         'tipo_loja': loja, 'observacao': None}]}
@@ -630,6 +648,8 @@ class Bot:
             n = it.get('numero')
             if fase == 'quantidade' and n:
                 self.definir_qtd(str(n))
+            elif fase == 'grupo_pessoas' and n:  # "6" é 6 pessoas, não o 6º botão
+                self.grupo_pessoas(n)
             elif n and fase == 'escolhendo':
                 visiveis = self._visiveis()
                 if 1 <= n <= len(visiveis):
@@ -651,6 +671,10 @@ class Bot:
                 self.reenviar_login()
             elif fase == 'recorrencia':
                 self.definir_recorrencia('7')
+            elif fase == 'foto':
+                self.foto_sim()
+            elif fase == 'kit':
+                self.kit_ok()
             elif botoes and fase in ('endereco_lista', 'repetir_lista'):
                 self.botao(botoes[0][0])
             else:
@@ -664,12 +688,20 @@ class Bot:
                 self.sem_complemento()
             elif fase == 'recorrencia':
                 self.definir_recorrencia('0')
+            elif fase in ('foto', 'kit'):
+                self.botao(f'{fase}:nao')
             elif fase == 'apagar':
                 self.menu()
             else:
                 self.menu('Tudo bem! 🙂')
         elif a == 'comprar':
-            self.iniciar_compra(it.get('itens') or [])
+            if fase in ('grupo_tema', 'grupo_pessoas', 'kit') and it.get('itens'):
+                # "pizza" quando o bot perguntou o que o grupo quer comer; "coca" com o kit na tela
+                self.grupo({'acao': 'grupo', 'itens': it['itens']})
+            else:
+                self.iniciar_compra(it.get('itens') or [])
+        elif a == 'grupo':
+            self.grupo(it)
         elif a == 'sugerir':
             self.sugerir(itens=it.get('itens'))
         elif a == 'mais_opcoes':
@@ -962,7 +994,7 @@ class Bot:
             return texto
         self._resposta = it.get('resposta')
         a = it.get('acao')
-        if a in ('comprar', 'sugerir'):
+        if a in ('comprar', 'sugerir', 'grupo'):
             self.u['pendente'] = it  # o pedido novo substitui o que esperava o endereço
             self._voltar_pra_etapa(T.anotei(it.get('itens') or []))
             return None
@@ -1145,19 +1177,7 @@ class Bot:
         u = self.u
         car = u.get('carrinho') or {}
         loja_id = car.get('loja_id') if car.get('itens') else None
-        # 1º o que a pessoa quer: busca desambiguada pelo Gemini ("cebola in natura", não "cebola"),
-        # depois o filtro tira o que não é o produto (a busca do iFood casa com nome de loja e sabor);
-        # só então a ordem do ranking. Se a busca precisa não achar nada, tenta o termo puro.
-        ofertas, proxima = [], None
-        for consulta in dict.fromkeys(x for x in (pedido.get('busca'), pedido['termo']) if x):
-            achadas, proxima = self.ctx.ifood(self.wa).buscar(
-                consulta, u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
-            ofertas = ranking.ordenar(relevancia.filtrar(self.ctx.llm, achadas, pedido), pedido)
-            if pedido.get('sugestao'):
-                ofertas = _sugeridas(ofertas, pedido['sugestao'])
-            if ofertas:
-                pedido['consulta_usada'] = consulta
-                break
+        ofertas, proxima = self._coletar(pedido, loja_id)
         u['atual'] = pedido
         if not ofertas:
             if pedido.get('sugestao'):
@@ -1166,9 +1186,32 @@ class Bot:
             self.perguntar(T.nao_achei(pedido['termo'], car.get('loja') if loja_id else None), botoes,
                            fase='pedido')
             return False
+        self._mostrar_lista(pedido, ofertas, proxima, loja_id, antes=antes)
+        return True
+
+    def _coletar(self, pedido, loja_id):
+        """As ofertas de um pedido, já filtradas e na ordem. Devolve (ofertas, token da próxima página)."""
+        # 1º o que a pessoa quer: busca desambiguada pelo Gemini ("cebola in natura", não "cebola"),
+        # depois o filtro tira o que não é o produto (a busca do iFood casa com nome de loja e sabor);
+        # só então a ordem do ranking. Se a busca precisa não achar nada, tenta o termo puro.
+        ofertas, proxima = [], None
+        for consulta in dict.fromkeys(x for x in (pedido.get('busca'), pedido['termo']) if x):
+            achadas, proxima = self.ctx.ifood(self.wa).buscar(
+                consulta, self.u['endereco'], pedido.get('tipo_loja') or 'MERCADO', loja_id=loja_id)
+            ofertas = ranking.ordenar(relevancia.filtrar(self.ctx.llm, achadas, pedido), pedido)
+            if pedido.get('sugestao'):
+                ofertas = _sugeridas(ofertas, pedido['sugestao'])
+            if ofertas:
+                pedido['consulta_usada'] = consulta
+                break
+        return ofertas, proxima
+
+    def _mostrar_lista(self, pedido, ofertas, proxima, loja_id, antes=None, termo=None):
+        """Guarda a lista (o "Mais opções" reaproveita) e mostra a 1ª página."""
+        u = self.u
         u['contador'] = int(u.get('contador') or 0) + 1
         lid = f'L{u["contador"]}'
-        u['listas'][lid] = {'termo': pedido['termo'], 'ofertas': ofertas, 'pos': 0, 'proxima': proxima,
+        u['listas'][lid] = {'termo': termo or pedido['termo'], 'ofertas': ofertas, 'pos': 0, 'proxima': proxima,
                             'loja_id': loja_id, 'tipo_loja': pedido.get('tipo_loja'), 'pedido': pedido}
         for velha in sorted(u['listas'], key=lambda k: int(k[1:]))[:-LISTAS_GUARDADAS]:
             u['listas'].pop(velha, None)
@@ -1176,7 +1219,6 @@ class Bot:
         if antes:
             self.dizer(antes)
         self.mostrar_pagina(lid)
-        return True
 
     def mostrar_pagina(self, lid):
         u = self.u
@@ -1381,7 +1423,7 @@ class Bot:
         if not car.get('itens'):
             self.perguntar_pedido()
             return
-        self.perguntar(T.mais_alguma(car.get('total') or car.get('subtotal')),
+        self.perguntar(T.mais_alguma(car.get('total') or car.get('subtotal'), self._pessoas()),
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
 
     def mostrar_carrinho(self):
@@ -1390,7 +1432,7 @@ class Bot:
             self.perguntar(T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             return
         linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car['itens'])
-        self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"))}',
+        self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"), self._pessoas())}',
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
 
     def perguntar_tirar(self, _arg=None):
@@ -1416,13 +1458,13 @@ class Bot:
         api = self.ctx.ifood(self.wa)
         if len(car['itens']) == 1:
             # carrinho vazio dá erro no submitOrder: esquece o carrinho em vez de esvaziar
-            u['carrinho'] = None
+            u['carrinho'] = u['grupo'] = None
             self.dizer(f'🗑️ Tirei *{it["nome"]}*. Seu pedido ficou vazio.')
             self.perguntar_pedido()
             return
         novo = api.remover(car['id'], it['cart_item_id'])
         if not novo or not novo.get('itens'):
-            u['carrinho'] = None
+            u['carrinho'] = u['grupo'] = None
             self.dizer(f'🗑️ Tirei *{it["nome"]}*. Seu pedido ficou vazio.')
             self.perguntar_pedido()
             return
@@ -1590,7 +1632,8 @@ class Bot:
             if 'NOT_FOUND' in str(e.codigo):
                 raise
             print(f'getCart antes do resumo falhou: {e!r}')
-        texto = T.resumo(car, u.get('endereco'), car.get('entrega'), car.get('pagamento'), car.get('cupom'))
+        texto = T.resumo(car, u.get('endereco'), car.get('entrega'), car.get('pagamento'), car.get('cupom'),
+                         pessoas=self._pessoas())
         direto, self._direto = self._direto, None
         if direto is not None:
             # a pessoa já disse "sim" no lembrete vendo valor, endereço e pagamento: fecha na hora,
@@ -1631,7 +1674,9 @@ class Bot:
                           'loja': car.get('loja'), 'loja_id': car.get('loja_id'),
                           'resumo': ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens'])[:300],
                           'total': car.get('total')}] + (u.get('pedidos') or []))[:PEDIDOS_GUARDADOS]
+        pessoas = self._pessoas()
         u['carrinho'] = None
+        u['grupo'] = None
         u['fila'] = []
         u['escolha'] = None
         detalhes = {}
@@ -1645,7 +1690,8 @@ class Bot:
                     self.ctx.dormir(1.5)
         u['pedidos'][0]['codigo'] = detalhes.get('codigo')
         self.dizer(T.pedido_feito(detalhes.get('codigo'), (car.get('entrega') or {}).get('tempo'),
-                                  detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo')))
+                                  detalhes.get('codigo_entrega'), (car.get('pagamento') or {}).get('tipo'),
+                                  total=car.get('total'), pessoas=pessoas))
         self._voz_acaba = True  # pedido feito = fim da sessão: esta resposta ainda vai em áudio, a próxima não
         self.ctx.iniciar_rastreio(self.wa, feito['id'])
         # lembrete só quando a compra se repete (item ou categoria, de qualquer loja) ou quando a pessoa
@@ -1732,7 +1778,8 @@ class Bot:
     def cancelar(self, _arg=None):
         u = self.u
         tinha = bool((u.get('carrinho') or {}).get('itens'))
-        u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None})
+        u.update({'carrinho': None, 'fila': [], 'escolha': None, 'atual': None, 'pendente': None, 'grupo': None,
+                  'kit': None, 'grupo_pendente': None, 'foto': None})
         self.menu(T.CANCELADO if tinha else 'Tudo bem! 🙂')
 
     # ================================================================== depois do pedido
@@ -1795,6 +1842,7 @@ class Bot:
         car['loja'] = car.get('loja') or loja
         self.u['carrinho'] = car
         self.u['fila'] = []
+        self.u['grupo'] = None
         linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car.get('itens') or [])
         self.dizer(f'🔁 Montei igual da outra vez:\n{linhas}')
         self.finalizar()
@@ -1896,6 +1944,302 @@ class Bot:
         self.perguntar(T.lembrete(rec, self.u.get('endereco')), botoes_lembrete(rec), fase='lembrete')
         return True
 
+    # ================================================================== foto vira pedido
+
+    def receber_fotos(self, fotos, texto='', outras=()):
+        """Foto em qualquer etapa (até como 1ª mensagem) é pedido (src/bot/foto.py): comida pergunta se
+        quer algo parecido; lista de compras ou produto vira a lista do pedido; o resto é comentado e a
+        conversa volta pra onde estava. Legenda, texto e áudio da mesma rajada vão junto pro Gemini."""
+        u = self.u
+        arquivos = []
+        for e in list(fotos)[:leitor_foto.MAX_FOTOS] + list(outras)[:1]:
+            try:  # o áudio que o Scribe não entendeu já chega baixado
+                mime, dados = (e.mime, e.dados) if e.dados else self.ctx.baixar_midia(e.media_id)
+            except Exception as erro:  # noqa: BLE001
+                print(f'baixar foto falhou: {erro!r}')
+                continue
+            arquivos.append((_mime_aceito(e.mime or mime), dados))  # o tipo que a Meta declarou na mensagem vale
+        if not any(m.startswith(('image/', 'application/pdf')) for m, _ in arquivos):
+            self._voltar_com(T.FOTO_RUIM)
+            return
+        try:
+            lido = leitor_foto.ler(self.ctx.llm, u, arquivos, [texto] + [e.texto for e in fotos if e.texto])
+        except ErroLLM as erro:
+            print(f'LLM falhou lendo a foto: {erro!r}')
+            self._voltar_com(T.FOTO_RUIM)
+            return
+        tipo = lido['tipo']
+        # documento ou foto pessoal não vai pro log; o resto ajuda a entender o que o bot fez
+        print(f'foto {self.wa}: {tipo}' + (f' {lido["descricao"][:80]!r}' if tipo != 'outro' else ''))
+        self._disse = ' / '.join(x for x in (self._disse, f'[foto: {lido["descricao"]}]' if tipo != 'outro' else '[foto]')
+                                 if x)[:300]
+        if tipo in ('lista', 'produto') or (tipo == 'outro' and lido['itens']):
+            itens = lido['itens']  # foto de outra coisa + "quero pão" escrito: o pão ainda é o pedido
+            if not itens:
+                self._voltar_com(T.FOTO_ILEGIVEL)
+                return
+            it = {'acao': 'comprar', 'itens': itens}
+            if u.get('fase') in ('endereco', 'complemento', 'bairro'):
+                u['pendente'] = it  # no meio do endereço a lista espera ele terminar, como um pedido escrito
+                self._voltar_pra_etapa(T.li_a_foto(itens))
+                return
+            if len(itens) == 1 or not self.logado():  # lista longa já vem com o "Anotei sua lista"
+                self.dizer(T.li_a_foto(itens))
+            self.intencao(it)
+            return
+        if tipo == 'comida' and lido['parecidos']:
+            u['contador'] = int(u.get('contador') or 0) + 1
+            u['foto'] = {'id': u['contador'], 'descricao': lido['descricao'], 'parecidos': lido['parecidos'],
+                         'quantidade': lido['quantidade'], 'quando': self.ctx.agora()}
+            escrito = ' '.join([texto] + [e.texto for e in fotos])
+            pessoas = lido['pessoas'] or kit_grupo.pessoas_em(escrito)  # o modelo às vezes não preenche
+            if (pessoas and pessoas > 1) or u.get('fase') == 'grupo_tema':  # "pizza dessas pra 5": é o kit
+                self.intencao({'acao': 'grupo', 'numero': pessoas, 'itens': lido['parecidos'][:1]})
+            elif lido['ja_pediu'] or QUER_ISSO.search(normalizar(escrito)):
+                # "quero isso", "me vê 2 desse": não pergunta o que ela já disse
+                self.foto_sim()
+            else:
+                fid = u['foto']['id']
+                self.perguntar(T.foto_parecido(lido['descricao'], lido['resposta']),
+                               [(f'{T.B_FOTO_SIM[0]}:{fid}', T.B_FOTO_SIM[1]), (f'{T.B_FOTO_NAO[0]}:{fid}', T.B_FOTO_NAO[1])],
+                               fase='foto')
+            return
+        self._voltar_com(T.foto_outro(lido['resposta']))
+
+    def _voltar_com(self, fala):
+        """Responde e volta pra onde a pessoa estava: etapa escrita (endereço, bairro), pergunta com
+        botões, ou o menu (sem login, o menu é o botão de entrar)."""
+        u = self.u
+        if u.get('fase') in ('endereco', 'bairro'):
+            self._voltar_pra_etapa(fala)
+        elif (u.get('pergunta') or {}).get('botoes') and u.get('fase') not in ('foto', None, 'inicio'):
+            self.repetir_pergunta(fala)
+        elif not self.logado():
+            self.dizer(fala)
+            self.pedir_login()
+        else:
+            self.menu(fala)
+
+    def responder_foto(self, arg):
+        oque, _, fid = str(arg).partition(':')
+        atual = (self.u.get('foto') or {}).get('id')
+        if fid and str(atual) != fid:  # "Sim" de uma foto antiga: não busca os parecidos da foto nova
+            self.repetir_pergunta(T.BOTAO_VELHO)
+            return
+        if oque == 'sim':
+            self.foto_sim()
+            return
+        self.u['foto'] = None
+        self.menu('Tudo bem! 🙂')
+
+    def foto_sim(self, _arg=None):
+        f = self.u.get('foto') or {}
+        if not f.get('parecidos'):
+            self.perguntar_pedido()
+            return
+        if not self.exigir_login(['botao', f'foto:sim:{f.get("id")}']):
+            return
+        if not self.garantir_endereco({'acao': 'botao', 'botao': f'foto:sim:{f.get("id")}'}):
+            return
+        self.buscar_parecidos(f)
+
+    def buscar_parecidos(self, f):
+        """Junta num carrossel só o que achar dos parecidos (do mais parecido pro mais genérico), no
+        máximo 3 buscas. Com pedido montado, só na loja dele (um pedido é de uma loja)."""
+        u = self.u
+        car = u.get('carrinho') or {}
+        loja_id = car.get('loja_id') if car.get('itens') else None
+        juntas, primeiro, proxima = [], None, None
+        for p in f['parecidos'][:3]:
+            pedido = {**p, 'quantidade': f.get('quantidade'), 'observacao': p.get('observacao')}
+            ofertas, prox = self._coletar(pedido, loja_id)
+            ja = {o['item_id'] for o in juntas}
+            novas = [o for o in ofertas if o['item_id'] not in ja]
+            if novas and primeiro is None:
+                primeiro, proxima = pedido, prox
+            juntas += novas
+            if len(juntas) >= 6:
+                break
+        if not juntas:
+            botoes = [T.B_FINALIZAR, T.B_INICIO] if car.get('itens') else [T.B_ESCREVER, T.B_INICIO]
+            self.perguntar(T.sem_parecido(f.get('descricao'), car.get('loja') if loja_id else None), botoes,
+                           fase='pedido')
+            return
+        u['atual'] = primeiro
+        self._mostrar_lista(primeiro, juntas, proxima, loja_id, antes=T.parecidos(f.get('descricao')),
+                            termo='opções parecidas')
+
+    # ================================================================== dividir com os amigos
+
+    def _pessoas(self):
+        """Quantas pessoas dividem o pedido montado (kit em grupo ou "vamos dividir em 3"); None se não divide."""
+        g = self.u.get('grupo') or {}
+        car = self.u.get('carrinho') or {}
+        if g.get('pessoas') and car.get('itens') and car.get('loja_id') == g.get('loja_id'):
+            return g['pessoas']
+        return None
+
+    def grupo(self, it):
+        """"Lanchar em 5 pessoas hambúrguer" (src/bot/grupo.py). Junta o que já foi dito antes (quantas
+        pessoas, o que comer) e pergunta só o que falta. Com o kit na tela, é ajuste do kit; sem comida
+        dita e com pedido montado, divide o pedido que já existe."""
+        u = self.u
+        itens = [i for i in it.get('itens') or [] if i.get('termo')]
+        pessoas = it.get('numero') if isinstance(it.get('numero'), int) and it['numero'] > 0 else None
+        ajuste = (it.get('texto') or '').strip()[:200] or None
+        kit = u.get('kit') if u.get('fase') == 'kit' else None
+        if not pessoas and not kit:  # o Gemini não preencheu: "eu e mais 3" pela regra (no ajuste do kit, não mudou)
+            pessoas = kit_grupo.pessoas_em(self._disse)
+        pend = u.get('grupo_pendente') or {}
+        if kit:  # ajuste do kit que está na tela
+            tema, extras, anterior = kit['tema'], list(kit.get('extras') or []), kit
+            if itens and kit_grupo.tema_em(itens[0]['termo']) and not _mesmo_termo(itens[0], tema):
+                tema, extras, anterior = itens[0], itens[1:], None  # "na verdade quero pizza": outro kit
+            else:
+                extras += [i for i in itens if not _mesmo_termo(i, tema)
+                           and not any(_mesmo_termo(i, e) for e in extras)]
+            self._montar_kit(pessoas or kit['pessoas'], tema, extras, ajuste or kit.get('ajuste'), anterior=anterior)
+            return
+        car = u.get('carrinho') or {}
+        if not itens and not car.get('itens'):
+            # o Gemini às vezes deixa a comida só no texto ("pizza com 4 amigos" -> itens vazio): a regra acha
+            dito = ' '.join(x for x in (it.get('texto'), self._disse) if x)
+            tema_dito = kit_grupo.tema_em(dito)
+            if tema_dito:
+                itens = [tema_dito] + kit_grupo.bebidas_em(dito)
+                if ajuste and normalizar(ajuste) in normalizar(self._disse):
+                    ajuste = None  # era a frase inteira, não uma restrição
+        if not itens and not pend.get('tema') and (pend.get('dividir') or (car.get('itens') and u.get('fase') != 'grupo_tema')):
+            self._dividir_pedido(pessoas)
+            return
+        tema = itens[0] if itens else pend.get('tema')
+        extras = itens[1:] if itens else list(pend.get('extras') or [])
+        pessoas = pessoas or pend.get('pessoas')
+        ajuste = ajuste or pend.get('ajuste')
+        if tema:
+            conhecido = kit_grupo.tema_em(tema['termo'])
+            if conhecido and tema.get('tipo_loja') != conhecido['tipo_loja']:
+                tema = {**tema, 'tipo_loja': conhecido['tipo_loja']}  # pizza pra galera é de restaurante
+        if not tema:
+            u['grupo_pendente'] = {'pessoas': pessoas, 'ajuste': ajuste}
+            self.perguntar(T.grupo_o_que(pessoas), [T.B_INICIO], fase='grupo_tema')
+            return
+        if not pessoas or pessoas > kit_grupo.MAX_PESSOAS:
+            u['grupo_pendente'] = {'tema': tema, 'extras': extras, 'ajuste': ajuste}
+            self.perguntar(T.GRUPO_DEMAIS if pessoas else T.GRUPO_QUANTAS, T.B_PESSOAS, fase='grupo_pessoas')
+            return
+        u['grupo_pendente'] = None
+        if pessoas == 1:  # "pra mim só": pedido normal
+            self.iniciar_compra([tema] + extras)
+            return
+        self._montar_kit(pessoas, tema, extras, ajuste)
+
+    def grupo_pessoas(self, arg):
+        n = arg if isinstance(arg, int) else (int(arg) if str(arg).isdigit() else numero_em(str(arg)))
+        if not n or n < 1:
+            self.perguntar(T.GRUPO_QUANTAS, T.B_PESSOAS, fase='grupo_pessoas')
+            return
+        self.grupo({'acao': 'grupo', 'numero': n})
+
+    def _dividir_pedido(self, pessoas):
+        """"Vamos dividir em 3": o pedido que já está montado ganha o "por pessoa" no total e no resumo."""
+        u = self.u
+        car = u.get('carrinho') or {}
+        if not car.get('itens'):
+            u['grupo_pendente'] = {'pessoas': pessoas}
+            self.perguntar(T.grupo_o_que(pessoas), [T.B_INICIO], fase='grupo_tema')
+            return
+        if not pessoas or pessoas > kit_grupo.MAX_PESSOAS:
+            u['grupo_pendente'] = {'dividir': True}
+            self.perguntar(T.GRUPO_DEMAIS if pessoas else T.GRUPO_QUANTAS, T.B_PESSOAS, fase='grupo_pessoas')
+            return
+        u['grupo_pendente'] = None
+        u['grupo'] = {'pessoas': pessoas, 'loja_id': car.get('loja_id')} if pessoas > 1 else None
+        self.mostrar_carrinho()
+
+    def _montar_kit(self, pessoas, tema, extras=(), ajuste=None, anterior=None, outra_loja=False):
+        u = self.u
+        it = {'acao': 'grupo', 'numero': pessoas, 'itens': [tema] + list(extras), 'texto': ajuste}
+        if not self.exigir_login(it):
+            return
+        if not self.garantir_endereco(it):
+            return
+        if not anterior:  # remontar é rápido; o 1º kit busca loja, cardápio e acompanhamentos
+            self.dizer(T.montando_kit(pessoas, tema['termo']))
+        kit, motivo = kit_grupo.montar(self.ctx.ifood(self.wa), self.ctx.llm, u['endereco'], pessoas, tema,
+                                       extras, ajuste, anterior=anterior, outra_loja=outra_loja)
+        if not kit:
+            if motivo == 'sem_loja' and anterior:
+                u['kit'] = {**anterior, 'tem_outra': False}
+                self._mostrar_kit(T.KIT_SEM_OUTRA_LOJA)
+                return
+            u['kit'] = None
+            u['grupo_pendente'] = {'pessoas': pessoas}
+            self.perguntar(T.kit_sem_principal(tema['termo']), [T.B_INICIO], fase='grupo_tema')
+            return
+        u['contador'] = int(u.get('contador') or 0) + 1
+        kit['id'] = u['contador']
+        u['kit'] = kit
+        self._mostrar_kit()
+
+    def _mostrar_kit(self, prefixo=None):
+        k = self.u['kit']
+        car = self.u.get('carrinho') or {}
+        troca = car.get('loja') if car.get('itens') and car.get('loja_id') != k['loja_id'] else None
+        botoes = [(f'{b[0]}:{k.get("id")}', b[1]) for b in
+                  [T.B_KIT_OK] + ([T.B_KIT_OUTRA] if k.get('tem_outra') else []) + [T.B_KIT_NAO]]
+        texto = T.kit(k, troca)
+        self.perguntar(f'{prefixo}\n\n{texto}' if prefixo else texto, botoes, fase='kit')
+
+    def responder_kit(self, arg):
+        k = self.u.get('kit')
+        arg, _, kid = str(arg).partition(':')
+        if kid and k and str(k.get('id')) != kid and arg != 'nao':
+            # "Quero esse kit" de um kit antigo: mostra o kit de agora em vez de comprar o que ela não viu
+            self._mostrar_kit(T.BOTAO_VELHO) if self.u.get('fase') == 'kit' else self.repetir_pergunta(T.BOTAO_VELHO)
+            return
+        if arg == 'nao':
+            self.u['kit'] = None
+            self.menu('Tudo bem! 🙂')
+        elif not k or not k.get('linhas'):
+            self.repetir_pergunta(T.BOTAO_VELHO) if self.u.get('fase') != 'kit' else self.perguntar_pedido()
+        elif arg == 'outra':
+            self._montar_kit(k['pessoas'], k['tema'], k.get('extras'), k.get('ajuste'), anterior=k, outra_loja=True)
+        else:
+            self.kit_ok()
+
+    def kit_ok(self, _arg=None):
+        """"Quero esse kit": só agora o carrinho é criado. Pedido montado na mesma loja ganha o kit junto;
+        de outra loja é trocado (o kit avisou). Daí em diante é o pedido de sempre, com o "por pessoa"."""
+        u = self.u
+        k = u.get('kit')
+        if not k or not k.get('linhas'):
+            self.perguntar_pedido()
+            return
+        if not self.exigir_login(['botao', f'kit:ok:{k.get("id")}']):
+            return
+        if not self.garantir_endereco({'acao': 'botao', 'botao': f'kit:ok:{k.get("id")}'}):
+            return
+        car = u.get('carrinho') or {}
+        linhas = [{'item_id': lin['item_id'], 'qtd': lin['qtd'], 'opcoes': lin['opcoes'], 'obs': None}
+                  for lin in k['linhas']]
+        if car.get('itens') and car.get('loja_id') == k['loja_id']:
+            linhas = [{'item_id': i['item_id'], 'qtd': i['qtd'], 'opcoes': i.get('opcoes') or [],
+                       'obs': i.get('obs')} for i in car['itens']] + linhas
+        novo = self.ctx.ifood(self.wa).criar_carrinho(k['loja_id'], u['endereco']['id'], linhas)
+        novo['loja'] = novo.get('loja') or k['loja']
+        # o iFood não devolve as opções escolhidas: guardamos por linha pra conseguir refazer o carrinho depois
+        fila = {}
+        for lin in linhas:
+            fila.setdefault(lin['item_id'], []).append((lin['opcoes'], lin['obs']))
+        for i in novo.get('itens') or []:
+            guardadas = fila.get(i.get('item_id')) or []
+            i['opcoes'], i['obs'] = guardadas.pop(0) if guardadas else ([], None)
+        u.update(carrinho=novo, fila=[], escolha=None, kit=None, grupo_pendente=None,
+                 grupo={'pessoas': k['pessoas'], 'loja_id': k['loja_id']})
+        self.dizer(T.kit_no_pedido(novo['loja']))
+        self._proximo_da_fila()
+
     # ================================================================== erros
 
     def erro_mcp(self, e):
@@ -1936,6 +2280,10 @@ class Bot:
             self.perguntar(msg, [T.B_TENTAR, T.B_INICIO])
 
 
+def _mesmo_termo(a, b):
+    return normalizar((a or {}).get('termo')) == normalizar((b or {}).get('termo'))
+
+
 def _falha_do_ifood(cod):
     """Erro de infraestrutura do iFood (fora do ar, firewall, rede), não de regra de negócio."""
     return cod.startswith('HTTP_') or cod in ('TIMEOUT', 'REDE', 'SESSAO', 'RESPOSTA_VAZIA')
@@ -1965,6 +2313,8 @@ def _quer_novo_pedido(texto):
 # claramente outro assunto no meio do endereço: segue o fluxo de sempre (pedido e papo têm tratamento próprio)
 OUTRO_ASSUNTO = {'cancelar', 'ajuda', 'acompanhar', 'ver_pedido', 'sair', 'apagar_dados', 'parar_lembrete'}
 CEP = re.compile(r'\b\d{5}-?\d{3}\b')
+# legenda da foto que já é o pedido: "quero isso", "me vê 2 desse", "acha um igual"
+QUER_ISSO = re.compile(r'\b(quero|queria|me ve|manda|pede|pedir|acha|procura|tem esse|tem essa|desse|dessa|igual)\b')
 PEDIDO = re.compile(r'\b(quero|queria|me ve|manda|pedir|pede|comer|beber|tomar|comprar|cancela|cancelar|ajuda)\b')
 COMPLEMENTO = re.compile(r'\b(ap|apto|apartamento|bloco|bl|casa|fundos|sala|andar|torre|condominio|cond|lote'
                          r'|quadra|qd|lt|sobrado|kitnet|edificio|predio|portaria)\b')

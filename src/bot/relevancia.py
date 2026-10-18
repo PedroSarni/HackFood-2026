@@ -36,11 +36,17 @@ def _raizes(termo):
     return [p[:5] if len(p) > 5 else p for p in normalizar(termo).split() if len(p) >= 3]
 
 
+# sem o Gemini, a palavra pura perde o sinônimo óbvio: "refrigerante" é a Coca, "hambúrguer" é o X-Bacon
+ALTERNATIVAS = {'refri': ('refri', 'coca', 'guarana', 'fanta', 'sprite', 'pepsi', 'soda'),
+                'hambu': ('hambu', 'burg', 'x '), 'lanch': ('lanch', 'burg', 'x ', 'misto', 'sanduich')}
+
+
 def _por_palavra(ofertas, termo):
     raizes = _raizes(termo)
     if not raizes:
         return ofertas
-    return [o for o in ofertas if all(r in normalizar(o.get('nome')) for r in raizes)]
+    return [o for o in ofertas
+            if all(any(alt in normalizar(o.get('nome')) + ' ' for alt in ALTERNATIVAS.get(r, (r,))) for r in raizes)]
 
 
 def filtrar(llm, ofertas, pedido):

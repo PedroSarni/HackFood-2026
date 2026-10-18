@@ -6,6 +6,8 @@ Regra de escrita (o público é quem tem dificuldade com o celular):
 - toda mensagem termina dizendo o que fazer ("toque em...", "pode escrever"); áudio fica fora das dicas por enquanto;
 - botão com até 20 caracteres (limite da Meta), verbo ou resposta direta.
 """
+from src.bot.grupo import MAX_PESSOAS, por_pessoa
+from src.shared.whatsapp import tamanho
 
 
 def reais(v):
@@ -255,8 +257,8 @@ def proximo_da_lista(termo):
     return f'Agora vamos procurar *{termo}*: 👇'
 
 
-def mais_alguma(total):
-    return f'🧺 Seu pedido até agora: *{reais(total)}*\n\nQuer mais alguma coisa?'
+def mais_alguma(total, pessoas=None):
+    return f'🧺 Seu pedido até agora: *{reais(total)}*{dividido(total, pessoas, linha=True)}\n\nQuer mais alguma coisa?'
 
 
 # --- fechamento -------------------------------------------------------------------------
@@ -273,7 +275,7 @@ QUAL_ENTREGA = 'Quando você quer receber? 🛵'
 LOJA_FECHADA = 'Essa loja não está entregando agora. 😕'
 
 
-def resumo(carrinho, endereco, entrega, pagamento, cupom=None):
+def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None):
     linhas = ['🧾 *Confira seu pedido:*', '']
     for it in carrinho['itens']:
         linhas.append(f'• {it["qtd"]}x {it["nome"]} — {reais(it.get("preco_total"))}')
@@ -293,7 +295,8 @@ def resumo(carrinho, endereco, entrega, pagamento, cupom=None):
         linhas.append(f'🏠 {endereco.get("apelido") or "Endereço"}: {endereco.get("texto") or ""}'.rstrip(': '))
     if pagamento:
         linhas.append(f'💳 {pagamento["nome"]}')
-    linhas += ['', f'*Total: {reais(carrinho.get("total"))}*', '', 'Posso fazer o pedido?']
+    linhas += ['', f'*Total: {reais(carrinho.get("total"))}*' + dividido(carrinho.get('total'), pessoas, linha=True),
+               '', 'Posso fazer o pedido?']
     return '\n'.join(linhas)
 
 
@@ -305,7 +308,7 @@ CANCELADO = 'Tudo bem, cancelei. Nada foi comprado. 🙂'
 ENVIANDO = 'Já estou fazendo seu pedido, só um instante... ⏳'
 
 
-def pedido_feito(numero=None, tempo=None, codigo_entrega=None, tipo_pagamento=None):
+def pedido_feito(numero=None, tempo=None, codigo_entrega=None, tipo_pagamento=None, total=None, pessoas=None):
     linhas = ['🎉 *Pedido feito!*']
     if numero:
         linhas.append(f'Número do pedido: *{numero}*')
@@ -316,6 +319,8 @@ def pedido_feito(numero=None, tempo=None, codigo_entrega=None, tipo_pagamento=No
     if tipo_pagamento == 'PIX':
         # o submitOrder não devolve o código PIX (nem QR): o pagamento segue pelo app do iFood
         linhas.append('💠 Pagamento por PIX: se o iFood pedir, o código aparece no app do iFood, no seu pedido.')
+    if pessoas and por_pessoa(total, pessoas):
+        linhas.append(f'👥 Dá {reais(por_pessoa(total, pessoas))} pra cada um ({pessoas} pessoas). Bom apetite, galera! 😋')
     linhas.append('\nEu te aviso aqui quando sair pra entrega.')
     return '\n'.join(linhas)
 
@@ -457,3 +462,104 @@ APAGAR_CONFIRMA = ('Quer mesmo apagar seus dados? 🗑️\n'
 B_APAGAR_SIM = ('apagar_sim', 'Sim, apagar')
 B_APAGAR_NAO = ('apagar_nao', 'Não, voltar')
 APAGADO = '✅ Pronto, apaguei tudo. Seu número agora é tratado como novo. 👋'
+
+
+# --- foto vira pedido (src/bot/foto.py) -------------------------------------------------
+
+B_FOTO_SIM = ('foto:sim', '😋 Sim, quero!')
+B_FOTO_NAO = ('foto:nao', 'Não, obrigado')
+FOTO_RUIM = ('Não consegui ver sua foto direito. 🙈\n'
+             'Pode mandar de novo, mais de perto, ou escrever o que você quer?')
+FOTO_ILEGIVEL = ('Recebi sua foto, mas não consegui ler o que está escrito. 🙈\n'
+                 'Pode mandar outra mais de perto, ou escrever a lista aqui?')
+FOTO_NO_CPF = ('Por segurança, nessa etapa eu não abro fotos. 🔒\n'
+               'Escreva o CPF com os números, por favor. 🙂')
+
+
+def foto_parecido(descricao, fala=None):
+    topo = fala or ('Que delícia! 😋' + (f' Vi aqui: *{descricao}*.' if descricao else ''))
+    return f'{topo}\n\nQuer que eu procure algo parecido pra você pedir? 👇'
+
+
+def foto_outro(fala=None):
+    return ((fala or 'Recebi sua foto! 🙂') + '\n\nMe manda a foto de uma comida, de um produto ou da sua '
+            'lista de compras, ou escreva o que você quer. ✍️')
+
+
+def parecidos(descricao):
+    return f'🔎 Procurei coisas parecidas com *{descricao}*:' if descricao else '🔎 Procurei coisas parecidas:'
+
+
+def sem_parecido(descricao, loja=None):
+    onde = f'no {loja}' if loja else 'perto de você'
+    return (f'Não achei nada parecido com *{descricao or "isso"}* {onde}. 😕\n'
+            'Me escreve o que você quer que eu procuro ✍️')
+
+
+def li_a_foto(itens):
+    return '📸 Li sua foto! ' + anotei(itens)
+
+
+# --- dividir com os amigos (src/bot/grupo.py) -------------------------------------------
+
+B_KIT_OK = ('kit:ok', '✅ Quero esse kit')
+B_KIT_OUTRA = ('kit:outra', '🔄 Outra loja')
+B_KIT_NAO = ('kit:nao', '❌ Não quero')
+B_PESSOAS = [('grupo_n:2', '2 pessoas'), ('grupo_n:4', '4 pessoas'), ('grupo_n:6', '6 pessoas')]
+GRUPO_QUANTAS = '👥 Pra quantas pessoas é, contando com você?\nToque ou escreva o número.'
+GRUPO_DEMAIS = (f'Pra mais de {MAX_PESSOAS} pessoas é melhor combinar direto com a loja. 😅\n'
+                f'Me diz um número de 2 a {MAX_PESSOAS}.')
+KIT_SEM_OUTRA_LOJA = 'Só achei essa loja perto de você pra esse kit. 🙂'
+KIT_DICA = 'Pode ser? Toque em *Quero esse kit* ou me diga o que mudar (ex.: _sem refri_, _mais barato_).'
+
+
+def dividido(total, pessoas, linha=False):
+    """'👥 *R$ 36,42 por pessoa* (5 pessoas)'; vazio se não é pedido em grupo."""
+    cada = por_pessoa(total, pessoas) if pessoas and pessoas > 1 else None
+    if not cada:
+        return ''
+    return ('\n' if linha else '') + f'👥 *{reais(cada)} por pessoa* ({pessoas} pessoas)'
+
+
+def grupo_o_que(pessoas=None):
+    quem = f' pra {pessoas} pessoas' if pessoas else ''
+    return (f'😋 Bora montar um kit{quem}! O que vocês querem comer?\n'
+            'Exemplo: _hambúrguer_, _pizza_, _esfiha_')
+
+
+def montando_kit(pessoas, termo):
+    return f'👥 Montando um kit de *{termo}* pra *{pessoas} pessoas*... ⏳'
+
+
+def kit(k, troca=None, _nome=60, _fala=True):
+    """O kit na tela: o que vai, quanto custa e quanto dá pra cada. Os números são do código.
+    Vai com botões, então cabe em 1024 caracteres: se passar, sai a fala e os nomes encurtam."""
+    linhas = [f'👥 *Kit pra {k["pessoas"]} pessoas* · {k["loja"]}']
+    if k.get('explicacao') and _fala:
+        linhas.append(f'_{k["explicacao"]}_')
+    linhas.append('')
+    for lin in k['linhas']:
+        nome = lin['nome'] if len(lin['nome']) <= _nome else lin['nome'][:_nome - 1].rstrip() + '…'
+        linhas.append(f'• {lin["qtd"]}x {nome} — {reais(lin["total"])}')
+    linhas.append('')
+    if k.get('taxa') is not None:
+        linhas.append(f'🛵 Entrega: {reais(k["taxa"]) if k["taxa"] else "grátis"}')
+    linhas.append(f'💰 *Total: {reais(k["total"])}*' + ('' if k.get('taxa') is not None else ' + entrega'))
+    linhas.append(dividido(k['total'], k['pessoas']))
+    if k.get('faltou'):
+        linhas.append(f'⚠️ Não achei {", ".join(k["faltou"])} nessa loja.')
+    if troca:
+        linhas.append(f'⚠️ Esse kit troca o pedido que você estava montando no *{troca}*.')
+    linhas += ['', KIT_DICA]
+    texto = '\n'.join(linhas)
+    if tamanho(texto) > 1000 and _nome > 30:
+        return kit(k, troca, _nome=30, _fala=False)
+    return texto
+
+
+def kit_sem_principal(termo):
+    return f'Não achei *{termo}* perto de você pra montar o kit. 😕\nQuer tentar outra comida? É só escrever ✍️'
+
+
+def kit_no_pedido(loja):
+    return f'✅ Coloquei o kit no seu pedido do *{loja}*.'

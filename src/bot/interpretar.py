@@ -14,7 +14,7 @@ import unicodedata
 ACOES = ['comprar', 'mais_opcoes', 'escolher', 'sim', 'nao', 'quantidade', 'endereco',
          'ver_pedido', 'finalizar', 'tirar_item', 'cancelar', 'acompanhar', 'repetir',
          'ajuda', 'saudacao', 'agradecer', 'sair', 'apagar_dados', 'parar_lembrete',
-         'agendar', 'sugerir', 'fora_do_escopo', 'nao_entendi']
+         'agendar', 'sugerir', 'grupo', 'fora_do_escopo', 'nao_entendi']
 LOJAS = ['MERCADO', 'RESTAURANTE', 'FARMACIA', 'BEBIDAS', 'PET', 'LOJA']
 
 ESQUEMA = {
@@ -31,7 +31,7 @@ ESQUEMA = {
                 'observacao': {'type': 'STRING', 'nullable': True},
             },
             'required': ['termo', 'busca', 'tipo_loja']}},
-        'numero': {'type': 'INTEGER', 'nullable': True},
+        'numero': {'type': 'INTEGER', 'nullable': True, 'description': 'quando grupo: quantas pessoas no total'},
         'texto': {'type': 'STRING', 'nullable': True},
         'transcricao': {'type': 'STRING', 'nullable': True},
         'resposta': {'type': 'STRING', 'nullable': True},
@@ -49,7 +49,7 @@ mensagens picadas, ou mandam áudio e foto. Seja generoso: descubra o que a pess
 Responda só o JSON do esquema. Campos:
 - acao: uma de comprar, sugerir, mais_opcoes, escolher, sim, nao, quantidade, endereco, ver_pedido, \
 finalizar, tirar_item, cancelar, acompanhar, repetir, ajuda, saudacao, agradecer, sair, \
-apagar_dados, parar_lembrete, agendar, fora_do_escopo, nao_entendi.
+apagar_dados, parar_lembrete, agendar, grupo, fora_do_escopo, nao_entendi.
 - itens: quando acao=comprar (ou agendar, se a pessoa disse o que quer no automático), cada produto \
 pedido, na ordem. termo curto e no singular ("pão francês", "leite integral", "carne moída", \
 "dipirona"), sem a quantidade. Sabor, tamanho \
@@ -70,7 +70,9 @@ sushi, pastel, "almoço"); FARMACIA para remédio e farmácia; BEBIDAS para bebi
 - hora: quando agendar e a pessoa disse horário, "HH:MM" 24h ("às 18h" = "18:00", "meio-dia" = \
 "12:00", "8 da noite" = "20:00"); senão null. Quando escolher (1, 2 ou 3, entre as opções que estão na tela; "o primeiro"=1, \
 "o do meio"=2, "o último" = o último da tela) ou quando quantidade.
-- texto: quando endereco, o endereço como a pessoa disse.
+- texto: quando endereco, o endereço como a pessoa disse. Quando grupo, SÓ as restrições e ajustes \
+("um é vegetariano", "até 30 reais cada", "sem refri", "troca a coca por guaraná"), nunca a comida nem o \
+número de pessoas; sem restrição = null.
 - transcricao: se veio áudio ou foto, o que foi dito ou o que está escrito/mostrado, curto.
 - resposta: SEMPRE preencha. É o que um atendente simpático diria de volta, com 1 ou 2 emojis, \
 português informal e caloroso, até 3 frases curtas (no máximo 350 caracteres). Pode conversar à \
@@ -91,6 +93,16 @@ Regras:
 - "o de sempre", "pedir igual da outra vez", "repetir" = repetir.
 - "me sugere algo", "o que você recomenda", "qualquer coisa", "você escolhe", "algo pra completar \
 o valor" ou "o pedido mínimo" = sugerir (quando a pessoa não disse o produto).
+- Comer em grupo e dividir a conta = grupo: "lanchar em 5 pessoas hambúrguer", "pizza pra 4 \
+dividindo", "vamos rachar uma pizza eu e mais 3", "churrasco pra 10 pessoas", "monta um kit pra galera", \
+"quanto fica pra cada". numero = quantas pessoas NO TOTAL, contando quem escreve ("eu e mais 3" = 4, \
+"com 4 amigos" = 5, "em 5 pessoas" = 5, "casal" = 2; não disse = null). itens = primeiro o que querem \
+comer (o principal) e depois o que pediram junto ("hambúrguer com coca" -> hambúrguer, coca-cola): a \
+comida dita vai SEMPRE em itens, nunca só no texto. Sem comida dita (itens vazio) = dividir o pedido que \
+já está montado. "2 pizzas" sem falar de pessoas é comprar.
+- Com um kit pra grupo na tela (etapa kit), pedido de mudança no kit ("sem refri", "troca por guaraná", \
+"mais barato", "mais batata", "agora somos 6", "põe uma sobremesa") = grupo, com texto = a mudança, numero \
+só se o número de pessoas mudou e itens só com produto novo. "pode ser", "fechou", "quero esse" = sim.
 - "quero isso todo dia às 18h", "toda semana", "todo mês", "deixa no automático", "me lembra de pedir", "pedido recorrente", "assinatura" = agendar (mesmo no meio de um pedido). Se a pessoa disse o que quer \
 ("todo dia às 7h dois pães"), os produtos vão em itens.
 - Conversa que não é sobre pedido (piada, política, receita, perguntas gerais) = fora_do_escopo.
@@ -327,6 +339,10 @@ def contexto_para_llm(estado):
     if perg.get('titulos'):
         linhas.append('Opções na tela, na ordem: ' + ' | '.join(
             f'{i}. {t}' for i, t in enumerate(perg['titulos'], 1)))
+    kit = estado.get('kit') or {}
+    if estado.get('fase') == 'kit' and kit.get('linhas'):
+        linhas.append(f'Kit na tela pra {kit.get("pessoas")} pessoas ({(kit.get("tema") or {}).get("termo")}): '
+                      + ', '.join(f'{lin["qtd"]}x {lin["nome"]}' for lin in kit['linhas']))
     car = estado.get('carrinho') or {}
     if car.get('itens'):
         linhas.append('Já no pedido: ' + ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens']))
@@ -359,6 +375,8 @@ def interpretar(llm, estado, partes, aviso=None):
     dados['itens'] = itens[:15]
     if dados['acao'] == 'comprar' and not itens:
         dados['acao'] = 'nao_entendi'
+    n = dados.get('numero')
+    dados['numero'] = n if isinstance(n, int) and not isinstance(n, bool) else None
     dados['resposta'] = ' '.join(str(dados.get('resposta') or '').split())[:500] or None
     if dados['acao'] == 'agendar' and not dados.get('hora'):
         dados['hora'] = hora_em(' '.join(p[1] for p in partes if p[0] == 'texto'))
