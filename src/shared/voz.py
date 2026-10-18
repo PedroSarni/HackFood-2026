@@ -1,14 +1,15 @@
 """Boca do bot: texto vira nota de voz (text-to-speech da ElevenLabs), irmã do Scribe (scribe.py).
 
-Só fala com quem PEDIU resposta em áudio (src/bot/voz.py decide quando). Mesmo secret do Scribe,
-`hackathon-elevenlabs`, mas a key precisa da permissão `text_to_speech` (a do Scribe só tinha
-`speech_to_text` em 17/10 21h40). Sem a permissão, ou com a ElevenLabs fora, `falar` levanta
+Só fala com quem PEDIU resposta em áudio (src/bot/voz.py decide quando). Mesmo secret e mesma key
+do Scribe, `hackathon-elevenlabs`; a key precisa das permissões `speech_to_text` E `text_to_speech`
+(a 1ª key só tinha a do Scribe, trocada em 17/10 22h30). Com a ElevenLabs fora, `falar` levanta
 ErroVoz e o fluxo manda as mensagens escritas de sempre.
 
 Variáveis (vazias = padrão):
-- VOZ_ID: voz da biblioteca da ElevenLabs (padrão: Sarah, multilíngue, já vem em toda conta);
-- VOZ_MODELO: `eleven_flash_v2_5` (~75 ms de latência, fala português) ou `eleven_multilingual_v2`
-  (mais natural, ~2x mais lento e não aceita language_code);
+- VOZ_ID: voz da biblioteca da ElevenLabs (padrão: Roberta, pt-BR, "conversational"). Outras
+  testadas em 17/10: Raquel GDzHdQOi6jjf8zaXhCYD, Ana Alice ORgG8rwdAiMYRug8RJwR, Davi 5p9IbzcK4R8rN1fpGdMF;
+- VOZ_MODELO: `eleven_flash_v2_5` (~1 s pra uma fala de 10 s, medido) ou `eleven_multilingual_v2`
+  (~2,5 s e não aceita language_code);
 - VOZ_VELOCIDADE: 0.7 a 1.2 (padrão 1.0).
 
 Formato: o WhatsApp só mostra como nota de voz (play + onda, `voice: true`) ogg/opus mono até
@@ -21,7 +22,7 @@ import time
 import httpx
 
 URL = 'https://api.elevenlabs.io/v1/text-to-speech/{voz}'
-VOZ_PADRAO = 'EXAVITQu4vr4xnSDxMaL'  # Sarah: premade, multilíngue
+VOZ_PADRAO = 'RGymW84CSmfVugnA5tvA'  # Roberta: pt-BR da biblioteca, tom de conversa
 MODELO_PADRAO = 'eleven_flash_v2_5'
 FORMATO = 'opus_48000_32'
 MIME = 'audio/ogg'
