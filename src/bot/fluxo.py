@@ -2129,7 +2129,7 @@ class Bot:
             raise
         u['pedidos'] = ([{'id': feito['id'], 'carrinho': car['id'], 'quando': self.ctx.agora(),
                           'loja': car.get('loja'), 'loja_id': car.get('loja_id'),
-                          'resumo': ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens'])[:300],
+                          'resumo': T.lista_itens(car['itens'])[:300],
                           'total': car.get('total')}] + (u.get('pedidos') or []))[:PEDIDOS_GUARDADOS]
         pessoas = self._pessoas()
         u['carrinho'] = None
@@ -2402,7 +2402,7 @@ class Bot:
         u = self.u
         linhas = [{'item_id': i['item_id'], 'qtd': i['qtd'], 'opcoes': i.get('opcoes') or [], 'obs': i.get('obs'),
                    'nome': i.get('nome')} for i in car['itens']]
-        resumo = ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in car['itens'])
+        resumo = T.lista_itens(car['itens'])
         demo = bool(self.ctx.armazem.get('cfg:demo_rapido'))
         rec = self.ctx.recorrencias.criar(
             self.wa, {'id': None, 'resumo': resumo, 'loja': car.get('loja'), 'subtotal': car.get('subtotal'),

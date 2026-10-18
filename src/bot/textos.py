@@ -19,6 +19,28 @@ def reais(v):
     return 'R$ ' + s.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def somar_iguais(itens):
+    """'4x Leite integral' + '1x Leite integral' viram '5x Leite integral' (preço da linha somado).
+    O carrinho continua com as duas linhas; isto é só como o pedido aparece pra pessoa."""
+    juntos = {}
+    for it in itens or []:
+        j = juntos.get(it['nome'])
+        if j is None:
+            juntos[it['nome']] = dict(it)
+            continue
+        j['qtd'] += it['qtd']
+        if j.get('preco_total') is not None and it.get('preco_total') is not None:
+            j['preco_total'] = round(j['preco_total'] + it['preco_total'], 2)
+        else:
+            j['preco_total'] = None
+    return list(juntos.values())
+
+
+def lista_itens(itens):
+    """'5x Leite integral, 1x Pão francês': o que vai no lembrete e no "Combinado!" do automático."""
+    return ', '.join(f'{i["qtd"]}x {i["nome"]}' for i in somar_iguais(itens))
+
+
 # --- botões fixos (id, título) --------------------------------------------------------
 
 B_PEDIR = ('pedir', '🛒 Fazer pedido')
@@ -341,7 +363,7 @@ LOJA_FECHADA = 'Essa loja não está entregando agora. 😕'
 
 def resumo(carrinho, endereco, entrega, pagamento, cupom=None, pessoas=None, sugestao=None):
     linhas = ['🧾 *Confira seu pedido:*', '']
-    for it in carrinho['itens']:
+    for it in somar_iguais(carrinho['itens']):
         linhas.append(f'• {it["qtd"]}x {it["nome"]} — {reais(it.get("preco_total"))}')
     linhas.append('')
     taxa_valor = carrinho.get('taxa_entrega')

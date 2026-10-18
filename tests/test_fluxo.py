@@ -1735,3 +1735,35 @@ def test_lembrete_com_itens_mais_caros_diz_que_o_preco_mudou(monkeypatch):
     assert not m.mcp.chamadas_de('submitOrder')
     assert m.estado()['fase'] == 'confirmar'
     assert 'preço mudou' in m.wpp.saida[-1][1]['texto']
+
+
+# --- U6: o mesmo produto em duas linhas aparece somado -----------------------------------------
+
+def test_resumo_soma_linhas_do_mesmo_produto_sem_mudar_o_total():
+    from src.bot import textos as T
+    car = {'itens': [{'nome': 'Leite integral', 'qtd': 4, 'preco_total': 20.0},
+                     {'nome': 'Pão francês', 'qtd': 1, 'preco_total': 1.5},
+                     {'nome': 'Leite integral', 'qtd': 1, 'preco_total': 5.0}], 'total': 26.5}
+    texto = T.resumo(car, None, None, None)
+    assert '• 5x Leite integral — R$ 25,00' in texto and '4x Leite' not in texto and '1x Leite' not in texto
+    assert '*Total: R$ 26,50*' in texto
+    assert len(car['itens']) == 3  # o carrinho em si não muda
+    assert T.lista_itens(car['itens']) == '5x Leite integral, 1x Pão francês'
+
+
+def test_combinado_e_lembrete_do_automatico_somam_o_mesmo_produto():
+    from src.bot import textos as T
+    m = Mundo()
+    endereco_pronto(m)
+    m.enviar('todo dia as 7h quero pao')
+    m.tocar('pick:')
+    m.tocar('qtd:3')
+    u = m.estado()
+    linha = u['carrinho']['itens'][0]
+    u['carrinho']['itens'].append(dict(linha, qtd=1))  # o mesmo pão de novo, em outra linha
+    m.armazem[f'u:{m.wa}'] = u
+    m.tocar('fim')
+    nome = linha['nome']
+    assert f'4x {nome}' in m.wpp.textos()[-1] and f'3x {nome}' not in m.wpp.textos()[-1]  # o "Combinado!"
+    rec = m.recs_dic[m.wa][0]
+    assert f'🧾 4x {nome}' in T.lembrete(rec)
