@@ -452,3 +452,11 @@ o que vai entrar."
 conversa aberta] e acrescente uma frase curta abaixo da imagem [...] rode grep e me liste o que sobrar."
 
 **Resposta:** Os dois [PREENCHER] trocados nos dois arquivos; grep de PREENCHER e [PRINT sem sobras.
+
+## 2026-10-18 13:30 — entrega única em PDF no repositório
+
+**Prompt:** "Há um PDF novo na raiz do repositório, "AiFood-entrega-unica.pdf" (sem commit). Adicione somente esse arquivo ao
+commit, sem movê-lo nem renomeá-lo. [...] rode git status e me liste o que vai entrar [...] commite com a mensagem
+"docs: entrega única em PDF" e dê push."
+
+**Resposta:** PDF adicionado na raiz, sem alteração de texto. Commit e push feitos.
