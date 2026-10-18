@@ -155,6 +155,22 @@ def test_voz_fora_do_ar_manda_tudo_escrito():
     assert any('Entregando em' in t for t in escritos(m))  # o que ia virar fala saiu escrito
 
 
+def test_primeiro_audio_falhou_nao_promete_audio():
+    m, loc = mundo_com_voz(falhar=True)  # key sem permissão de text_to_speech, por exemplo
+    m.enviar('me responde por áudio')
+    assert T.VOZ_INDISPONIVEL in escritos(m) and T.VOZ_LIGADA not in escritos(m)
+    assert not m.estado().get('voz')  # não fica tentando (e falhando) a cada mensagem
+
+
+def test_falha_depois_de_ja_ter_falado_mantem_o_modo():
+    m, loc = mundo_com_voz()
+    endereco_pronto(m)
+    m.enviar('me responde por áudio')
+    loc.falhar = True  # soluço da ElevenLabs no meio da conversa
+    m.enviar('quero leite')
+    assert m.estado()['voz']  # a próxima tenta em áudio de novo
+
+
 def test_sem_elevenlabs_avisa_e_nao_liga():
     m = Mundo()  # sem locutor
     m.enviar('me responde por áudio')

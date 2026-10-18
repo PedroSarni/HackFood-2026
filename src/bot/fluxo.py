@@ -208,10 +208,16 @@ class Bot:
                     enviado = True
                     if modo:
                         modo['ultima'] = fala[:200]
+                        modo['falou'] = True
             except Exception:  # noqa: BLE001 - sem áudio, vai escrito
                 traceback.print_exc()
             if not enviado:
-                for to, texto in g.guardados:
+                guardados = g.guardados
+                if self.u and self.u.get('voz') and not self.u['voz'].get('falou'):
+                    # nem o 1º áudio saiu (key sem permissão, ElevenLabs fora): não promete o que não cumpre
+                    self.u['voz'] = None
+                    guardados = [(to, T.VOZ_INDISPONIVEL if t == T.VOZ_LIGADA else t) for to, t in guardados]
+                for to, texto in guardados:
                     try:
                         self.ctx.wpp.texto(to, texto)
                     except Exception:  # noqa: BLE001
