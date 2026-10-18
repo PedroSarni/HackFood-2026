@@ -34,6 +34,18 @@ estava em produção. Ninguém precisa configurar Meta Business, número ou toke
 
 Convenção herdada: valor `PREENCHER` = não configurado (trate como string vazia).
 
+## Status da conta (checado em 2026-10-17; dados do número reconferidos na Graph API em 2026-10-18)
+
+- Recebe mensagem e responde dentro de 24h: **OK** (testado ponta a ponta).
+- Mensagem iniciada por nós (template): **BLOQUEADA**, erro 141006 (método de pagamento da WABA com problema,
+  visto em 17/10). Até o Fabio trocar o cartão no Meta Business Suite, não conte com template nem mensagem proativa.
+- Número (`GET /{PHONE_ID}`): limite **TIER_250** (250 conversas iniciadas por nós a cada 24h; a empresa não é
+  verificada), qualidade GREEN, nome "handwrite bot" com `name_status` AVAILABLE_WITHOUT_REVIEW (pode ser usado
+  sem revisão). Não é Official Business Account (`is_official_business_account: false`), então **Groups API
+  não está disponível**. E grupos não aceitam botões nem listas de qualquer jeito.
+- Política da Meta desde 15/01/2026: proibido chatbot de IA de uso geral. IA para tarefa do negócio (pedir comida)
+  pode. O bot deve recusar papo fora do assunto em vez de virar um ChatGPT no zap.
+
 ## Virada do número para o deploy novo (feita em 17/10, antes das 16h37)
 
 O número já entrega mensagens para o nosso endpoint (`/whatsapp` no Modal). A virada troca o callback

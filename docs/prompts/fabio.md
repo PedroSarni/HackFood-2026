@@ -352,3 +352,13 @@ no Modal não é afetado).
 servidor de dados do dash (porta 8787), por falta de memória; o Vite (5173) seguia de pé. Religuei o servidor:
 "Dados reais" já mostra 942 eventos (o deploy resolveu o vazio) e a demonstração, 32 mil. Ficou pendente: apagar
 ou não o `app.js` antigo do Pedro, e o `docs/whatsapp.md` com edição não commitada de outra janela.
+
+## 2026-10-18 ~00h45 — apagar o app.js e acertar o status do WhatsApp
+
+**Prompt:** "pode apagar o app.js sim do pedro pode arrumar esse 2 corrigido e commitar."
+
+**Resposta:** Apaguei `Frontend/Rascunho_Dash/app.js` (versão antiga em JS puro que ninguém importava). Os 24
+testes do dash passam e o build também. Commitei a seção "Status da conta" do `docs/whatsapp.md` depois de
+reconferir o número na Graph API (só leitura): TIER_250, qualidade GREEN, sem Official Business Account. Corrigi
+o nome, que não está "não aprovado": é AVAILABLE_WITHOUT_REVIEW. O erro 141006 do template não foi retestado,
+porque exigiria enviar mensagem.
