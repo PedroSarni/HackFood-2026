@@ -608,13 +608,13 @@ def test_toque_duplo_em_confirmar_nao_faz_dois_pedidos():
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
-def test_sim_digitado_no_resumo_com_sugestao_pergunta_de_novo_e_so_o_toque_fecha():
+def test_sim_no_resumo_com_sugestao_pergunta_uma_vez_e_o_sim_seguinte_fecha():
     m = pedido_ate_o_resumo(Mundo())
     assert 'pra acompanhar' in m.estado()['pergunta']['texto']   # o resumo também oferece a manteiga
     m.enviar('pode sim')
-    assert not m.mcp.chamadas_de('submitOrder')
+    assert not m.mcp.chamadas_de('submitOrder')                  # sim pra manteiga ou pro pedido?
     assert [t for _, t in m.wpp.ultimos_botoes()] == ['✅ Fazer pedido assim', '➕ Colocar manteiga', '✏️ Mudar']
-    m.tocar('ok:')
+    m.enviar('sim')   # 18/10: quem pede por áudio não toca em botão; antes perguntava de novo pra sempre
     assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
@@ -1572,7 +1572,7 @@ def _resumo_sem_sugestao(m, monkeypatch):
     return m
 
 
-def test_sim_com_sugestao_nao_fecha_e_mostra_os_3_botoes():
+def test_sim_com_sugestao_mostra_os_3_botoes_e_o_sim_seguinte_fecha():
     m = pedido_ate_o_resumo(Mundo())
     m.wpp.limpar()
     m.enviar('sim')
@@ -1581,8 +1581,8 @@ def test_sim_com_sugestao_nao_fecha_e_mostra_os_3_botoes():
     botoes = m.wpp.ultimos_botoes()
     assert [i for i, _ in botoes][1:] == ['acomp', 'mudar'] and botoes[0][0].startswith('ok:')
     assert all(len(t) <= 20 for _, t in botoes)
-    m.enviar('sim')                              # insistir no "sim" continua sem fechar
-    assert not m.mcp.chamadas_de('submitOrder')
+    m.enviar('sim')                              # já não é ambíguo: fecha (por áudio também, sem toque)
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
 def test_nao_com_sugestao_nao_abre_o_mudar_direto():
@@ -1592,6 +1592,8 @@ def test_nao_com_sugestao_nao_abre_o_mudar_direto():
     assert 'mud:itens' not in [i for i, _ in m.wpp.ultimos_botoes()]
     assert [i for i, _ in m.wpp.ultimos_botoes()][1:] == ['acomp', 'mudar']
     assert not m.mcp.chamadas_de('submitOrder')
+    m.enviar('sim')                              # respondeu a pergunta de volta: fecha, sem perguntar de novo
+    assert len(m.mcp.chamadas_de('submitOrder')) == 1
 
 
 def test_sim_sem_sugestao_continua_confirmando(monkeypatch):

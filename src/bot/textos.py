@@ -308,10 +308,19 @@ def proximo_da_lista(termo):
     return f'Agora vamos procurar *{termo}*: 👇'
 
 
-def mais_alguma(total, pessoas=None, falta=None, loja=None):
+def ate_agora(total, pessoas=None, subtotal=None):
+    """"Seu pedido até agora" é o que os itens somam. O iFood de verdade já põe entrega e taxas no total desde o
+    carrinho criado (o falso só depois da entrega): aí sai a 2ª linha, senão a conta não fecha (18/10, QA M2:
+    um lanche de R$ 36,99 e "até agora R$ 47,97"). A divisão do grupo usa o total, que é o que cada um paga."""
+    if subtotal is not None and total is not None and total - subtotal > 0.005:
+        return (f'🧺 Seu pedido até agora: *{reais(subtotal)}*\n🛵 Com entrega e taxas: *{reais(total)}*'
+                f'{dividido(total, pessoas, linha=True)}')
+    return f'🧺 Seu pedido até agora: *{reais(total)}*{dividido(total, pessoas, linha=True)}'
+
+
+def mais_alguma(total, pessoas=None, falta=None, loja=None, subtotal=None):
     aviso = f'\n{falta_minimo(falta, loja)}' if falta and falta > 0.005 else ''
-    return (f'🧺 Seu pedido até agora: *{reais(total)}*{dividido(total, pessoas, linha=True)}{aviso}'
-            '\n\nQuer mais alguma coisa?')
+    return f'{ate_agora(total, pessoas, subtotal)}{aviso}\n\nQuer mais alguma coisa?'
 
 
 def minimo_da_loja(carrinho):

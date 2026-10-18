@@ -777,13 +777,20 @@ class Bot:
                 self.grupo_pessoas(n)
             elif fase == 'escolhendo' and (n or a == 'escolher'):
                 self._escolha_por_fala(it)
+            elif a == 'quantidade' and it.get('itens') and fase not in ('quantidade', 'kit'):
+                # "pode colocar mais 10 leites" fora do "quantas unidades?" é pedido de produto, não o 10º
+                # (nem o 2º) botão. 18/10 (QA U20): o modelo reserva chamou de quantidade, o carrinho não
+                # mexeu e a fala dele ("adicionei mais 10 leites") saiu como se tivesse mexido.
+                self.iniciar_compra(it['itens'])
             elif n and 1 <= n <= len(botoes):
                 self.botao(botoes[n - 1][0])
             else:
                 self.repetir_pergunta(self._resposta or T.NAO_ENTENDI)
         elif a == 'sim':
-            if fase == 'confirmar' and u.get('sugestao_resumo'):
-                self._sim_ou_acompanhamento()  # "sim" pro café ou pro pedido? só o toque fecha
+            if fase == 'confirmar' and u.get('sugestao_resumo') and u.get('sim_ambiguo') != u.get('resumo_de'):
+                # "sim" pro café ou pro pedido? pergunta UMA vez; o "sim" seguinte (o 1º botão é o
+                # "Fazer pedido assim") fecha, falado ou escrito: quem pede por áudio não toca em botão
+                self._sim_ou_acompanhamento()
             elif fase == 'confirmar':
                 self.botao(botoes[0][0] if botoes else 'nada')
             elif fase == 'escolhendo' and self._visiveis():  # "sim, quero esse" com os cards na tela
@@ -848,6 +855,10 @@ class Bot:
                 if getattr(self, '_falado', None):  # "quero esse e pode fechar" com o carrinho ainda vazio
                     self._falado['fechar'] = True
                 self._escolha_por_fala(it)
+            elif fase == 'confirmar' and u.get('resumo_de') == _marca_resumo(u.get('carrinho') or {}):
+                # "faz o pedido", "pode fechar" com o resumo deste carrinho na tela = o Confirmar. 18/10: o áudio
+                # caía no "toque em Confirmar pedido" e quem pede por áudio nunca conseguia fechar
+                self.confirmar(str((u.get('carrinho') or {}).get('id') or '')[:12])
             else:
                 self.finalizar()
         elif a == 'ver_pedido':
@@ -1833,7 +1844,7 @@ class Bot:
             self.finalizar()
             return
         self.perguntar(T.mais_alguma(car.get('total') or car.get('subtotal'), self._pessoas(),
-                                     *_falta_minimo(car)),
+                                     *_falta_minimo(car), subtotal=car.get('subtotal')),
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
 
     def mostrar_carrinho(self):
@@ -1842,7 +1853,7 @@ class Bot:
             self.perguntar(T.CARRINHO_VAZIO + '\n\n' + T.PERGUNTA_PEDIDO, self._menu(), fase='pedido')
             return
         linhas = '\n'.join(f'• {i["qtd"]}x {i["nome"]}' for i in car['itens'])
-        self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"), self._pessoas(), *_falta_minimo(car))}',
+        self.perguntar(f'🧺 *Seu pedido:*\n{linhas}\n\n{T.mais_alguma(car.get("total") or car.get("subtotal"), self._pessoas(), *_falta_minimo(car), subtotal=car.get("subtotal"))}',
                        [T.B_FINALIZAR, T.B_MAIS_COISAS, T.B_TIRAR], fase='mais')
 
     def perguntar_tirar(self, _arg=None):
@@ -1908,7 +1919,8 @@ class Bot:
         if u.get('fase') == 'confirmar' and u.get('resumo_de') == _marca_resumo(car):
             # 18/10 03h33: o fechamento demorou, a pessoa tocou Finalizar 3x e recebeu 3 resumos de uma vez.
             # O resumo do carrinho de agora já está na tela: aponta pra ele em vez de refazer tudo com o iFood.
-            self.dizer(f'☝️ O resumo do pedido está aí em cima. Toque em *{T.B_CONFIRMAR}* pra eu fazer o pedido.')
+            self.dizer(f'☝️ O resumo do pedido está aí em cima. Toque em *{T.B_CONFIRMAR}* ou me diga *pode fazer* '
+                       'que eu faço o pedido.')
             return
         if not car.get('entrega') or not car.get('pagamento'):  # vai falar com a loja: são vários segundos
             self.dizer(T.FECHANDO)
@@ -2075,10 +2087,11 @@ class Bot:
         self.perguntar(texto, [(f'ok:{car["id"][:12]}', T.B_CONFIRMAR), T.B_MUDAR, T.B_CANCELAR], fase='confirmar')
 
     def _sim_ou_acompanhamento(self):
-        """O resumo perguntou do acompanhamento e do pedido: "sim" ou "não" digitado não fecha nem abre
-        o mudar. Pergunta de novo com um botão pra cada caminho; o pedido só sai no toque."""
+        """O resumo perguntou do acompanhamento e do pedido: o 1º "sim" ou "não" não fecha nem abre o mudar.
+        Pergunta de novo com um caminho por botão; daí o "sim" (ou "faz assim") falado fecha o pedido."""
         u = self.u
         sug = u['sugestao_resumo']
+        u['sim_ambiguo'] = u.get('resumo_de')   # já perguntou deste resumo: o próximo "sim" é pro pedido
         colocar = f'➕ Colocar {sug}'
         if len(colocar) > MAX_BOTAO:
             colocar = f'➕ {sug}'[:MAX_BOTAO]
@@ -2270,7 +2283,7 @@ class Bot:
             self._responder_e_seguir(T.minimo_da_loja(car))
             return
         if sobre == 'total' and car.get('itens'):  # "quanto deu?" montando o pedido: é o carrinho de agora
-            self._responder_e_seguir(f'🧺 Seu pedido até agora: *{T.reais(car.get("total") or car.get("subtotal"))}*')
+            self._responder_e_seguir(T.ate_agora(car.get('total') or car.get('subtotal'), subtotal=car.get('subtotal')))
             return
         pedidos = self.u.get('pedidos') or []
         if not pedidos:

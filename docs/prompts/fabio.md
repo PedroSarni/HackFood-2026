@@ -608,3 +608,25 @@ dash e a demo leem a constante, então o cartão da Cutucada já diz "Depois de 
 commit, com o main inteiro: inclui o Claude na frente dos agentes (47d3f17), a origem própria do abandono e a
 passada do cron dos lembretes no diário. Testes: 463 no back e 51 no front.
 
+## 2026-10-18 ~06h00 — QA do Davi (kit, M2, U20) e o pedido que não fechava por áudio
+
+**Prompts:** "davi me mandou isso aqui: [relato do QA do Davi: 1) kit do grupo: U14 'somos 6, até 100 reais'
+montou R$ 205,99 sem avisar; U11 'sem refri' trocou por sucos e ficou mais caro; U16 cada ajuste refazia o kit do
+zero; 2) M2: item de R$ 36,99 e 'até agora' de R$ 47,97 no MCP real; 3) U20: 'mais 10 leites' por áudio disse que
+adicionou e o carrinho não mudou]", "[print do WhatsApp: no resumo, dois áudios e o bot mandando tocar em Confirmar
+pedido] EU NUNCA CONSIGO FINALIZAR O PEDIDO POR AUDIO, especificamente essa ultima etapa ele nao aceita audio, ele
+deve aceitar, porra"
+
+**Resposta:**
+- **Kit (1):** U16 e U11 já estavam resolvidos no 643c477 (no ar desde o v48). O U14 (o teto do "até 100 reais") a
+  outra sessão está fazendo agora; não mexi.
+- **M2:** o "até agora" usava o total do iFood, que no real já soma entrega e taxas desde o carrinho criado (o falso
+  não). Na conversa de 01:58 era 1 lanche só e "até agora R$ 47,97". Agora mostra o que os itens somam e, quando há,
+  uma 2ª linha "Com entrega e taxas".
+- **U20:** às 04:26, "pode colocar mais 10 leites" com o bot em modo áudio. A Lia, no modelo reserva, chamou de
+  `quantidade`; fora do "quantas unidades?" isso não fazia nada, e a `resposta` dela ("adicionei mais 10 leites")
+  saía como mensagem, que a Vina falou. Agora vira compra, e o prompt da Lia proíbe dizer que já colocou.
+- **Áudio no resumo:** o "sim" com sugestão perguntava "assim ou com feijão?" sem fim, e "faz o pedido" falado caía
+  no "toque em Confirmar". Agora o "sim" seguinte e o "faz o pedido" falado fecham o pedido.
+- **Testes:** 474 numa cópia limpa do main com estas mudanças. Deploy logo depois deste commit.
+
