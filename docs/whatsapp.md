@@ -43,6 +43,10 @@ Convenção herdada: valor `PREENCHER` = não configurado (trate como string vaz
   verificada), qualidade GREEN, nome "handwrite bot" com `name_status` AVAILABLE_WITHOUT_REVIEW (pode ser usado
   sem revisão). Não é Official Business Account (`is_official_business_account: false`), então **Groups API
   não está disponível**. E grupos não aceitam botões nem listas de qualquer jeito.
+- **18/10 a partir das 05:01: a Meta parou de entregar TODA resposta** (até dentro da janela de 24h), erro
+  `131042 Business eligibility payment issue`: a conta do WhatsApp Business está sem moeda configurada no
+  faturamento. O bot recebe, entende e responde normalmente (log "envio falhou" no Modal), quem barra é a Meta.
+  Só o Fabio resolve: Meta Business Suite → Faturamento e pagamentos → conta do WhatsApp → definir país/moeda.
 - Política da Meta desde 15/01/2026: proibido chatbot de IA de uso geral. IA para tarefa do negócio (pedir comida)
   pode. O bot deve recusar papo fora do assunto em vez de virar um ChatGPT no zap.
 

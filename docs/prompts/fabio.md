@@ -450,3 +450,25 @@ imediata e ninguém testou agendar em loja fechada. Deploy feito e interruptor l
 
 **Resposta:** Tirei o aviso: com `--fechadas on`, a loja fechada aparece igual às abertas (só vem depois delas).
 Deploy feito.
+
+## 2026-10-18 ~05h20 — o bot parou de responder; pauzinhos do Maestro e MCP no palco
+
+**Prompt:** "agora ta muito melhor, tirando o fato que ele parou de responder... voce fez alguma cagada aí, né?....
+outra coisa, adicione uma pequena animacao de pausinhos nas "maos" do maestro se mexendo enquanto ele "orquestra",
+assim como a possibilidade de clicar nos agentes na tela supeior, pra expandir um pouquinho as acoes dele assim
+como eu quero ver mais dados sobre o mcp nessa tela, to sentindo muita falta disso... mesmo que de uma forma sutil"
+
+**Resposta:**
+- **Por que parou de responder:** não foi código. Nos logs do Modal o bot recebe, entende e manda a resposta, mas
+  desde 05:01 a Meta recusa toda entrega com o erro `131042 Business eligibility payment issue` (conta do WhatsApp
+  sem moeda configurada no faturamento). Nenhum traceback no app. Anotado em `docs/whatsapp.md`; só o Fabio
+  resolve, no Meta Business Suite.
+- **Palco:** o Maestro ganhou dois pauzinhos que balançam devagar parado e regem rápido enquanto orquestra.
+  Cliente, Maestro, agentes e iFood viraram clicáveis e abrem um balão com as últimas ações; o de agente tem um
+  atalho pra ficha completa.
+- **MCP na tela do time:** o balão do iFood mostra as 5 tools mais chamadas (chamadas, erro, latência); o nó do
+  iFood mostra o total, a % de erro e a última tool chamada. Entrou uma faixa "O que o Maestro mais pede ao iFood"
+  que acende a tool da vez, e um 5º número no topo (pedidos ao iFood).
+- **Testes:** 37 do front passando. Sem deploy: só o dash mudou.
+- Errata: os horários "~02h" das entradas anteriores eram ~05h (o relógio de verdade).
+
