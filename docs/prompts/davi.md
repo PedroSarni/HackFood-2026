@@ -417,3 +417,12 @@ Sobrou o título "Poucas opções por vez, com foto" no 03. Sem código.
 [...] rode grep -rniE "poucas opç" e me liste o que sobrar."
 
 **Resposta:** Título da seção 4 do 03 e frase da linha 27 do 01 trocados. Grep sem sobras. Sem código.
+
+## 2026-10-18 12:30 — prints A7 e A8 e texto das seções
+
+**Prompt:** "Os prints A7.png e A8.png estão em docs/entregaveis/prints/ [...] Troque [PRINT A7] [...] e [PRINT A8] [...]
+Alinhe o texto das seções A7 e A8 ao que os prints mostram [...] confira em src/bot/textos.py [...] liste o que
+continua como [PREENCHER]."
+
+**Resposta:** A7 e A8 viraram imagens no 04 e na entrega única; os textos seguem `textos.py` (abertura "Tá com fome de
+quê?", "Itens: R$ 69,98 + entrega", kit com entrega, total, por pessoa e limite). Restam [PRINT A9] e os [PREENCHER].

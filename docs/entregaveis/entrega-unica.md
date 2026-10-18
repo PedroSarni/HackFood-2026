@@ -185,12 +185,12 @@ Regras visuais: frases curtas, um emoji por ideia (🛒 pedido, 🏠 endereço, 
 **A6. Pedido feito e acompanhamento.** "🎉 *Pedido feito!*" e uma mensagem por mudança de status, sempre dizendo qual pedido é (loja, itens e valor).
 ![Pedido feito e acompanhamento (captura de 18/10 em modo de teste, catálogo simulado)](prints/A6.png)
 
-**A7. Lembrete de compra recorrente.** "🔔 Chegou o dia!" com itens, loja, endereço, pagamento e o valor da última vez, e "*Podemos pedir aqui pra enviar na sua casa?*". Botões **Sim, pode pedir**, **Hoje não**, **Parar lembretes**.
+**A7. Lembrete de compra recorrente.** "🔔 Chegou o dia! Tá com fome de quê? A gente já sabe. 😋" com itens, loja, endereço, pagamento e "💰 Itens: R$ 69,98 + entrega (pode variar um pouquinho)" (depois do 1º pedido, "Da última vez"), e "*Podemos pedir aqui pra enviar na sua casa?*". Botões **Sim, pode pedir**, **Hoje não**, **Parar lembretes**.
 ![Recorrência agendada (captura de 18/10, modo de teste)](prints/A11.png)
-[PRINT A7]
+![Lembrete de compra recorrente (captura de 18/10 em modo de teste, catálogo simulado; endereço omitido)](prints/A7.png)
 
-**A8. Kit em grupo.** Kit numa loja só, com **👥 R$ X por pessoa (N pessoas)** e "Pode ser? Toque em *Quero esse kit* ou me diga o que mudar (ex.: _sem refri_, _mais barato_)". Botões **✅ Quero esse kit**, **🔄 Outra loja**, **❌ Não quero**.
-[PRINT A8]
+**A8. Kit em grupo.** "👥 Kit pra 8 pessoas · <loja>", itens com preço, entrega, total, **👥 R$ 42,98 por pessoa (8 pessoas)**, "✅ Dentro do seu limite de R$ 350,00" e "Pode ser? Toque em *Quero esse kit* ou me diga o que mudar (ex.: _sem refri_, _mais barato_)". Botões **✅ Quero esse kit**, **🔄 Outra loja**, **❌ Não quero**.
+![Kit em grupo com valor por pessoa (captura de 18/10 em modo de teste, catálogo simulado)](prints/A8.png)
 
 **A9. Ajuda e papo fora do assunto.** "Eu faço pedidos no iFood pra você. 🛒" com os 4 passos e "Nada é comprado sem você confirmar." Fora do assunto: "Eu só sei fazer pedidos no iFood 🙂".
 [PRINT A9]

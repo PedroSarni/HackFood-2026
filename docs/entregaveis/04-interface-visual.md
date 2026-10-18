@@ -53,20 +53,23 @@ Depois, uma mensagem por mudança de status, sempre dizendo qual pedido é (loja
 ![Pedido feito e acompanhamento (captura de 18/10 em modo de teste, catálogo simulado)](prints/A6.png)
 
 ### A7. Lembrete de compra recorrente
-> 🔔 Chegou o dia! …
-> 🧾 itens · 🏪 loja · 🏠 endereço · 💳 pagamento · 💰 Da última vez: R$ …
+> 🔔 Chegou o dia! Tá com fome de quê? A gente já sabe. 😋
+> 🧾 itens · 🏪 loja · 🏠 endereço · 💳 pagamento · 💰 Itens: R$ 69,98 + entrega (pode variar um pouquinho)
 > *Podemos pedir aqui pra enviar na sua casa?*
 
 Botões: **Sim, pode pedir**, **Hoje não**, **Parar lembretes**.
 ![Recorrência agendada (captura de 18/10, modo de teste)](prints/A11.png)
-[PRINT A7]
+![Lembrete de compra recorrente (captura de 18/10 em modo de teste, catálogo simulado; endereço omitido)](prints/A7.png)
 
 ### A8. Kit em grupo
-Kit numa loja só, com **👥 R$ X por pessoa (N pessoas)**.
+> 👥 Kit pra 8 pessoas · <loja>
+> Itens com preço · 🛵 Entrega: grátis · 💰 Total
+> 👥 R$ 42,98 por pessoa (8 pessoas)
+> ✅ Dentro do seu limite de R$ 350,00
 > Pode ser? Toque em *Quero esse kit* ou me diga o que mudar (ex.: _sem refri_, _mais barato_).
 
 Botões: **✅ Quero esse kit**, **🔄 Outra loja**, **❌ Não quero**.
-[PRINT A8]
+![Kit em grupo com valor por pessoa (captura de 18/10 em modo de teste, catálogo simulado)](prints/A8.png)
 
 ### A9. Ajuda e papo fora do assunto
 > Eu faço pedidos no iFood pra você. 🛒
