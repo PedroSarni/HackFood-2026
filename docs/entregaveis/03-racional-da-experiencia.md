@@ -27,7 +27,7 @@ Pedir do iFood deve parecer mandar mensagem para alguém de confiança. Cada dec
 **Complemento:** o que a pessoa diz manda e o botão é atalho. Se ela digita "mudar" ou o número da opção, funciona igual ao toque. Em qualquer etapa, uma pergunta ("quanto deu?", "cadê meu pedido?") é respondida e a conversa volta de onde estava.
 **O que o QA mostrou:** "Mudar" digitado no pagamento não funcionava, e não havia como voltar no pagamento e no CPF. Corrigimos os dois.
 
-## 4. Poucas opções por vez, com foto
+## 4. Opções com foto, em carrossel
 
 **Decisão:** mostrar as opções em um carrossel de cards com foto e botão "Quero esse", até 10 por vez no texto e 3 no modo áudio, mais um "Mais opções" que reaproveita a lista já buscada.
 **Por quê:** o carrossel deixa a pessoa percorrer as opções sem uma lista longa de texto, e a foto reduz o erro de escolha. A pessoa pode tocar ou dizer "o do meio", "a segunda".

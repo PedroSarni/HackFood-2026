@@ -409,3 +409,11 @@ junto). A11 entrou na seção A7, acima do marcador [PRINT A7], que ficou intact
 
 **Resposta:** Frases ajustadas no 02 (passo 6), 03 (decisão e justificativa, só com carrossel e foto), 04 (A4) e 06.
 Sobrou o título "Poucas opções por vez, com foto" no 03. Sem código.
+
+## 2026-10-18 12:15 — "poucas opções" fora dos títulos
+
+**Prompt:** "Duas correções de coerência com "carrossel de até 10 cards por vez (3 no modo áudio)" [...] 03, linha 30:
+"## 4. Opções com foto, em carrossel" [...] 01, linha 27: "opções em carrossel com foto, botões grandes e "Mais opções""
+[...] rode grep -rniE "poucas opç" e me liste o que sobrar."
+
+**Resposta:** Título da seção 4 do 03 e frase da linha 27 do 01 trocados. Grep sem sobras. Sem código.

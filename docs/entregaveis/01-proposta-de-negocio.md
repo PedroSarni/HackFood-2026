@@ -24,7 +24,7 @@ Leitura do time (argumento, não dado medido): a conversa é a interface que ess
 Pedir do iFood como quem manda uma mensagem a alguém de confiança.
 
 - **Fala do jeito que a pessoa quer:** texto, áudio ou foto (lista de papel, embalagem, foto de comida). O assistente entende e responde, por escrito ou por áudio quando a pessoa pede.
-- **Nunca deixa a pessoa perdida:** toda mensagem termina dizendo o que fazer; poucas opções por vez, com botões grandes e "Mais opções".
+- **Nunca deixa a pessoa perdida:** toda mensagem termina dizendo o que fazer; opções em carrossel com foto, botões grandes e "Mais opções".
 - **Repete a compra com 1 toque:** "toda semana às 18h". O assistente lembra, mostra itens, endereço e valor, e só fecha com o "sim" da pessoa.
 - **Ajuda a fechar o pedido:** quando falta pouco para o pedido mínimo, sugere o que combina; para grupos, monta um kit numa loja só e diz quanto fica para cada um.
 - **Segurança por desenho ("a IA entende, o código garante"):** o pedido só é fechado com a confirmação explícita da pessoa (um toque em "Confirmar pedido" ou um "sim" dela); o CPF nunca passa pela IA; a pessoa pode apagar seus dados.
