@@ -630,3 +630,15 @@ deve aceitar, porra"
   no "toque em Confirmar". Agora o "sim" seguinte e o "faz o pedido" falado fecham o pedido.
 - **Testes:** 474 numa cópia limpa do main com estas mudanças. Deploy logo depois deste commit.
 
+## 2026-10-18 ~06h20 — "o pagamento não passou" do nada, depois do "saiu pra entrega"
+
+**Prompt:** "[print do WhatsApp: pedido 7483 do Extra confirmado e saindo pra entrega; 'ta chegando?' respondido;
+1 min depois '❌ O pagamento não passou. Confira no app do iFood ou faça o pedido de novo.'] oxi caralho, o que é
+essa msg do nada de pagamento, nem to pedindo mais nada"
+
+**Resposta:** Veio do rastreio, e o status era do próprio pedido: o MCP real mandou PIX_CREATED (06:10, virou o
+genérico "seu pedido teve uma atualização"), CONFIRMED (06:11), DISPATCHED (06:14) e PAYMENT_DECLINED (06:18).
+O rastreio avisava qualquer código novo. Agora "registrado" e PIX_CREATED ficam calados (o pedido feito já explica
+o PIX), recusa de pagamento depois de a loja confirmar fica só no log (se o pedido cair, o CANCELLED avisa) e
+status que vai e volta avisa uma vez só. Recusa antes da confirmação continua avisando. 489 testes.
+

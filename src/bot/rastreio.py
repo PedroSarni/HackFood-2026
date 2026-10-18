@@ -19,6 +19,13 @@ MAX_INTERVALO = 300
 DURACAO_MAX = 90 * 60
 FINAIS = {'DELIVERED', 'CONCLUDED', 'CANCELLED', 'CANCELED'}
 PRIMEIRA_ESPERA = 10
+# 18/10, pedido 7483 (MCP real): PIX_CREATED, CONFIRMED, DISPATCHED e, 4 min depois, PAYMENT_DECLINED. O "o pagamento
+# não passou" depois do "saiu pra entrega" assustou do nada. "Registrado" e PIX a pessoa já soube no pedido feito;
+# recusa de pagamento depois que a loja confirmou fica só no log: se o pedido cair de verdade, o CANCELLED avisa.
+CALADOS = {'ORDER_CREATED', 'PIX_CREATED'}
+PAGAMENTO = {'PAYMENT_DECLINED'}
+LOJA_CONFIRMOU = {'CONFIRMED', 'PREPARING', 'DISPATCHED', 'ON_THE_WAY', 'ORDER_LATE',
+                  'DELIVERY_ARRIVED_AT_DESTINATION', 'DELIVERED', 'CONCLUDED'}
 
 
 def segundos_da_dica(dica, padrao=INTERVALO):
@@ -48,7 +55,7 @@ def _acompanhar(ctx, wa_id, pedido_id, dormir, relogio):
     # ("a loja confirmou") podia chegar antes dele
     dormir(PRIMEIRA_ESPERA)
     inicio = relogio()
-    ultimo = None
+    ultimo, vistos = None, set()
     falhas = 0
     while relogio() - inicio < DURACAO_MAX:
         try:
@@ -67,8 +74,11 @@ def _acompanhar(ctx, wa_id, pedido_id, dormir, relogio):
             continue
         codigo = st.get('codigo')
         if codigo and codigo != ultimo:
-            if codigo != 'ORDER_CREATED':  # "registrado" a pessoa já soube na confirmação
+            if codigo in PAGAMENTO and vistos & LOJA_CONFIRMOU:
+                print(f'rastreio {pedido_id}: {codigo} depois da loja confirmar, sem aviso')
+            elif codigo not in CALADOS and codigo not in vistos:  # o iFood vai e volta: cada status avisa 1 vez
                 voz.avisar(ctx, wa_id, T.status_pedido(codigo, st.get('descricao')))
+            vistos.add(codigo)
             ultimo = codigo
         # a doc manda decidir o fim pelo pollingStop (a lista de códigos terminais não é fechada)
         if st.get('parar') or codigo in FINAIS:

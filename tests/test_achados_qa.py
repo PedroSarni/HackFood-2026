@@ -1,11 +1,43 @@
 """Achados do QA da madrugada de 18/10: a quantidade dita fora da pergunta "quantas unidades?" (U20), o "até
-agora" que somava entrega e taxas sem avisar (M2) e o pedido que só fechava com toque, nunca por áudio."""
+agora" que somava entrega e taxas sem avisar (M2), o pedido que só fechava com toque, nunca por áudio, e o
+"o pagamento não passou" que o rastreio mandou depois do "saiu pra entrega"."""
 from src.bot import interpretar
 from src.bot import textos as T
-from tests.fakes import Mundo
+from src.bot.rastreio import acompanhar
+from tests.fakes import Mundo, WhatsAppFake
 from tests.test_fluxo import endereco_pronto, pedido_ate_o_resumo
 
 LEITE = {'termo': 'leite', 'busca': 'leite', 'quantidade': 10, 'tipo_loja': 'MERCADO'}
+
+
+def _rastreio(*codigos):
+    """O que o rastreio avisa pra uma sequência de status do iFood (o último encerra)."""
+    fila = iter(codigos)
+
+    class Api:
+        def rastrear(self, _pid):
+            c = next(fila)
+            return {'codigo': c, 'descricao': '', 'parar': c == codigos[-1], 'proxima': None}
+
+    class Ctx:
+        wpp = WhatsAppFake()
+
+        def ifood(self, _wa):
+            return Api()
+    ctx = Ctx()
+    acompanhar(ctx, 'wa', 'p1', dormir=lambda s: None)
+    return [d['texto'] for _, d in ctx.wpp.saida]
+
+
+def test_pagamento_recusado_depois_de_sair_pra_entrega_nao_assusta():
+    # a sequência real do pedido 7483, das 06:10 às 06:18
+    avisos = _rastreio('PIX_CREATED', 'CONFIRMED', 'DISPATCHED', 'PAYMENT_DECLINED', 'DISPATCHED', 'DELIVERED')
+    assert avisos == [T.STATUS['CONFIRMED'], T.STATUS['DISPATCHED'], T.STATUS['DELIVERED']]
+
+
+def test_pagamento_recusado_antes_da_loja_confirmar_avisa():
+    avisos = _rastreio('PIX_CREATED', 'PAYMENT_DECLINED', 'CANCELLED')
+    assert avisos == [T.STATUS['PAYMENT_DECLINED'], T.STATUS['CANCELLED']]
 
 
 def _lia_diz(m, intencao):
