@@ -118,3 +118,11 @@ Duas observações:
 **Resposta:** Preparei o ambiente Linux com `.venv`, instalei `requirements.txt` e executei `npm install`; `pip check` passou.
 Iniciei o servidor com `--sem-real` na porta 8787 e reutilizei o frontend já aberto na 5173. API sem erros e SSE validado pelo Vite, com 790 e depois 791 conversas.
 Demonstração disponível em http://127.0.0.1:5173/?fonte=demo; dados reais continuam dependendo do acesso ao Modal. Navegador indisponível para inspeção visual nesta sessão.
+
+## 2026-10-17 21:51 — relatório com indicadores do dashboard
+
+**Prompt:** Queri que você mude a forma como o relatório em pdf é estruturado, quero que ao invés de omstrar uma tabelas da conversa de todos os clientes, quero que vc apenas revele  dados relevantes retirados do proprio dashboard, como graficos, estatisicas relevantes, como de conversão, visão geral, follow ups, mercado financeiro e etc, quero que sejam os exatos mesmo dados do dashboard
+
+**Resposta:** Pedido repetido após interrupção; revisei o gerador PDF, seus testes e os cálculos das páginas do dashboard.
+Preparei o claim `dash-pdf-insights` para substituir conversas individuais por indicadores e gráficos agregados, reutilizando os cálculos e filtros da tela e identificando corretamente a fonte real ou demonstração.
+Implementação pendente da publicação obrigatória do claim (§1.2 de AGENTS.md); o envio ao GitHub será verificado antes de alterar código.
