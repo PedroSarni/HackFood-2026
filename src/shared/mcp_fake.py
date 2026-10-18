@@ -40,6 +40,7 @@ LOJAS = {
     'l1': ('Lanchonete do Bairro', 'RESTAURANT', {'min': 20, 'max': 35}, 3.99, 4.7, 0.8, 30.0),
     'r3': ('Esfiharia do Líbano', 'RESTAURANT', {'min': 25, 'max': 40}, 4.90, 4.6, 1.5, 20.0),
     'c1': ('Cafeteria Grão Bom', 'RESTAURANT', {'min': 15, 'max': 25}, 2.99, 4.8, 0.7, 15.0),
+    'l2': ('Burger House', 'RESTAURANT', {'min': 30, 'max': 45}, 5.90, 4.8, 2.4, 35.0),
 }
 
 # grupo: (nome, minSelections, maxSelections, [(opção, preço adicional)])
@@ -172,12 +173,24 @@ CATALOGO = [
     ('c1', 'Bolo de cenoura com chocolate', 'Fatia', 9.90, None, None),
     ('c1', 'Misto quente', 'Pão de forma, presunto e queijo', 13.90, None, None),
     ('c1', 'Suco natural de laranja', 'Copo 300 ml', 8.90, None, None),
+    # --- 17/10 22h30: kit pra dividir com os amigos (src/bot/grupo.py): refri de 2 litros e uma 2ª hamburgueria ---
+    ('l1', 'Coca-Cola 2 litros', 'Garrafa 2 litros', 14.90, 12.90, None),
+    ('l1', 'Guaraná Antarctica 2 litros', 'Garrafa 2 litros', 11.90, None, None),
+    ('l2', 'Smash Burger duplo', 'Pão brioche, 2 smash 80 g, cheddar e cebola caramelizada', 32.90, None, None),
+    ('l2', 'Cheeseburger clássico', 'Pão brioche, burger 150 g, queijo prato e picles', 28.90, 26.90, None),
+    ('l2', 'Burger vegetariano', 'Burger de grão-de-bico, alface, tomate e maionese verde', 27.90, None, None),
+    ('l2', 'Batata frita rústica', 'Porção 400 g com páprica', 19.90, None, None),
+    ('l2', 'Coca-Cola 2 litros', 'Garrafa 2 litros', 15.90, None, None),
+    ('l2', 'Refrigerante lata 350 ml', 'Coca-Cola, Guaraná ou Sprite', 6.90, None, None),
+    ('l2', 'Milkshake de chocolate', 'Copo 400 ml', 18.90, None, None),
 ]
 SINONIMOS = {'paozinho': ['pao frances'], 'carne': ['carne', 'picanha', 'contrafile', 'alcatra', 'acem'],
              'remedio': ['dipirona', 'paracetamol'], 'racao': ['racao'], 'almoco': ['marmita', 'sopa'],
              'refeicao': ['marmita'], 'frios': ['queijo', 'presunto', 'manteiga'],
-             'refri': ['refrigerante'], 'coca': ['refrigerante'], 'guarana': ['refrigerante'],
-             'lanche': ['x-', 'misto', 'cachorro'], 'sanduiche': ['x-', 'misto'], 'hamburguer': ['x-', 'burger'],
+             'refri': ['refrigerante', 'coca-cola', 'guarana'], 'coca': ['refrigerante', 'coca-cola'],
+             'guarana': ['refrigerante', 'guarana'], 'refrigerante': ['refrigerante', 'coca-cola', 'guarana'],
+             'lanche': ['x-', 'misto', 'cachorro', 'burger'], 'sanduiche': ['x-', 'misto'], 'hamburguer': ['x-', 'burger'],
+             'burguer': ['x-', 'burger'], 'hamburger': ['x-', 'burger'],
              'bolacha': ['biscoito'], 'sobremesa': ['pudim', 'bolo', 'chocolate'],
              'doce': ['doce', 'chocolate', 'pudim', 'bolo'], 'bebida': ['refrigerante', 'suco', 'agua mineral'],
              'margarita': ['margherita'], 'marguerita': ['margherita'], 'mussarela': ['mucarela'],

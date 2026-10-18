@@ -7,7 +7,7 @@ INCERTO e tem plano B no código.
 Formatos nossos (o fluxo depende só destes campos):
   endereço  {id, apelido, texto, lat, lng, bairro, ultimo, mais_usado}
   oferta    {item_id, loja_id, nome, descricao, preco, preco_antigo, imagem, loja, tempo, nota,
-             distancia, disponivel}
+             distancia, disponivel, taxa_entrega}
   item      {item_id, loja_id, nome, descricao, preco, grupos: [{id, nome, min, max, opcoes: [{id, nome, preco}]}]}
   carrinho  {id, loja_id, loja, itens: [{cart_item_id, item_id, nome, qtd, preco_total}], subtotal,
              taxa_entrega, desconto, total}
@@ -191,7 +191,9 @@ class Ifood:
                 'preco': preco, 'preco_antigo': cheio, 'imagem': _campo(r, 'itemImageUrl'),
                 'loja': _campo(loja, 'merchantName', padrao=''), 'tempo': _minutos(_campo(entrega, 'estimatedMinutes')),
                 'nota': _num(_campo(loja, 'reviewRating')), 'distancia': _num(_campo(loja, 'straightLineDistanceKm')),
-                'disponivel': _campo(loja, 'isOpen', padrao=True) is not False}
+                'disponivel': _campo(loja, 'isOpen', padrao=True) is not False,
+                # taxa da loja na busca: o kit em grupo (src/bot/grupo.py) já mostra o total com entrega
+                'taxa_entrega': _num(_campo(entrega, 'promotionalFee', 'fee'))}
 
     def buscar(self, termo, endereco, tipo_loja, loja_id=None, pagina=None):
         """searchOffers só com o termo descritivo; vertical no merchantType e o resto em

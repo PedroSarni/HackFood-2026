@@ -801,7 +801,8 @@ def test_lanche_ganha_sugestao_de_refri_e_o_que_fecha_o_minimo_vem_primeiro():
     m = Mundo()
     endereco_pronto(m)
     m.enviar('quero um x burger')
-    m.tocar('pick:')
+    xburger = next(c for c in m.wpp.cards() if c['texto'].startswith('*X-Burger*'))  # a Burger House também tem burger
+    m.enviar(('botao', xburger['botoes'][0][0]))
     m.tocar('qtd:1')
     m.tocar('fim')              # X-Burger R$ 22,90 e a lanchonete pede R$ 30: faltam R$ 7,10
     m.wpp.limpar()
